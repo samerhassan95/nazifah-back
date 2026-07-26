@@ -791,22 +791,11 @@ class OrderTrackingController extends Controller
 
                 foreach ($request->items as $item) {
                     $pieceId = (int) $item['piece_id'];
-                    $serviceId = (int) $item['service_id'];
-                    $lineKey = $pieceId.':'.$serviceId;
-                    $lineExistedOnOrder = isset($existingLineKeys[$lineKey]);
-
-                    $availabilityError = $this->catalogAvailabilityService->validateOrderLineForOrderUpdate(
-                        $storeBranchId,
-                        $pieceId,
-                        $serviceId,
-                        $item['additional_service_ids'] ?? [],
-                        $lang,
-                        $lineExistedOnOrder
-                    );
-                    if ($availabilityError !== null) {
+                    $mainServiceIds = OrderItemsNormalizer::mainServiceIds($item);
+                    if ($mainServiceIds === []) {
                         DB::rollBack();
 
-                        return errorResponse($availabilityError, 400);
+                        return errorResponse(trans('order.piece_not_found'), 400);
                     }
 
                     $piece = $pieces->firstWhere('id', $pieceId);
@@ -815,31 +804,59 @@ class OrderTrackingController extends Controller
 
                         return errorResponse(trans('order.piece_not_found'), 400);
                     }
-                    if (! $lineExistedOnOrder && ! in_array($pieceId, $branchPieceIds, true)) {
-                        $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang);
-                        DB::rollBack();
 
-                        return errorResponse(trans('order.piece_not_available_at_branch', ['piece_name' => $pieceName]), 400);
+                    $servicesRows = [];
+                    $servicesTotal = 0.0;
+
+                    foreach ($mainServiceIds as $serviceId) {
+                        $lineKey = $pieceId.':'.$serviceId;
+                        $lineExistedOnOrder = isset($existingLineKeys[$lineKey]);
+
+                        $availabilityError = $this->catalogAvailabilityService->validateOrderLineForOrderUpdate(
+                            $storeBranchId,
+                            $pieceId,
+                            $serviceId,
+                            $item['additional_service_ids'] ?? [],
+                            $lang,
+                            $lineExistedOnOrder
+                        );
+                        if ($availabilityError !== null) {
+                            DB::rollBack();
+
+                            return errorResponse($availabilityError, 400);
+                        }
+
+                        if (! $lineExistedOnOrder && ! in_array($pieceId, $branchPieceIds, true)) {
+                            $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang);
+                            DB::rollBack();
+
+                            return errorResponse(trans('order.piece_not_available_at_branch', ['piece_name' => $pieceName]), 400);
+                        }
+
+                        $service = $piece->services->firstWhere('id', $serviceId);
+                        if (! $service) {
+                            $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang);
+                            DB::rollBack();
+
+                            return errorResponse(__('order.service_not_available', ['piece_name' => $pieceName]), 400);
+                        }
+                        if (! $lineExistedOnOrder && ! in_array($serviceId, $branchServiceIds, true)) {
+                            $serviceName = \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang);
+                            DB::rollBack();
+
+                            return errorResponse(trans('order.service_not_available_at_branch', ['service_name' => $serviceName]), 400);
+                        }
+
+                        $servicePrice = (float) $service->getPriceForPieceAtBranch($piece->id, $storeBranchId);
+                        $servicesTotal += $servicePrice;
+                        $servicesRows[] = [
+                            'service_id' => $serviceId,
+                            'service_piece_price' => $servicePrice,
+                            'price' => $servicePrice,
+                        ];
                     }
 
-                    $service = $piece->services->firstWhere('id', $serviceId);
-                    if (! $service) {
-                        $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang);
-                        DB::rollBack();
-
-                        return errorResponse(__('order.service_not_available', ['piece_name' => $pieceName]), 400);
-                    }
-                    if (! $lineExistedOnOrder && ! in_array($serviceId, $branchServiceIds, true)) {
-                        $serviceName = \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang);
-                        DB::rollBack();
-
-                        return errorResponse(trans('order.service_not_available_at_branch', ['service_name' => $serviceName]), 400);
-                    }
-
-                    // New pricing model: piece_price = 0, service_price is the combined
-                    // piece+service price from service_piece (branch → vendor-level → global).
                     $piecePrice = 0.0;
-                    $servicePrice = $service->getPriceForPieceAtBranch($piece->id, $storeBranchId);
                     $additionalServicesTotal = 0;
                     $additionalServicesData = [];
 
@@ -868,8 +885,7 @@ class OrderTrackingController extends Controller
                         }
                     }
 
-                    // Formula: (service_piece_price + additional_services) × quantity
-                    $unitPrice = $piecePrice + $servicePrice + $additionalServicesTotal;
+                    $unitPrice = $piecePrice + $servicesTotal + $additionalServicesTotal;
                     $itemTotal = $unitPrice * $item['quantity'];
 
                     if (! $appliedDiscount) {
@@ -879,12 +895,14 @@ class OrderTrackingController extends Controller
                     $itemsData[] = [
                         'piece_id' => $item['piece_id'],
                         'piece_price' => $piecePrice,
-                        'service_id' => $item['service_id'],
-                        'service_price' => $servicePrice,
+                        'service_id' => $servicesRows[0]['service_id'],
+                        'service_price' => $servicesRows[0]['service_piece_price'],
+                        'services' => $servicesRows,
                         'quantity' => $item['quantity'],
                         'unit_price' => $unitPrice,
                         'total_price' => $itemTotal,
                         'additional_services' => $additionalServicesData,
+                        'additional_services_total' => (float) $additionalServicesTotal,
                         'note' => $item['note'] ?? null,
                     ];
                 }

@@ -56,7 +56,7 @@ Each order line allowed only one `service_id`. Catalog already supports multiple
 ### Fix
 Client may send either:
 - `service_id` (single – unchanged), or
-- `service_ids` (array – expanded server-side into one line per main service)
+- `service_ids` (array – **one cart piece line** with multiple main services in `services[]`)
 
 ### Affected endpoints
 
@@ -90,11 +90,10 @@ Client may send either:
 }
 ```
 
-Server expands this to two order lines:
-- piece `1` + service `10`
-- piece `1` + service `20`
+Server returns **one** summary item for that piece with `services: [10, 20]` and combined `unit_price`.
+DB stores linked rows under the same `line_group` (additions once).
 
-Sending two separate items with the same `piece_id` and different `service_id` values also works.
+Sending two separate items with the same `piece_id` and different `service_id` values also works (two piece lines).
 
 ### How to verify
 1. Create a new order.

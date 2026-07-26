@@ -21,6 +21,7 @@ class OrderItem extends Model
         'order_id',
         'piece_id',
         'service_id',
+        'line_group',
         'piece_price',
         'service_price',
         'quantity',

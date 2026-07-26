@@ -5,8 +5,8 @@ namespace Modules\Order\Support;
 /**
  * Normalizes client order-item payloads before validation / pricing.
  *
- * Supports nested show-shape fields and expanding multiple main services
- * (service_ids) into one line per service — matching order_items.service_id.
+ * Multiple main services on one piece stay on ONE cart line via service_ids[].
+ * service_id is set to the first id for backward-compatible validation.
  */
 class OrderItemsNormalizer
 {
@@ -23,14 +23,51 @@ class OrderItemsNormalizer
                 continue;
             }
 
-            $item = self::flattenNestedIds($item);
-
-            foreach (self::expandMainServices($item) as $expanded) {
-                $normalized[] = $expanded;
-            }
+            $normalized[] = self::normalizeOne($item);
         }
 
         return array_values($normalized);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    public static function normalizeOne(array $item): array
+    {
+        $item = self::flattenNestedIds($item);
+
+        $serviceIds = self::mainServiceIds($item);
+        if ($serviceIds !== []) {
+            $item['service_ids'] = $serviceIds;
+            $item['service_id'] = $serviceIds[0];
+        }
+
+        return $item;
+    }
+
+    /**
+     * Unique main service ids for a cart line (service_ids or singular service_id).
+     *
+     * @param  array<string, mixed>  $item
+     * @return list<int>
+     */
+    public static function mainServiceIds(array $item): array
+    {
+        if (! empty($item['service_ids']) && is_array($item['service_ids'])) {
+            return collect($item['service_ids'])
+                ->filter(fn ($id) => $id !== null && $id !== '')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        if (! empty($item['service_id'])) {
+            return [(int) $item['service_id']];
+        }
+
+        return [];
     }
 
     /**
@@ -47,6 +84,25 @@ class OrderItemsNormalizer
             $item['service_id'] = $item['service']['id'];
         }
 
+        if (
+            empty($item['service_ids'])
+            && ! empty($item['services'])
+            && is_array($item['services'])
+        ) {
+            $item['service_ids'] = collect($item['services'])
+                ->map(function ($service) {
+                    if (is_array($service)) {
+                        return $service['id'] ?? $service['service_id'] ?? null;
+                    }
+
+                    return $service;
+                })
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
         if (! isset($item['additional_service_ids']) && ! empty($item['additional_services']) && is_array($item['additional_services'])) {
             $item['additional_service_ids'] = collect($item['additional_services'])
                 ->pluck('id')
@@ -57,45 +113,5 @@ class OrderItemsNormalizer
         }
 
         return $item;
-    }
-
-    /**
-     * Expand service_ids[] into one item per main service.
-     * Keeps singular service_id payloads unchanged.
-     *
-     * @param  array<string, mixed>  $item
-     * @return list<array<string, mixed>>
-     */
-    private static function expandMainServices(array $item): array
-    {
-        $serviceIds = [];
-
-        if (! empty($item['service_ids']) && is_array($item['service_ids'])) {
-            $serviceIds = collect($item['service_ids'])
-                ->filter(fn ($id) => $id !== null && $id !== '')
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values()
-                ->all();
-        }
-
-        if ($serviceIds === [] && ! empty($item['service_id'])) {
-            return [$item];
-        }
-
-        if ($serviceIds === []) {
-            // Leave invalid payloads for the validator (missing service_id).
-            return [$item];
-        }
-
-        $expanded = [];
-        foreach ($serviceIds as $serviceId) {
-            $line = $item;
-            $line['service_id'] = $serviceId;
-            unset($line['service_ids']);
-            $expanded[] = $line;
-        }
-
-        return $expanded;
     }
 }

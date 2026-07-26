@@ -1142,34 +1142,59 @@ class OrderPaymentService
         }
         $order->items()->delete();
 
-        // Match store / PendingOrderService: one DB row per unit (quantity = 1).
-        // Bundled quantity rows inflate invoice totals after edit when show/edit
-        // UIs treat each row as a unit or when addition pivot qty is re-multiplied.
+        // Match store: one DB row per unit, and one row per main service when
+        // a cart line has multiple services (linked by line_group).
         foreach ($itemsData as $itemData) {
             $quantityToCreate = max(1, (int) ($itemData['quantity'] ?? 1));
-            $unitPrice = (float) $itemData['unit_price'];
+            $serviceRows = $itemData['services'] ?? [[
+                'service_id' => $itemData['service_id'],
+                'service_piece_price' => $itemData['service_price'] ?? $itemData['service_piece_price'] ?? 0,
+            ]];
+            // Normalize keys used by updateOrder vs store.
+            $serviceRows = array_map(function (array $row): array {
+                return [
+                    'service_id' => (int) ($row['service_id'] ?? $row['id'] ?? 0),
+                    'service_piece_price' => (float) ($row['service_piece_price'] ?? $row['price'] ?? $row['service_price'] ?? 0),
+                ];
+            }, $serviceRows);
+
+            $additionalServicesTotal = (float) ($itemData['additional_services_total'] ?? 0);
+            if ($additionalServicesTotal <= 0 && ! empty($itemData['additional_services'])) {
+                $additionalServicesTotal = (float) array_sum(array_column($itemData['additional_services'], 'price'));
+            }
 
             for ($i = 0; $i < $quantityToCreate; $i++) {
-                $orderItem = OrderItem::create([
-                    'order_id' => $order->id,
-                    'piece_id' => $itemData['piece_id'],
-                    'service_id' => $itemData['service_id'],
-                    'piece_price' => $itemData['piece_price'],
-                    'service_price' => $itemData['service_price'],
-                    'quantity' => 1,
-                    'unit_price' => $unitPrice,
-                    'total_price' => $unitPrice,
-                    'notes' => $itemData['note'] ?? null,
-                ]);
+                $lineGroup = count($serviceRows) > 1 ? (string) \Illuminate\Support\Str::uuid() : null;
 
-                if (! empty($itemData['additional_services'])) {
-                    foreach ($itemData['additional_services'] as $additionalService) {
-                        \Modules\Order\Models\OrderItemAdditionalService::create([
-                            'order_item_id' => $orderItem->id,
-                            'service_addition_id' => $additionalService['id'],
-                            'price' => $additionalService['price'],
-                            'quantity' => 1,
-                        ]);
+                foreach ($serviceRows as $serviceIndex => $serviceRow) {
+                    $isPrimary = $serviceIndex === 0;
+                    $servicePrice = (float) $serviceRow['service_piece_price'];
+                    $rowUnitPrice = $isPrimary
+                        ? ($servicePrice + $additionalServicesTotal)
+                        : $servicePrice;
+
+                    $orderItem = OrderItem::create([
+                        'order_id' => $order->id,
+                        'piece_id' => $itemData['piece_id'],
+                        'service_id' => $serviceRow['service_id'],
+                        'line_group' => $lineGroup,
+                        'piece_price' => $itemData['piece_price'] ?? 0,
+                        'service_price' => $servicePrice,
+                        'quantity' => 1,
+                        'unit_price' => $rowUnitPrice,
+                        'total_price' => $rowUnitPrice,
+                        'notes' => $itemData['note'] ?? null,
+                    ]);
+
+                    if ($isPrimary && ! empty($itemData['additional_services'])) {
+                        foreach ($itemData['additional_services'] as $additionalService) {
+                            \Modules\Order\Models\OrderItemAdditionalService::create([
+                                'order_item_id' => $orderItem->id,
+                                'service_addition_id' => $additionalService['id'],
+                                'price' => $additionalService['price'],
+                                'quantity' => 1,
+                            ]);
+                        }
                     }
                 }
             }

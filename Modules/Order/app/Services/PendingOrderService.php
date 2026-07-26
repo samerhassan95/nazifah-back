@@ -29,29 +29,45 @@ class PendingOrderService
 
         foreach ($itemsData as $itemData) {
             $quantityToCreate = (int) $itemData['quantity'];
+            $serviceRows = $itemData['services'] ?? [[
+                'service_id' => $itemData['service_id'],
+                'service_piece_price' => $itemData['service_piece_price'],
+            ]];
+            $additionalServicesTotal = (float) ($itemData['additional_services_total'] ?? 0);
 
             for ($i = 0; $i < $quantityToCreate; $i++) {
-                $orderItem = OrderItem::create([
-                    'order_id' => $order->id,
-                    'piece_id' => $itemData['piece_id'],
-                    'service_id' => $itemData['service_id'],
-                    'piece_price' => 0,
-                    'service_price' => $itemData['service_piece_price'],
-                    'quantity' => 1,
-                    'unit_price' => $itemData['unit_price'],
-                    'total_price' => $itemData['unit_price'],
-                    'notes' => $itemData['note'] ?? null,
-                    'images' => $itemData['uploaded_image'] ?? null,
-                ]);
+                $lineGroup = count($serviceRows) > 1 ? (string) \Illuminate\Support\Str::uuid() : null;
 
-                if (! empty($itemData['additional_services'])) {
-                    foreach ($itemData['additional_services'] as $additionalService) {
-                        OrderItemAdditionalService::create([
-                            'order_item_id' => $orderItem->id,
-                            'service_addition_id' => $additionalService['id'],
-                            'price' => $additionalService['price'],
-                            'quantity' => 1,
-                        ]);
+                foreach ($serviceRows as $serviceIndex => $serviceRow) {
+                    $isPrimary = $serviceIndex === 0;
+                    $servicePrice = (float) $serviceRow['service_piece_price'];
+                    $rowUnitPrice = $isPrimary
+                        ? ($servicePrice + $additionalServicesTotal)
+                        : $servicePrice;
+
+                    $orderItem = OrderItem::create([
+                        'order_id' => $order->id,
+                        'piece_id' => $itemData['piece_id'],
+                        'service_id' => $serviceRow['service_id'],
+                        'line_group' => $lineGroup,
+                        'piece_price' => 0,
+                        'service_price' => $servicePrice,
+                        'quantity' => 1,
+                        'unit_price' => $rowUnitPrice,
+                        'total_price' => $rowUnitPrice,
+                        'notes' => $itemData['note'] ?? null,
+                        'images' => $itemData['uploaded_image'] ?? null,
+                    ]);
+
+                    if ($isPrimary && ! empty($itemData['additional_services'])) {
+                        foreach ($itemData['additional_services'] as $additionalService) {
+                            OrderItemAdditionalService::create([
+                                'order_item_id' => $orderItem->id,
+                                'service_addition_id' => $additionalService['id'],
+                                'price' => $additionalService['price'],
+                                'quantity' => 1,
+                            ]);
+                        }
                     }
                 }
             }

@@ -7,6 +7,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Address\Models\Address;
 use Modules\Discount\Interfaces\DiscountRepositoryInterface;
 use Modules\Discount\Models\Discount;
+use Modules\Order\Support\OrderItemsNormalizer;
 use Modules\Piece\Models\Piece;
 use Modules\Service\Models\ServiceAddition;
 
@@ -245,45 +246,67 @@ class DiscountService
             /** @var \Modules\Piece\Models\Piece $piece */
             $piece = $pieces->firstWhere('id', $pieceId);
 
-            if ($branchId !== null) {
-                $availabilityError = $this->catalogAvailabilityService->validateOrderLineForNewOrder(
-                    $branchId,
-                    (int) $pieceId,
-                    (int) $item['service_id'],
-                    $item['additional_service_ids'] ?? [],
-                    $lang
-                );
-                if ($availabilityError !== null) {
-                    return [
-                        'success' => false,
-                        'message' => $availabilityError,
-                        'code' => 400,
-                    ];
-                }
-            }
-
-            $service = $piece->services->firstWhere('id', $item['service_id']);
-
-            if (! $service) {
-                $pieceName = method_exists($piece, 'getTranslation')
-                    ? $piece->getTranslation('name', $lang)
-                    : $piece->name;
-                $serviceMsg = $lang === 'ar'
-                    ? 'الخدمة غير متاحة للعنصر: '.$pieceName
-                    : 'Service not available for item: '.$pieceName;
-
+            $mainServiceIds = OrderItemsNormalizer::mainServiceIds(
+                OrderItemsNormalizer::normalizeOne(is_array($item) ? $item : [])
+            );
+            if ($mainServiceIds === []) {
                 return [
                     'success' => false,
-                    'message' => $serviceMsg,
+                    'message' => $msg['items_unavailable'][$lang],
                     'code' => 400,
                 ];
             }
 
+            $servicesTotal = 0.0;
+            $primaryServiceId = $mainServiceIds[0];
+            foreach ($mainServiceIds as $mainServiceId) {
+                if ($branchId !== null) {
+                    $availabilityError = $this->catalogAvailabilityService->validateOrderLineForNewOrder(
+                        $branchId,
+                        (int) $pieceId,
+                        (int) $mainServiceId,
+                        $item['additional_service_ids'] ?? [],
+                        $lang
+                    );
+                    if ($availabilityError !== null) {
+                        return [
+                            'success' => false,
+                            'message' => $availabilityError,
+                            'code' => 400,
+                        ];
+                    }
+                }
+
+                $service = $piece->services->firstWhere('id', $mainServiceId);
+                if (! $service) {
+                    $pieceName = method_exists($piece, 'getTranslation')
+                        ? $piece->getTranslation('name', $lang)
+                        : $piece->name;
+                    $serviceMsg = $lang === 'ar'
+                        ? 'الخدمة غير متاحة للعنصر: '.$pieceName
+                        : 'Service not available for item: '.$pieceName;
+
+                    return [
+                        'success' => false,
+                        'message' => $serviceMsg,
+                        'code' => 400,
+                    ];
+                }
+
+                if ($branchId !== null) {
+                    $servicesTotal += (float) $service->getPriceForPieceAtBranch($piece->id, $branchId);
+                } else {
+                    $servicesTotal += (float) ($service->pivot->price ?? 0);
+                }
+            }
+
+            $service = $piece->services->firstWhere('id', $primaryServiceId);
+
             $additionalServicesDetail = [];
             if ($branchId !== null) {
-                // New pricing model: piece_price = 0, service_price is combined piece+service.
+                // New pricing model: piece_price = 0, service prices summed for all main services.
                 $piecePrice = 0.0;
-                $servicePrice = $service->getPriceForPieceAtBranch($piece->id, $branchId);
+                $servicePrice = $servicesTotal;
                 $additionalTotal = 0;
                 if (! empty($item['additional_service_ids'])) {
                     foreach (array_unique($item['additional_service_ids']) as $additionalServiceId) {
@@ -312,7 +335,7 @@ class DiscountService
                 $unitPrice = $piecePrice + $servicePrice + $additionalTotal;
             } else {
                 $piecePrice = 0;
-                $servicePrice = (float) ($service->pivot->price ?? 0);
+                $servicePrice = $servicesTotal;
                 $additionalTotal = 0;
                 $unitPrice = $servicePrice;
                 if (! empty($item['additional_service_ids'])) {
@@ -350,7 +373,8 @@ class DiscountService
                 'piece_name' => method_exists($piece, 'getTranslation')
                     ? $piece->getTranslation('name', $lang) : $piece->name,
                 'piece_price' => (float) $piecePrice,
-                'service_id' => (int) $item['service_id'],
+                'service_id' => (int) $primaryServiceId,
+                'service_ids' => $mainServiceIds,
                 'service_price' => (float) $servicePrice,
                 'additional_services' => $additionalServicesDetail,
                 'unit_price' => (float) $unitPrice,
