@@ -22,6 +22,7 @@ use Modules\Order\Exceptions\InsufficientWalletBalanceException;
 use Modules\Order\Models\Order;
 use Modules\Order\Models\OrderStatusLog;
 use Modules\Order\Services\OrderPaymentService;
+use Modules\Order\Support\OrderItemGrouper;
 use Modules\Order\Support\OrderItemsNormalizer;
 use Modules\Payment\Models\PaymentTransaction;
 use Modules\Payment\Services\PaymentService;
@@ -195,70 +196,13 @@ class OrderTrackingController extends Controller
             $activeDriver = $order->driver;
         }
 
-        $mappedItems = $order->items->map(function ($item) use ($lang, $order) {
-            $branchId = (int) ($order->branch_id ?? 0);
-            $quantity = (int) $item->quantity;
-            $itemStatus = $item->vendor_status ?? 'pending';
-
-            $additionalServices = [];
-            if ($item->relationLoaded('additionalServicesPivot')) {
-                $additionalServices = $item->additionalServicesPivot->map(function ($pivot) use ($lang, $branchId) {
-                    if (! $pivot->serviceAddition) {
-                        return null;
-                    }
-                    $serviceAddition = $pivot->serviceAddition;
-                    $additionPrice = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
-                    $qty = (int) ($pivot->quantity ?? 1);
-
-                    return [
-                        'id' => $serviceAddition->id,
-                        'name' => \App\Support\OrderItemDisplayNames::additionalServiceName($serviceAddition, $branchId, $lang),
-                        'price' => $additionPrice,
-                        'quantity' => $qty,
-                        'total' => $additionPrice * $qty,
-                        'icon' => \App\Support\OrderItemDisplayNames::additionalServiceIconUrl($serviceAddition, $branchId),
-                        'vendor_status' => $pivot->vendor_status,
-                        'vendor_notes' => $pivot->vendor_notes,
-                    ];
-                })->filter()->values();
-            }
-
-            $acceptedAdditionsTotal = (float) collect($additionalServices)
-                ->filter(fn ($a) => ($a['vendor_status'] ?? 'accepted') !== 'rejected')
-                ->sum(fn ($a) => (float) ($a['total'] ?? 0));
-
-            if ($itemStatus === 'rejected') {
-                $unitPrice = 0.0;
-                $totalPrice = 0.0;
-            } else {
-                $basePerUnit = (float) $item->piece_price + (float) $item->service_price;
-                $totalPrice = round(($basePerUnit * $quantity) + $acceptedAdditionsTotal, 2);
-                $unitPrice = $quantity > 0 ? round($totalPrice / $quantity, 2) : 0.0;
-            }
-
-            return [
-                'id' => $item->id,
-                'piece' => $item->piece ? [
-                    'id' => $item->piece->id,
-                    'name' => \App\Support\OrderItemDisplayNames::pieceName($item->piece, $branchId, $lang),
-                    'icon' => \App\Support\OrderItemDisplayNames::pieceIconUrl($item->piece),
-                ] : null,
-                'service' => $item->service ? [
-                    'id' => $item->service->id,
-                    'name' => \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang),
-                    'icon' => \App\Support\OrderItemDisplayNames::serviceIconUrl($item->service, $branchId),
-                    'price' => (float) $item->service_price,
-                ] : null,
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'total_price' => $totalPrice,
-                'additional_services_total' => round($acceptedAdditionsTotal, 2),
-                'status' => $itemStatus,
-                'additional_services' => $additionalServices,
-                'note' => $item->notes,
-                'image' => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null,
-            ];
-        })->values();
+        $branchId = (int) ($order->branch_id ?? 0);
+        $mappedItems = collect(OrderItemGrouper::toApiLines(
+            $order->items,
+            $branchId,
+            $lang,
+            fn ($item) => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null
+        ))->values();
 
         return successResponse(array_merge([
             'order_id' => $order->id,

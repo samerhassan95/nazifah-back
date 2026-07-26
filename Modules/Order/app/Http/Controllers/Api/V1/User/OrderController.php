@@ -28,6 +28,7 @@ use Modules\Order\Models\OrderItemAdditionalService;
 use Modules\Order\Models\OrderStatusLog;
 use Modules\Order\Models\PendingOrder;
 use Modules\Order\Services\OrderPaymentService;
+use Modules\Order\Support\OrderItemGrouper;
 use Modules\Order\Support\OrderItemsNormalizer;
 use Modules\Payment\DTOs\PaymentRequest;
 use Modules\Payment\Models\PaymentTransaction;
@@ -1730,67 +1731,14 @@ class OrderController extends Controller
             }
         }
 
-        // Build items: unit/total always include accepted service-addition prices
-        $mappedItems = $order->items->map(function ($item) use ($lang, $order) {
-            $branchId = (int) ($order->branch_id ?? 0);
-            $quantity = (int) $item->quantity;
-            $itemStatus = $item->vendor_status ?? null;
-
-            $additionalServices = $item->additionalServicesPivot->map(function ($pivot) use ($lang, $branchId) {
-                $addition = $pivot->serviceAddition;
-                $additionPrice = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
-                $qty = (int) ($pivot->quantity ?? 1);
-
-                return [
-                    'id' => $addition->id ?? null,
-                    'name' => $addition
-                        ? \App\Support\OrderItemDisplayNames::additionalServiceName($addition, $branchId, $lang)
-                        : null,
-                    'price' => $additionPrice,
-                    'quantity' => $qty,
-                    'total_price' => $additionPrice * $qty,
-                    'icon' => \App\Support\OrderItemDisplayNames::additionalServiceIconUrl($addition, $branchId),
-                    'status' => $pivot->vendor_status ?? 'pending',
-                    'notes' => $pivot->vendor_notes,
-                ];
-            });
-
-            $acceptedAdditionsTotal = (float) $additionalServices
-                ->filter(fn ($a) => ($a['status'] ?? 'accepted') !== 'rejected')
-                ->sum('total_price');
-
-            if ($itemStatus === 'rejected') {
-                $unitPrice = 0.0;
-                $totalPrice = 0.0;
-            } else {
-                $basePerUnit = (float) $item->piece_price + (float) $item->service_price;
-                $totalPrice = round(($basePerUnit * $quantity) + $acceptedAdditionsTotal, 2);
-                $unitPrice = $quantity > 0 ? round($totalPrice / $quantity, 2) : 0.0;
-            }
-
-            return [
-                'id' => $item->id,
-                'piece' => $item->piece ? [
-                    'id' => $item->piece->id,
-                    'name' => \App\Support\OrderItemDisplayNames::pieceName($item->piece, $branchId, $lang),
-                    'icon' => \App\Support\OrderItemDisplayNames::pieceIconUrl($item->piece),
-                ] : null,
-                'service' => $item->service ? [
-                    'id' => $item->service->id,
-                    'name' => \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang),
-                    'icon' => \App\Support\OrderItemDisplayNames::serviceIconUrl($item->service, $branchId),
-                    'price' => (float) $item->service_price,
-                ] : null,
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'total_price' => $totalPrice,
-                'additional_services_total' => round($acceptedAdditionsTotal, 2),
-                'status' => $itemStatus,
-                'note' => $item->notes,
-                'image' => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null,
-                'additional_services' => $additionalServices,
-            ];
-        })->values();
+        // Build items: group multi-service piece lines; totals include accepted additions
+        $branchId = (int) ($order->branch_id ?? 0);
+        $mappedItems = collect(OrderItemGrouper::toApiLines(
+            $order->items,
+            $branchId,
+            $lang,
+            fn ($item) => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null
+        ))->values();
 
         // Use stored order totals so list, show, and store response stay consistent
         $subtotal = (float) $order->total_amount;
