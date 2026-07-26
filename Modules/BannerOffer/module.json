@@ -1,0 +1,11 @@
+{
+    "name": "BannerOffer",
+    "alias": "banneroffer",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\BannerOffer\\Providers\\BannerOfferServiceProvider"
+    ],
+    "files": []
+}

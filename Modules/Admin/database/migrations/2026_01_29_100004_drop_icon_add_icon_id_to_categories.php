@@ -1,0 +1,42 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('categories', function (Blueprint $table) {
+            // Drop old icon column if exists
+            if (Schema::hasColumn('categories', 'icon')) {
+                $table->dropColumn('icon');
+            }
+        });
+
+        Schema::table('categories', function (Blueprint $table) {
+            // Add new icon_id foreign key
+            if (! Schema::hasColumn('categories', 'icon_id')) {
+                $table->foreignId('icon_id')->nullable()->constrained('icons')->onDelete('set null');
+            }
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('categories', function (Blueprint $table) {
+            if (Schema::hasColumn('categories', 'icon_id')) {
+                $table->dropForeign(['icon_id']);
+                $table->dropColumn('icon_id');
+            }
+        });
+
+        Schema::table('categories', function (Blueprint $table) {
+            // Restore old icon column
+            if (! Schema::hasColumn('categories', 'icon')) {
+                $table->string('icon')->nullable();
+            }
+        });
+    }
+};

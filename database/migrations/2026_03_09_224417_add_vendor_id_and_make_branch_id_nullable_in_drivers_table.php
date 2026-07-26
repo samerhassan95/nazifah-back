@@ -1,0 +1,34 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('drivers', function (Blueprint $table) {
+            if (! Schema::hasColumn('drivers', 'vendor_id')) {
+                $table->foreignId('vendor_id')->after('id')->default(1)->constrained('vendors')->onDelete('cascade');
+            } else {
+                $table->foreignId('vendor_id')->change()->nullable(false);
+            }
+
+            if (Schema::hasColumn('drivers', 'branch_id')) {
+                $table->foreignId('branch_id')->nullable()->change();
+            }
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('drivers', function (Blueprint $table) {
+            $table->dropForeign(['vendor_id']);
+            $table->dropColumn('vendor_id');
+        });
+    }
+};

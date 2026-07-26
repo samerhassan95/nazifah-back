@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/banneroffer",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\BannerOffer\\": "app/",
+            "Modules\\BannerOffer\\Database\\Factories\\": "database/factories/",
+            "Modules\\BannerOffer\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\BannerOffer\\Tests\\": "tests/"
+        }
+    }
+}

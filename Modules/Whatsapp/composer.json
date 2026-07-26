@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/whatsapp",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Whatsapp\\": "app/",
+            "Modules\\Whatsapp\\Database\\Factories\\": "database/factories/",
+            "Modules\\Whatsapp\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Whatsapp\\Tests\\": "tests/"
+        }
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "name": "Zone",
+    "alias": "zone",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Zone\\Providers\\ZoneServiceProvider"
+    ],
+    "files": []
+}
