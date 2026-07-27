@@ -158,9 +158,14 @@ class DiscountService
         // Calculate discount amount
         $discountAmount = $this->calculateDiscountAmount($discount, $orderAmount);
 
+        $successMessage = match ($discount->discount_type) {
+            Discount::DISCOUNT_TYPE_DELIVERY_FREE => $lang === 'ar' ? 'تم تطبيق إعفاء رسوم التوصيل بنجاح' : 'Free delivery applied successfully',
+            default => $lang === 'ar' ? 'تم تطبيق الخصم بنجاح' : 'Discount applied successfully',
+        };
+
         return [
             'success' => true,
-            'message' => $msg['coupon_valid'][$lang],
+            'message' => $successMessage,
             'code' => 200,
             'data' => [
                 'discount' => $discount,

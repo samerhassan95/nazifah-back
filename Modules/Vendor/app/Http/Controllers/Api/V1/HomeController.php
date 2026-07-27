@@ -402,27 +402,48 @@ class HomeController extends Controller
 
                 $branchLocation = $order->branch?->getApiLocation($locale);
 
-                $items = $order->items->map(function ($item) use ($order, $locale, $branchId) {
-                    $itemPieceName = 'Item';
-                    if ($item->piece) {
-                        $itemPieceName = \App\Support\OrderItemDisplayNames::pieceName($item->piece, $branchId, $locale) ?: 'Item';
+                $items = collect(\Modules\Order\Support\OrderItemGrouper::toApiLines(
+                    $order->items,
+                    $branchId,
+                    $locale,
+                    fn ($item) => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null
+                ))->map(function (array $g) use ($order, $branchId, $locale) {
+                    $primaryItem = $order->items->firstWhere('id', $g['id']);
+
+                    // Collect service additions from all grouped items
+                    $serviceAdditions = [];
+                    foreach ($g['ids'] ?? [$g['id']] as $itemId) {
+                        $itemModel = $order->items->firstWhere('id', $itemId);
+                        if ($itemModel) {
+                            $serviceAdditions = array_merge($serviceAdditions, $this->formatOrderItemServiceAdditions($itemModel, $order));
+                        }
+                    }
+
+                    // Build services with CatalogActivePresenter
+                    $servicesData = [];
+                    foreach ($g['services'] ?? [] as $svc) {
+                        $svcEntry = [
+                            'id' => $svc['id'],
+                            'name' => $svc['name'] ?? '',
+                        ];
+                        $serviceModel = $primaryItem?->piece?->services->firstWhere('id', $svc['id']);
+                        if ($serviceModel) {
+                            $svcEntry = array_merge($svcEntry, \App\Support\CatalogActivePresenter::service($serviceModel, $branchId));
+                        }
+                        $servicesData[] = $svcEntry;
                     }
 
                     return [
-                        'item_id' => $item->id,
-                        'piece_id' => $item->piece_id,
-                        'item_name' => $itemPieceName,
-                        'quantity' => $item->quantity,
-                        'unit_price' => (float) $item->unit_price,
-                        'total_price' => (float) $item->total_price,
-                        'status' => $item->vendor_status ?? 'pending',
-                        'service' => $item->service
-                            ? array_merge([
-                                'id' => $item->service->id,
-                                'name' => \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $locale),
-                            ], \App\Support\CatalogActivePresenter::service($item->service, $branchId))
-                            : null,
-                        'service_additions' => $this->formatOrderItemServiceAdditions($item, $order),
+                        'item_id' => $g['id'],
+                        'piece_id' => $primaryItem->piece_id ?? null,
+                        'item_name' => $g['piece']['name'] ?? 'Item',
+                        'quantity' => $g['quantity'],
+                        'unit_price' => (float) $g['unit_price'],
+                        'total_price' => (float) $g['total_price'],
+                        'status' => $g['status'] ?? 'pending',
+                        'service' => $servicesData[0] ?? null,
+                        'services' => $servicesData,
+                        'service_additions' => $serviceAdditions,
                     ];
                 })->values();
 
@@ -491,18 +512,24 @@ class HomeController extends Controller
 
         $uploadService = $this->uploadFilesService;
 
-        // Build items
-        $items = $order->items->map(function ($item) use ($uploadService, $order) {
-            $locale = app()->getLocale();
-            $branchId = (int) ($order->branch_id ?? 0);
-            $pieceName = 'Item';
-            if ($item->piece) {
-                $pieceName = \App\Support\OrderItemDisplayNames::pieceName($item->piece, $branchId, $locale) ?: 'Item';
-            }
+        // Build items — group multi-service piece lines (same logic as user tracking)
+        $locale = app()->getLocale();
+        $branchId = (int) ($order->branch_id ?? 0);
+
+        $items = collect(\Modules\Order\Support\OrderItemGrouper::toApiLines(
+            $order->items,
+            $branchId,
+            $locale,
+            fn ($item) => $item->images ? $uploadService->getFullUrl($item->images) : null
+        ))->map(function (array $grouped) use ($order, $branchId, $locale) {
+            $primaryItemId = $grouped['id'];
+            $primaryItem = $order->items->firstWhere('id', $primaryItemId);
+
+            $pieceName = $grouped['piece']['name'] ?? 'Item';
 
             $modifiers = [];
-            if ($item->notes) {
-                $notes = json_decode($item->notes, true);
+            if ($primaryItem && $primaryItem->notes) {
+                $notes = json_decode($primaryItem->notes, true);
                 if (is_array($notes)) {
                     foreach ($notes as $modifier) {
                         $modifiers[] = [
@@ -514,64 +541,60 @@ class HomeController extends Controller
                 }
             }
 
-            // Get service additions with branch-specific pricing
-            $serviceAdditions = $this->formatOrderItemServiceAdditions($item, $order);
-
-            // Get service data
-            $serviceData = null;
-            if ($item->service) {
-                $serviceData = array_merge([
-                    'id' => $item->service->id,
-                    'name' => \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $locale),
-                    'price' => (float) $item->service_price,
-                    'icon' => \App\Support\OrderItemDisplayNames::serviceIconUrl($item->service, $branchId),
-                ], \App\Support\CatalogActivePresenter::service($item->service, $branchId));
+            // Collect service additions from all grouped items
+            $serviceAdditions = [];
+            $groupItemIds = $grouped['ids'] ?? [$primaryItemId];
+            foreach ($groupItemIds as $itemId) {
+                $itemModel = $order->items->firstWhere('id', $itemId);
+                if ($itemModel) {
+                    $serviceAdditions = array_merge($serviceAdditions, $this->formatOrderItemServiceAdditions($itemModel, $order));
+                }
             }
 
-            // Get piece data
+            // Build services array with CatalogActivePresenter data
+            $servicesData = [];
+            foreach ($grouped['services'] ?? [] as $svc) {
+                $serviceModel = $primaryItem ? $primaryItem->piece?->services->firstWhere('id', $svc['id']) : null;
+                $svcEntry = [
+                    'id' => $svc['id'],
+                    'name' => $svc['name'] ?? $svc['service_name'] ?? '',
+                    'price' => (float) ($svc['price'] ?? 0),
+                    'icon' => $svc['icon'] ?? null,
+                ];
+                if ($serviceModel) {
+                    $svcEntry = array_merge($svcEntry, \App\Support\CatalogActivePresenter::service($serviceModel, $branchId));
+                }
+                $servicesData[] = $svcEntry;
+            }
+
+            $primaryServiceData = $servicesData[0] ?? null;
+
             $pieceData = null;
-            if ($item->piece) {
+            if ($primaryItem && $primaryItem->piece) {
                 $pieceData = array_merge([
-                    'id' => $item->piece->id,
+                    'id' => $primaryItem->piece->id,
                     'name' => $pieceName,
-                    'icon' => \App\Support\OrderItemDisplayNames::pieceIconUrl($item->piece),
-                ], \App\Support\CatalogActivePresenter::piece($item->piece, $branchId));
-            }
-
-            $itemStatus = $item->vendor_status ?? 'pending';
-            $quantity = (int) $item->quantity;
-            $acceptedAdditionsTotal = array_sum(array_map(
-                fn (array $a) => (float) ($a['total_price'] ?? 0),
-                array_filter(
-                    $serviceAdditions,
-                    fn (array $a) => ($a['status'] ?? 'accepted') !== 'rejected'
-                )
-            ));
-
-            if ($itemStatus === 'rejected') {
-                $unitPrice = 0.0;
-                $totalPrice = 0.0;
-            } else {
-                $basePerUnit = (float) $item->piece_price + (float) $item->service_price;
-                $totalPrice = round(($basePerUnit * $quantity) + $acceptedAdditionsTotal, 2);
-                $unitPrice = $quantity > 0 ? round($totalPrice / $quantity, 2) : 0.0;
+                    'icon' => \App\Support\OrderItemDisplayNames::pieceIconUrl($primaryItem->piece),
+                ], \App\Support\CatalogActivePresenter::piece($primaryItem->piece, $branchId));
             }
 
             return [
-                'item_id' => $item->id,
-                'piece_id' => $item->piece_id,
+                'item_id' => $primaryItemId,
+                'item_ids' => $groupItemIds,
+                'piece_id' => $primaryItem->piece_id ?? null,
                 'item_name' => $pieceName,
-                'service_price' => (float) $item->service_price,
-                'additional_services_total' => round($acceptedAdditionsTotal, 2),
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'total_price' => $totalPrice,
-                'status' => $itemStatus,
-                'note' => $item->notes,
-                'image' => $item->images ? $uploadService->getFullUrl($item->images) : null,
+                'service_price' => (float) ($primaryServiceData['price'] ?? 0),
+                'additional_services_total' => (float) ($grouped['additional_services_total'] ?? 0),
+                'quantity' => (int) ($grouped['quantity'] ?? 1),
+                'unit_price' => (float) ($grouped['unit_price'] ?? 0),
+                'total_price' => (float) ($grouped['total_price'] ?? 0),
+                'status' => $grouped['status'] ?? 'pending',
+                'note' => $grouped['note'] ?? null,
+                'image' => $grouped['image'] ?? null,
                 'modifiers' => $modifiers,
                 'service_additions' => $serviceAdditions,
-                'service' => $serviceData,
+                'service' => $primaryServiceData,
+                'services' => $servicesData,
                 'piece' => $pieceData,
             ];
         });
