@@ -22,6 +22,23 @@ class OrderItemGrouper
         string $lang,
         ?callable $imageResolver = null
     ): array {
+        $lines = [];
+        foreach (self::buckets($items) as $groupItems) {
+            $lines[] = self::mapGroup($groupItems, $branchId, $lang, $imageResolver);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Bucket order items by line_group / legacy multi-service siblings.
+     * Same-service qty-split rows stay as individual buckets.
+     *
+     * @param  Collection<int, mixed>  $items
+     * @return list<Collection<int, mixed>>
+     */
+    public static function buckets(Collection $items): array
+    {
         $buckets = [];
 
         foreach ($items as $item) {
@@ -29,7 +46,7 @@ class OrderItemGrouper
             $buckets[$key][] = $item;
         }
 
-        $lines = [];
+        $result = [];
         foreach ($buckets as $groupItems) {
             $groupItems = collect($groupItems)->values();
 
@@ -42,16 +59,16 @@ class OrderItemGrouper
                 && count($uniqueServiceIds) !== count($groupItems)
             ) {
                 foreach ($groupItems as $solo) {
-                    $lines[] = self::mapSingle($solo, $branchId, $lang, $imageResolver);
+                    $result[] = collect([$solo]);
                 }
 
                 continue;
             }
 
-            $lines[] = self::mapGroup($groupItems, $branchId, $lang, $imageResolver);
+            $result[] = $groupItems;
         }
 
-        return $lines;
+        return $result;
     }
 
     /**

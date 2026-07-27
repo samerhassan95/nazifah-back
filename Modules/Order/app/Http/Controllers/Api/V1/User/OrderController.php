@@ -2346,7 +2346,9 @@ class OrderController extends Controller
     }
 
     /**
-     * Split order lines into accepted / rejected / modified lists (no duplicate rows).
+     * Split order lines into accepted / rejected / modified lists.
+     * Multi-service piece lines stay one entry per piece (services joined),
+     * split only when vendor statuses differ within the same piece.
      */
     private function categorizePendingApprovalItems(Order $order, string $lang): array
     {
@@ -2356,106 +2358,170 @@ class OrderController extends Controller
 
         $branchId = (int) ($order->branch_id ?? 0);
 
-        foreach ($order->items as $item) {
-            $pieceName = $item->piece
-                ? \App\Support\OrderItemDisplayNames::pieceName($item->piece, $branchId, $lang)
+        foreach (OrderItemGrouper::buckets($order->items) as $groupItems) {
+            $primary = $groupItems->first();
+            $pieceName = $primary->piece
+                ? \App\Support\OrderItemDisplayNames::pieceName($primary->piece, $branchId, $lang)
                 : 'Unknown';
-            $serviceName = $item->service
-                ? \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang)
-                : 'Unknown';
+            $quantity = (int) $primary->quantity;
 
-            $additions = [];
-            if ($item->relationLoaded('additionalServicesPivot')) {
-                foreach ($item->additionalServicesPivot as $pivot) {
-                    $addition = $pivot->serviceAddition;
-                    if (! $addition) {
-                        continue;
-                    }
-                    $qty = (int) ($pivot->quantity ?? 1);
-                    $price = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
-                    $additions[] = [
-                        'id' => $addition->id,
-                        'name' => \App\Support\OrderItemDisplayNames::additionalServiceName($addition, $branchId, $lang),
-                        'price' => $price,
-                        'quantity' => $qty,
-                        'total' => $price * $qty,
-                        'vendor_status' => $pivot->vendor_status ?? 'accepted',
-                        'vendor_notes' => $pivot->vendor_notes,
-                    ];
-                }
-            }
-
-            $lineStatus = $item->vendor_status ?? 'accepted';
-
-            if ($lineStatus === 'rejected') {
-                $rejectedItems[] = [
-                    'id' => $item->id,
-                    'piece_name' => $pieceName,
-                    'service_name' => $serviceName,
-                    'quantity' => (int) $item->quantity,
-                    'unit_price' => (float) $item->unit_price,
-                    'total_price' => (float) $item->total_price,
-                    'vendor_notes' => $item->vendor_notes,
-                    'additional_services' => $additions,
-                ];
-
-                continue;
-            }
-
-            if ($lineStatus === 'modified') {
-                $modifiedItems[] = [
-                    'id' => $item->id,
-                    'piece_name' => $pieceName,
-                    'service_name' => $serviceName,
-                    'original_quantity' => $item->original_quantity ?? $item->quantity,
-                    'original_unit_price' => (float) ($item->original_unit_price ?? $item->unit_price),
-                    'original_total_price' => (float) ($item->original_total_price ?? $item->total_price),
-                    'modified_quantity' => $item->modified_quantity,
-                    'modified_unit_price' => (float) $item->modified_unit_price,
-                    'modified_total_price' => (float) $item->modified_total_price,
-                    'quantity' => (int) $item->quantity,
-                    'unit_price' => (float) $item->unit_price,
-                    'total_price' => (float) $item->total_price,
-                    'vendor_notes' => $item->vendor_notes,
-                    'additional_services' => array_values(array_filter(
-                        $additions,
-                        fn ($a) => ($a['vendor_status'] ?? 'accepted') !== 'rejected'
-                    )),
-                ];
-
-                continue;
-            }
-
-            $acceptedAdditions = array_values(array_filter(
-                $additions,
-                fn ($a) => ($a['vendor_status'] ?? 'accepted') === 'accepted'
-            ));
-            $rejectedAdditions = array_values(array_filter(
-                $additions,
-                fn ($a) => ($a['vendor_status'] ?? 'accepted') === 'rejected'
-            ));
-
-            $acceptedItems[] = [
-                'id' => $item->id,
-                'piece_name' => $pieceName,
-                'service_name' => $serviceName,
-                'quantity' => (int) $item->quantity,
-                'unit_price' => (float) $item->unit_price,
-                'total_price' => (float) $item->total_price,
-                'vendor_notes' => $item->vendor_notes,
-                'additional_services' => $acceptedAdditions,
+            $byStatus = [
+                'accepted' => collect(),
+                'rejected' => collect(),
+                'modified' => collect(),
             ];
 
-            foreach ($rejectedAdditions as $rejectedAddition) {
-                $rejectedItems[] = [
-                    'order_item_id' => $item->id,
+            foreach ($groupItems as $item) {
+                $status = $item->vendor_status ?? 'accepted';
+                if (! isset($byStatus[$status])) {
+                    $status = 'accepted';
+                }
+                $byStatus[$status]->push($item);
+            }
+
+            foreach (['accepted', 'rejected', 'modified'] as $status) {
+                $statusItems = $byStatus[$status];
+                if ($statusItems->isEmpty()) {
+                    continue;
+                }
+
+                $services = [];
+                $servicesTotal = 0.0;
+                $additionalServices = [];
+                $ids = [];
+                $vendorNotes = [];
+
+                foreach ($statusItems as $item) {
+                    $ids[] = (int) $item->id;
+                    if ($item->vendor_notes) {
+                        $vendorNotes[] = $item->vendor_notes;
+                    }
+
+                    if ($item->service) {
+                        $servicePrice = (float) $item->service_price;
+                        $servicesTotal += $servicePrice;
+                        $label = \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang);
+                        $services[] = [
+                            'id' => $item->service->id,
+                            'name' => $label,
+                            'price' => $servicePrice,
+                        ];
+                    }
+
+                    if ($item->relationLoaded('additionalServicesPivot')) {
+                        foreach ($item->additionalServicesPivot as $pivot) {
+                            $addition = $pivot->serviceAddition;
+                            if (! $addition) {
+                                continue;
+                            }
+                            $qty = (int) ($pivot->quantity ?? 1);
+                            $price = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
+                            $additionalServices[] = [
+                                'id' => $addition->id,
+                                'name' => \App\Support\OrderItemDisplayNames::additionalServiceName($addition, $branchId, $lang),
+                                'price' => $price,
+                                'quantity' => $qty,
+                                'total' => $price * $qty,
+                                'vendor_status' => $pivot->vendor_status ?? 'accepted',
+                                'vendor_notes' => $pivot->vendor_notes,
+                            ];
+                        }
+                    }
+                }
+
+                $serviceName = collect($services)->pluck('name')->filter()->implode('، ') ?: 'Unknown';
+                $notes = $vendorNotes !== [] ? implode(' | ', array_unique($vendorNotes)) : null;
+
+                if ($status === 'rejected') {
+                    $rejectedItems[] = [
+                        'id' => $ids[0],
+                        'ids' => $ids,
+                        'piece_name' => $pieceName,
+                        'service_name' => $serviceName,
+                        'services' => $services,
+                        'quantity' => $quantity,
+                        'unit_price' => 0.0,
+                        'total_price' => 0.0,
+                        'vendor_notes' => $notes,
+                        'additional_services' => $additionalServices,
+                    ];
+
+                    continue;
+                }
+
+                if ($status === 'modified') {
+                    $first = $statusItems->first();
+                    $acceptedAdditionsTotal = collect($additionalServices)
+                        ->filter(fn ($a) => ($a['vendor_status'] ?? 'accepted') !== 'rejected')
+                        ->sum('total');
+                    $modifiedTotal = round(($servicesTotal * $quantity) + $acceptedAdditionsTotal, 2);
+                    $modifiedUnit = $quantity > 0 ? round($modifiedTotal / $quantity, 2) : 0.0;
+
+                    $modifiedItems[] = [
+                        'id' => $ids[0],
+                        'ids' => $ids,
+                        'piece_name' => $pieceName,
+                        'service_name' => $serviceName,
+                        'services' => $services,
+                        'original_quantity' => $first->original_quantity ?? $quantity,
+                        'original_unit_price' => (float) ($first->original_unit_price ?? $first->unit_price),
+                        'original_total_price' => (float) ($statusItems->sum(fn ($i) => (float) ($i->original_total_price ?? $i->total_price))),
+                        'modified_quantity' => $first->modified_quantity ?? $quantity,
+                        'modified_unit_price' => $first->modified_unit_price !== null
+                            ? (float) $first->modified_unit_price
+                            : $modifiedUnit,
+                        'modified_total_price' => $first->modified_total_price !== null
+                            ? (float) $statusItems->sum(fn ($i) => (float) ($i->modified_total_price ?? 0))
+                            : $modifiedTotal,
+                        'quantity' => $quantity,
+                        'unit_price' => $modifiedUnit,
+                        'total_price' => $modifiedTotal,
+                        'vendor_notes' => $notes,
+                        'additional_services' => array_values(array_filter(
+                            $additionalServices,
+                            fn ($a) => ($a['vendor_status'] ?? 'accepted') !== 'rejected'
+                        )),
+                    ];
+
+                    continue;
+                }
+
+                $acceptedAdditions = array_values(array_filter(
+                    $additionalServices,
+                    fn ($a) => ($a['vendor_status'] ?? 'accepted') === 'accepted'
+                ));
+                $rejectedAdditions = array_values(array_filter(
+                    $additionalServices,
+                    fn ($a) => ($a['vendor_status'] ?? 'accepted') === 'rejected'
+                ));
+                $acceptedAdditionsTotal = collect($acceptedAdditions)->sum('total');
+                $totalPrice = round(($servicesTotal * $quantity) + $acceptedAdditionsTotal, 2);
+                $unitPrice = $quantity > 0 ? round($totalPrice / $quantity, 2) : 0.0;
+
+                $acceptedItems[] = [
+                    'id' => $ids[0],
+                    'ids' => $ids,
                     'piece_name' => $pieceName,
-                    'service_name' => $rejectedAddition['name'],
-                    'price' => $rejectedAddition['price'],
-                    'quantity' => $rejectedAddition['quantity'],
-                    'total' => $rejectedAddition['total'],
-                    'vendor_notes' => $rejectedAddition['vendor_notes'],
+                    'service_name' => $serviceName,
+                    'services' => $services,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'total_price' => $totalPrice,
+                    'vendor_notes' => $notes,
+                    'additional_services' => $acceptedAdditions,
                 ];
+
+                foreach ($rejectedAdditions as $rejectedAddition) {
+                    $rejectedItems[] = [
+                        'order_item_id' => $ids[0],
+                        'piece_name' => $pieceName,
+                        'service_name' => $rejectedAddition['name'],
+                        'price' => $rejectedAddition['price'],
+                        'quantity' => $rejectedAddition['quantity'],
+                        'total' => $rejectedAddition['total'],
+                        'vendor_notes' => $rejectedAddition['vendor_notes'],
+                    ];
+                }
             }
         }
 
