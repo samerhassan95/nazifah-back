@@ -641,7 +641,7 @@ class OrderController extends Controller
                 ->values();
             $servicesTotalPrice = (float) collect($servicesData)->sum('price');
             $originalUnitPrice = (float) $groupModels->sum(
-                fn ($item) => (float) ($item->original_unit_price ?? $item->unit_price ?? 0)
+                fn ($item) => (float) ($item->service_price ?? 0)
             );
             $originalTotalPrice = (float) $groupModels->sum(
                 fn ($item) => (float) ($item->original_total_price ?? $item->total_price ?? 0)

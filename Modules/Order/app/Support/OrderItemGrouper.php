@@ -150,8 +150,9 @@ class OrderItemGrouper
             $unitPrice = 0.0;
             $totalPrice = 0.0;
         } else {
-            $totalPrice = round(($servicesTotal * $quantity) + $acceptedAdditionsTotal, 2);
-            $unitPrice = $quantity > 0 ? round($totalPrice / $quantity, 2) : 0.0;
+            // unit_price = main services only; total_price adds accepted additions once per line.
+            $unitPrice = round($servicesTotal, 2);
+            $totalPrice = round(($unitPrice * $quantity) + $acceptedAdditionsTotal, 2);
         }
 
         return [

@@ -2422,7 +2422,7 @@ class OrderController extends Controller
                         ->filter(fn ($a) => ($a['vendor_status'] ?? 'accepted') !== 'rejected')
                         ->sum('total');
                     $modifiedTotal = round(($servicesTotal * $quantity) + $acceptedAdditionsTotal, 2);
-                    $modifiedUnit = $quantity > 0 ? round($modifiedTotal / $quantity, 2) : 0.0;
+                    $modifiedUnit = round($servicesTotal, 2);
 
                     $modifiedItems[] = [
                         'id' => $ids[0],
@@ -2462,8 +2462,8 @@ class OrderController extends Controller
                     fn ($a) => ($a['vendor_status'] ?? 'accepted') === 'rejected'
                 ));
                 $acceptedAdditionsTotal = collect($acceptedAdditions)->sum('total');
-                $totalPrice = round(($servicesTotal * $quantity) + $acceptedAdditionsTotal, 2);
-                $unitPrice = $quantity > 0 ? round($totalPrice / $quantity, 2) : 0.0;
+                $unitPrice = round($servicesTotal, 2);
+                $totalPrice = round(($unitPrice * $quantity) + $acceptedAdditionsTotal, 2);
 
                 $acceptedItems[] = [
                     'id' => $ids[0],
