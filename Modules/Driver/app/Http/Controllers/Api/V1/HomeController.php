@@ -392,7 +392,7 @@ class HomeController extends Controller
         $lang = app()->getLocale();
 
         $order = \Modules\Order\Models\Order::forDriver($driver->id)
-            ->with(['client', 'pickupAddress', 'deliveryAddress', 'items.piece'])
+            ->with(['client', 'pickupAddress', 'deliveryAddress', 'items.piece', 'items.service'])
             ->whereIn('status', [
                 OrderStatus::DRIVER_PICKUP_ASSIGNED->value,
                 OrderStatus::DRIVER_DELIVERY_ASSIGNED->value,
@@ -421,16 +421,33 @@ class HomeController extends Controller
 
         $taskType = $this->resolveDriverTaskType($order, $driver, $lang);
 
-        // Get pieces details
-        $piecesDetails = $order->items->map(function ($item) use ($lang) {
-            return [
-                'piece_id' => $item->piece_id,
-                'piece_name' => $item->piece && method_exists($item->piece, 'getTranslation')
-                    ? $item->piece->getTranslation('name', $lang)
-                    : ($item->piece?->name ?? 'Unknown'),
-                'quantity' => (int) $item->quantity,
-            ];
-        })->toArray();
+        // Get pieces details — one row per piece line (multi-service stays together)
+        $branchId = (int) ($order->branch_id ?? 0);
+        $piecesDetails = collect(\Modules\Order\Support\OrderItemGrouper::buckets($order->items))
+            ->map(function ($group) use ($lang, $branchId) {
+                $item = $group->first();
+                $services = $group->map(function ($row) use ($lang, $branchId) {
+                    if (! $row->service) {
+                        return null;
+                    }
+
+                    return [
+                        'service_id' => $row->service_id,
+                        'service_name' => \App\Support\OrderItemDisplayNames::serviceName($row->service, $branchId, $lang),
+                    ];
+                })->filter()->values()->all();
+
+                return [
+                    'piece_id' => $item->piece_id,
+                    'piece_name' => $item->piece
+                        ? \App\Support\OrderItemDisplayNames::pieceName($item->piece, $branchId, $lang)
+                        : 'Unknown',
+                    'quantity' => (int) $item->quantity,
+                    'services' => $services,
+                ];
+            })
+            ->values()
+            ->toArray();
 
         return successResponse([
             'order_info' => array_merge([

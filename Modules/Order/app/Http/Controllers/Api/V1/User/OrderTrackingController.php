@@ -1182,75 +1182,13 @@ class OrderTrackingController extends Controller
                 ])
                 : null;
 
-            $itemsResponse = $order->items->map(function ($item) use ($lang, $order) {
-                $branchId = (int) ($order->branch_id ?? 0);
-                $quantity = (int) $item->quantity;
-                $itemStatus = $item->vendor_status ?? 'accepted';
-
-                $additionalServices = [];
-                if ($item->relationLoaded('additionalServicesPivot')) {
-                    foreach ($item->additionalServicesPivot as $pivot) {
-                        $addition = $pivot->serviceAddition;
-                        if ($addition) {
-                            $additionPrice = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
-                            $pivotQty = (int) ($pivot->quantity ?? 1);
-                            $additionalServices[] = [
-                                'id' => $addition->id,
-                                'name' => \App\Support\OrderItemDisplayNames::additionalServiceName($addition, $branchId, $lang),
-                                'price' => $additionPrice,
-                                'quantity' => $pivotQty,
-                                'total_price' => $additionPrice * $pivotQty,
-                                'vendor_status' => $pivot->vendor_status ?? 'accepted',
-                            ];
-                        }
-                    }
-                }
-
-                $acceptedAdditionsTotal = (float) collect($additionalServices)
-                    ->filter(fn ($a) => ($a['vendor_status'] ?? 'accepted') !== 'rejected')
-                    ->sum(fn ($a) => (float) ($a['total_price'] ?? 0));
-
-                // Same formula as show/tracking: base×qty + additions (do not use
-                // stored unit_price which already embeds additions).
-                if ($itemStatus === 'rejected') {
-                    $unitPrice = 0.0;
-                    $totalPrice = 0.0;
-                } else {
-                    $basePerUnit = (float) $item->piece_price + (float) $item->service_price;
-                    $totalPrice = round(($basePerUnit * $quantity) + $acceptedAdditionsTotal, 2);
-                    $unitPrice = $quantity > 0 ? round($totalPrice / $quantity, 2) : 0.0;
-                }
-
-                $serviceLabel = $item->service
-                    ? \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang)
-                    : '';
-
-                return [
-                    'id' => $item->id,
-                    'piece' => $item->piece ? [
-                        'id' => $item->piece->id,
-                        'name' => \App\Support\OrderItemDisplayNames::pieceName($item->piece, $branchId, $lang),
-                        'icon' => $item->piece->iconRelation?->full_path,
-                    ] : null,
-                    'service' => $item->service ? [
-                        'id' => $item->service->id,
-                        'name' => $serviceLabel,
-                        'service_name' => $serviceLabel,
-                        'price' => (float) ($item->service_price ?? 0),
-                    ] : null,
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                    'total_price' => $totalPrice,
-                    'additional_services_total' => round($acceptedAdditionsTotal, 2),
-                    'note' => $item->notes,
-                    'image' => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null,
-                    'additional_services' => array_map(static function (array $a): array {
-                        unset($a['vendor_status']);
-
-                        return $a;
-                    }, $additionalServices),
-                ];
-            })->toArray();
+            $branchId = (int) ($order->branch_id ?? 0);
+            $itemsResponse = OrderItemGrouper::toApiLines(
+                $order->items,
+                $branchId,
+                $lang,
+                fn ($item) => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null
+            );
 
             return successResponse([
                 'order' => [

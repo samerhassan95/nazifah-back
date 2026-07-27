@@ -56,7 +56,9 @@ class OrderController extends Controller
             'items' => ['nullable', 'array', 'min:1'],
             'items.*.piece_id' => ['required', 'exists:pieces,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.service_id' => ['required', 'exists:services,id'],
+            'items.*.service_id' => ['nullable', 'exists:services,id'],
+            'items.*.service_ids' => ['nullable', 'array', 'min:1'],
+            'items.*.service_ids.*' => ['integer', 'exists:services,id'],
             'items.*.additional_service_ids' => ['nullable', 'array'],
             'items.*.additional_service_ids.*' => ['integer', 'exists:service_additions,id'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
@@ -110,28 +112,57 @@ class OrderController extends Controller
             }
 
             foreach ($itemsInput as $item) {
-                $availabilityError = $this->catalogAvailabilityService->validateOrderLineForNewOrder(
-                    $branchId,
-                    (int) $item['piece_id'],
-                    (int) $item['service_id'],
-                    $item['additional_service_ids'] ?? [],
-                    $lang
-                );
-                if ($availabilityError !== null) {
-                    return errorResponse($availabilityError, 400);
+                $mainServiceIds = OrderItemsNormalizer::mainServiceIds($item);
+                if ($mainServiceIds === []) {
+                    return errorResponse(__('order.service_not_available', ['piece_name' => '']), 400);
                 }
 
                 $piece = $pieces->firstWhere('id', $item['piece_id']);
-                $service = $piece?->services->firstWhere('id', $item['service_id']);
-                if (! $piece || ! $service) {
-                    $pieceName = $piece
-                        ? \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang)
-                        : 'Item';
-
-                    return errorResponse(__('order.service_not_available', ['piece_name' => $pieceName]), 400);
+                if (! $piece) {
+                    return errorResponse(__('order.items_not_available'), 400);
                 }
 
-                $servicePiecePrice = (float) $service->getPriceForPieceAtBranch($piece->id, $branchId);
+                $servicesSummary = [];
+                $servicesTotal = 0.0;
+                $primaryService = null;
+                $primaryServicePrice = 0.0;
+
+                foreach ($mainServiceIds as $mainServiceId) {
+                    $availabilityError = $this->catalogAvailabilityService->validateOrderLineForNewOrder(
+                        $branchId,
+                        (int) $item['piece_id'],
+                        (int) $mainServiceId,
+                        $item['additional_service_ids'] ?? [],
+                        $lang
+                    );
+                    if ($availabilityError !== null) {
+                        return errorResponse($availabilityError, 400);
+                    }
+
+                    $service = $piece->services->firstWhere('id', $mainServiceId);
+                    if (! $service) {
+                        $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang);
+
+                        return errorResponse(__('order.service_not_available', ['piece_name' => $pieceName]), 400);
+                    }
+
+                    $servicePiecePrice = (float) $service->getPriceForPieceAtBranch($piece->id, $branchId);
+                    $servicesTotal += $servicePiecePrice;
+                    $serviceLabel = \App\Support\OrderItemDisplayNames::serviceName($service, $branchId, $lang);
+                    $servicesSummary[] = [
+                        'id' => $service->id,
+                        'service_id' => $service->id,
+                        'name' => $serviceLabel,
+                        'service_name' => $serviceLabel,
+                        'price' => $servicePiecePrice,
+                    ];
+
+                    if ($primaryService === null) {
+                        $primaryService = $service;
+                        $primaryServicePrice = $servicePiecePrice;
+                    }
+                }
+
                 $additionalServicesSummary = [];
                 $additionalServicesTotal = 0.0;
 
@@ -152,7 +183,7 @@ class OrderController extends Controller
                     }
                 }
 
-                $unitPrice = $servicePiecePrice + $additionalServicesTotal;
+                $unitPrice = $servicesTotal + $additionalServicesTotal;
                 $itemTotal = $unitPrice * (int) $item['quantity'];
                 $totalAmount += $itemTotal;
 
@@ -164,13 +195,14 @@ class OrderController extends Controller
                             'name' => \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang),
                             'icon' => $piece->iconRelation?->full_path,
                         ],
-                        'service' => [
-                            'id' => $service->id,
-                            'service_id' => $service->id,
-                            'name' => \App\Support\OrderItemDisplayNames::serviceName($service, $branchId, $lang),
-                            'service_name' => \App\Support\OrderItemDisplayNames::serviceName($service, $branchId, $lang),
-                            'price' => $servicePiecePrice,
+                        'service' => $servicesSummary[0] ?? [
+                            'id' => $primaryService->id,
+                            'service_id' => $primaryService->id,
+                            'name' => \App\Support\OrderItemDisplayNames::serviceName($primaryService, $branchId, $lang),
+                            'service_name' => \App\Support\OrderItemDisplayNames::serviceName($primaryService, $branchId, $lang),
+                            'price' => $primaryServicePrice,
                         ],
+                        'services' => $servicesSummary,
                         'additional_services' => $additionalServicesSummary,
                         'additional_services_total' => $additionalServicesTotal,
                         'quantity' => 1,
@@ -361,28 +393,40 @@ class OrderController extends Controller
     }
 
     /**
-     * @return list<array{piece_id: int, service_id: int, quantity: int, additional_service_ids: list<int>, note: ?string}>
+     * @return list<array{piece_id: int, service_id: int, service_ids: list<int>, quantity: int, additional_service_ids: list<int>, note: ?string}>
      */
     private function mapOrderItemsForCalculate(Order $order): array
     {
-        $order->loadMissing(['items.additionalServices']);
+        $order->loadMissing(['items.additionalServices', 'items.service', 'items.piece']);
 
-        return $order->items->map(function ($item) {
-            $additionIds = $item->additionalServices
+        $result = [];
+        foreach (\Modules\Order\Support\OrderItemGrouper::buckets($order->items) as $group) {
+            $primary = $group->first();
+            $additionIds = $primary->additionalServices
                 ->pluck('service_addition_id')
                 ->filter()
                 ->map(fn ($id) => (int) $id)
                 ->values()
                 ->all();
 
-            return [
-                'piece_id' => (int) $item->piece_id,
-                'service_id' => (int) $item->service_id,
-                'quantity' => max(1, (int) $item->quantity),
+            $serviceIds = $group->pluck('service_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $result[] = [
+                'piece_id' => (int) $primary->piece_id,
+                'service_id' => (int) ($serviceIds[0] ?? $primary->service_id),
+                'service_ids' => $serviceIds,
+                'quantity' => max(1, (int) $primary->quantity),
                 'additional_service_ids' => $additionIds,
-                'note' => $item->notes,
+                'note' => $primary->notes,
             ];
-        })->values()->all();
+        }
+
+        return $result;
     }
 
     /**
@@ -969,7 +1013,10 @@ class OrderController extends Controller
         $result = $reviewService->reviewOrderItems($order, $itemsReview, $request->notes);
 
         if ($result['success']) {
-            return successResponse($result['order'], __('order.order_accepted_successfully'));
+            return successResponse(
+                $this->formatVendorOrderWithGroupedItems($result['order']),
+                __('order.order_accepted_successfully')
+            );
         }
 
         return errorResponse($result['message'], null, 400);
@@ -1075,9 +1122,38 @@ class OrderController extends Controller
         );
 
         if ($result['success']) {
-            return successResponse($result['order'], $result['message']);
+            return successResponse(
+                $this->formatVendorOrderWithGroupedItems($result['order']),
+                $result['message']
+            );
         }
 
         return errorResponse($result['message'], null, 400);
+    }
+
+    /**
+     * Shape vendor review/accept payloads so multi-service pieces stay one line.
+     */
+    private function formatVendorOrderWithGroupedItems(Order $order): array
+    {
+        $order->loadMissing([
+            'items.piece',
+            'items.service',
+            'items.additionalServicesPivot.serviceAddition',
+            'client',
+            'branch',
+            'driver',
+        ]);
+
+        $lang = app()->getLocale();
+        $branchId = (int) ($order->branch_id ?? 0);
+        $data = $order->toArray();
+        $data['items'] = \Modules\Order\Support\OrderItemGrouper::toApiLines(
+            $order->items,
+            $branchId,
+            $lang
+        );
+
+        return $data;
     }
 }

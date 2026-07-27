@@ -360,47 +360,92 @@ class AdminOrderController extends Controller
             return ErrorResponse::make('Order not found', null, 404);
         }
 
-        // Separate accepted and rejected items
+        // Separate accepted and rejected items (multi-service piece = one line)
         $acceptedItems = collect();
         $rejectedItems = collect();
+        $branchId = (int) ($order->branch_id ?? 0);
+        $lang = app()->getLocale();
 
-        foreach ($order->items as $item) {
-            $additionalServices = $item->additions->map(function ($addition) {
-                return $addition->serviceAddition?->getTranslation('name', app()->getLocale())
-                    ?? $addition->serviceAddition?->name;
-            })->filter()->values()->toArray();
+        foreach (\Modules\Order\Support\OrderItemGrouper::buckets($order->items) as $groupItems) {
+            $primary = $groupItems->first();
+            $pieceName = $primary->piece
+                ? \App\Support\OrderItemDisplayNames::pieceName($primary->piece, $branchId, $lang)
+                : ($primary->piece?->name ?? '');
 
-            // Use stored item prices so all order APIs return same amounts
-            $itemTotalPrice = (float) $item->total_price;
-
-            $itemData = [
-                'icon' => $item->piece?->icon->path ?? '',
-                'Piece_count' => $item->quantity,
-                'Piece_name' => $item->piece?->name ?? '',
-                'Total_without_tax' => $itemTotalPrice,
-                'Services' => [[
-                    'Piece_amount' => $item->quantity,
-                    'service_name' => $item->service?->name ?? '',
-                ]],
-                'Item_details' => [
-                    'Piece_name' => $item->piece?->name ?? '',
-                    'Price' => $itemTotalPrice,
-                    'Services' => [[
-                        'Main_services' => array_values(array_filter([
-                            $item->service?->name,
-                        ])),
-                        'Additional_services' => $additionalServices,
-                    ]],
-                    'Comment' => $item->notes ?? '',
-                    'Image' => $item->image ?? '',
-                ],
+            $byStatus = [
+                'accepted' => collect(),
+                'rejected' => collect(),
+                'modified' => collect(),
             ];
+            foreach ($groupItems as $item) {
+                $status = $item->vendor_status ?? 'accepted';
+                if ($status === 'rejected') {
+                    $byStatus['rejected']->push($item);
+                } elseif ($status === 'modified') {
+                    $byStatus['modified']->push($item);
+                } else {
+                    $byStatus['accepted']->push($item);
+                }
+            }
 
-            // Check if item is rejected by vendor_status
-            if (($item->vendor_status ?? null) === 'rejected') {
-                $rejectedItems->push($itemData);
-            } else {
-                $acceptedItems->push($itemData);
+            foreach (['accepted', 'modified', 'rejected'] as $statusKey) {
+                $statusItems = $byStatus[$statusKey];
+                if ($statusItems->isEmpty()) {
+                    continue;
+                }
+
+                $serviceNames = [];
+                $totalPrice = 0.0;
+                $additionalServices = [];
+                foreach ($statusItems as $item) {
+                    if ($item->service) {
+                        $serviceNames[] = \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang)
+                            ?: ($item->service->name ?? '');
+                    }
+                    if ($statusKey !== 'rejected') {
+                        $totalPrice += (float) $item->total_price;
+                    }
+                    foreach ($item->additions ?? [] as $addition) {
+                        $name = $addition->serviceAddition?->getTranslation('name', $lang)
+                            ?? $addition->serviceAddition?->name;
+                        if ($name) {
+                            $additionalServices[] = $name;
+                        }
+                    }
+                }
+
+                $serviceNames = array_values(array_unique(array_filter($serviceNames)));
+                $additionalServices = array_values(array_unique(array_filter($additionalServices)));
+                $joinedServices = implode('، ', $serviceNames);
+                $quantity = (int) $primary->quantity;
+
+                $itemData = [
+                    'icon' => $primary->piece?->icon->path ?? '',
+                    'Piece_count' => $quantity,
+                    'Piece_name' => $pieceName,
+                    'Total_without_tax' => round($totalPrice, 2),
+                    'Services' => collect($serviceNames)->map(fn ($name) => [
+                        'Piece_amount' => $quantity,
+                        'service_name' => $name,
+                    ])->values()->all(),
+                    'Item_details' => [
+                        'Piece_name' => $pieceName,
+                        'Price' => round($totalPrice, 2),
+                        'Services' => [[
+                            'Main_services' => $serviceNames,
+                            'Additional_services' => $additionalServices,
+                        ]],
+                        'Comment' => $primary->notes ?? '',
+                        'Image' => $primary->image ?? '',
+                    ],
+                    'name_operation' => $joinedServices,
+                ];
+
+                if ($statusKey === 'rejected') {
+                    $rejectedItems->push($itemData);
+                } else {
+                    $acceptedItems->push($itemData);
+                }
             }
         }
 
@@ -427,7 +472,7 @@ class AdminOrderController extends Controller
                     return [
                         'piece_count' => $item['Piece_count'],
                         'piece_name' => $item['Piece_name'],
-                        'service' => $item['Services'][0]['service_name'] ?? '',
+                        'service' => $item['name_operation'] ?: ($item['Services'][0]['service_name'] ?? ''),
                         'additional_services' => $item['Item_details']['Services'][0]['Additional_services'] ?? [],
                         'price' => $item['Item_details']['Price'],
                     ];

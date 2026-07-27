@@ -793,47 +793,37 @@ class OrderController extends Controller
             $response['order_info']['payment_status_label'] = \App\Support\PaymentStatusPresenter::label($order->payment_status ?? 'pending');
         }
 
-        // Items info (use stored item prices so all order APIs return same amounts)
-        $response['items_info'] = $order->items->map(function ($item) use ($lang, $order) {
-            $uploadService = app(\App\Services\UploadFilesService::class);
-            $branchId = (int) ($order->branch_id ?? 0);
-
-            $additionalServices = $item->additionalServicesPivot->map(function ($pivot) use ($lang, $branchId) {
-                $addition = $pivot->serviceAddition;
-                $additionPrice = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
-                $qty = (int) ($pivot->quantity ?? 1);
-
-                return [
-                    'id' => $addition->id ?? null,
-                    'name' => $addition
-                        ? \App\Support\OrderItemDisplayNames::additionalServiceName($addition, $branchId, $lang)
-                        : null,
-                    'price' => $additionPrice,
-                    'quantity' => $qty,
-                    'total_price' => $additionPrice * $qty,
-                    'status' => $pivot->vendor_status ?? 'pending',
-                ];
-            });
+        // Items info — group multi-service piece lines into one entry
+        $branchId = (int) ($order->branch_id ?? 0);
+        $uploadService = app(\App\Services\UploadFilesService::class);
+        $response['items_info'] = collect(\Modules\Order\Support\OrderItemGrouper::toApiLines(
+            $order->items,
+            $branchId,
+            $lang,
+            fn ($item) => $item->images ? $uploadService->getFullUrl($item->images) : null
+        ))->map(function (array $g) {
+            $services = $g['services'] ?? [];
+            $serviceNames = collect($services)->pluck('name')->filter()->values()->all();
 
             return [
-                'item_id' => $item->id,
-                'piece_id' => $item->piece_id,
-                'piece_name' => $item->piece
-                    ? \App\Support\OrderItemDisplayNames::pieceName($item->piece, $branchId, $lang)
-                    : 'Unknown',
-                'service_id' => $item->service_id,
-                'service_name' => $item->service
-                    ? \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang)
-                    : 'Unknown',
-                'quantity' => (int) $item->quantity,
-                'unit_price' => (float) $item->unit_price,
-                'total_price' => (float) $item->total_price,
-                'status' => $item->vendor_status ?? null,
-                'note' => $item->notes,
-                'image' => $item->images ? $uploadService->getFullUrl($item->images) : null,
-                'additional_services' => $additionalServices,
+                'item_id' => $g['id'],
+                'item_ids' => $g['ids'] ?? [$g['id']],
+                'piece_id' => $g['piece']['id'] ?? null,
+                'piece_name' => $g['piece']['name'] ?? 'Unknown',
+                'service_id' => $services[0]['id'] ?? null,
+                'service_name' => $serviceNames !== []
+                    ? implode('، ', $serviceNames)
+                    : ($g['service']['name'] ?? 'Unknown'),
+                'services' => $services,
+                'quantity' => (int) ($g['quantity'] ?? 1),
+                'unit_price' => (float) ($g['unit_price'] ?? 0),
+                'total_price' => (float) ($g['total_price'] ?? 0),
+                'status' => $g['status'] ?? null,
+                'note' => $g['note'] ?? null,
+                'image' => $g['image'] ?? null,
+                'additional_services' => $g['additional_services'] ?? [],
             ];
-        })->toArray();
+        })->values()->toArray();
 
         $response['delivery_fee'] = (float) $order->getDeliveryFeeForDriver($driver->id);
 

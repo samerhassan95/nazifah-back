@@ -4,6 +4,7 @@ namespace Modules\Admin\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Order\Support\OrderItemGrouper;
 
 class OrderResource extends JsonResource
 {
@@ -13,6 +14,9 @@ class OrderResource extends JsonResource
         $vendor = $this->whenLoaded('branch', function () {
             return $this->branch?->vendor;
         });
+
+        $locale = app()->getLocale();
+        $branchId = (int) ($this->branch_id ?? 0);
 
         return [
             'id' => $this->id,
@@ -41,7 +45,9 @@ class OrderResource extends JsonResource
             'driver' => new DriverResource($this->whenLoaded('driver')),
             'pickup_driver' => new DriverResource($this->whenLoaded('pickupDriver')),
             'delivery_driver' => new DriverResource($this->whenLoaded('deliveryDriver')),
-            'items' => OrderItemResource::collection($this->whenLoaded('items')),
+            'items' => $this->whenLoaded('items', function () use ($branchId, $locale) {
+                return OrderItemGrouper::toApiLines($this->items, $branchId, $locale);
+            }),
             'created_at' => $this->created_at?->toDateTimeString(),
             'updated_at' => $this->updated_at?->toDateTimeString(),
         ];

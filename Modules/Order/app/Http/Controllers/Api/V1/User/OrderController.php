@@ -1533,47 +1533,12 @@ class OrderController extends Controller
                             'name' => $order->vendor->getTranslatedName($lang),
                             'logo' => $this->uploadFilesService->getFullUrl($order->vendor->logo),
                         ] : null,
-                    'items' => $order->items->map(function ($item) use ($lang, $order) {
-                        $branchId = (int) ($order->branch_id ?? 0);
-                        $additionalServices = $item->additionalServicesPivot->map(function ($pivot) use ($lang, $branchId) {
-                            $addition = $pivot->serviceAddition;
-                            if (! $addition) {
-                                return null;
-                            }
-
-                            $additionPrice = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
-
-                            return [
-                                'id' => $addition->id,
-                                'name' => \App\Support\OrderItemDisplayNames::additionalServiceName($addition, $branchId, $lang),
-                                'price' => $additionPrice,
-                                'quantity' => $pivot->quantity,
-                                'total_price' => $additionPrice * (int) ($pivot->quantity ?? 1),
-                            ];
-                        })->filter()->values()->toArray();
-
-                        $additionalServicesTotal = array_sum(array_column($additionalServices, 'total_price'));
-
-                        if (! $item->piece || ! $item->service) {
-                            return null;
-                        }
-
-                        return $this->formatOrderLineItem(
-                            $item->piece,
-                            $item->service,
-                            (float) $item->service_price,
-                            $additionalServices,
-                            $additionalServicesTotal,
-                            (int) $item->quantity,
-                            (float) $item->unit_price,
-                            $lang,
-                            $branchId,
-                            $item->id,
-                            $item->notes,
-                            $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null,
-                            (float) $item->total_price
-                        );
-                    })->filter()->values()->toArray(),
+                    'items' => OrderItemGrouper::toApiLines(
+                        $order->items,
+                        (int) ($order->branch_id ?? 0),
+                        $lang,
+                        fn ($item) => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null
+                    ),
                     'notes' => $order->notes,
                     'attachments' => $order->attachments ? collect($order->attachments)->map(function ($attachment) {
                         return [
