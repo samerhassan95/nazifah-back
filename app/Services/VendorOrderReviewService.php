@@ -10,6 +10,7 @@ use Modules\Order\Models\OrderItem;
 use Modules\Order\Models\OrderItemAdditionalService;
 use Modules\Order\Models\OrderPayment;
 use Modules\Order\Services\OrderPaymentService;
+use Modules\Order\Support\OrderItemGrouper;
 use Modules\Payment\Models\PaymentTransaction;
 
 class VendorOrderReviewService
@@ -35,8 +36,14 @@ class VendorOrderReviewService
                 ];
             }
 
-            $orderItemIds = OrderItem::where('order_id', $order->id)->pluck('id')->toArray();
-            $reviewItemIds = collect($itemsReview)->pluck('item_id')->toArray();
+            $order->loadMissing([
+                'items.piece',
+                'items.service',
+                'items.additionalServicesPivot.serviceAddition',
+            ]);
+
+            $orderItemIds = $order->items->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $reviewItemIds = collect($itemsReview)->pluck('item_id')->map(fn ($id) => (int) $id)->all();
             $invalidItemIds = array_diff($reviewItemIds, $orderItemIds);
 
             if (! empty($invalidItemIds)) {
@@ -48,6 +55,9 @@ class VendorOrderReviewService
                     'invalid_item_ids' => $invalidItemIds,
                 ];
             }
+
+            // Rejecting/accepting a piece line must apply to ALL main services on that piece.
+            $itemsReview = $this->expandReviewsToPieceServiceSiblings($order, $itemsReview);
 
             foreach ($itemsReview as $review) {
                 if (isset($review['additional_services']) && is_array($review['additional_services'])) {
@@ -88,7 +98,7 @@ class VendorOrderReviewService
             $rejectedServiceAdditions = [];
 
             $allOrderItems = OrderItem::where('order_id', $order->id)->get();
-            $reviewedItemIds = collect($itemsReview)->pluck('item_id')->toArray();
+            $reviewedItemIds = collect($itemsReview)->pluck('item_id')->map(fn ($id) => (int) $id)->all();
 
             foreach ($itemsReview as $review) {
                 $item = OrderItem::where('order_id', $order->id)
@@ -146,15 +156,23 @@ class VendorOrderReviewService
                         }
                     }
                 } else {
-                    // If no additional services review provided, accept all by default
+                    // If no additional services review provided:
+                    // - accepted/modified → accept additions by default
+                    // - rejected piece → reject all additions on that piece too
                     $additionalServices = OrderItemAdditionalService::where('order_item_id', $item->id)->get();
                     foreach ($additionalServices as $additionalService) {
-                        if (! $additionalService->vendor_status) {
-                            $additionalService->vendor_status = 'accepted';
+                        if ($status === 'rejected') {
+                            $additionalService->vendor_status = 'rejected';
                             $additionalService->save();
-                        }
-                        if ($additionalService->vendor_status === 'accepted') {
-                            $additionalServicesTotal += $additionalService->price * $additionalService->quantity;
+                            $hasRejections = true;
+                        } else {
+                            if (! $additionalService->vendor_status) {
+                                $additionalService->vendor_status = 'accepted';
+                                $additionalService->save();
+                            }
+                            if ($additionalService->vendor_status === 'accepted') {
+                                $additionalServicesTotal += $additionalService->price * $additionalService->quantity;
+                            }
                         }
                     }
                 }
@@ -179,9 +197,12 @@ class VendorOrderReviewService
                     case 'modified':
                         $hasModifications = true;
                         $modifiedQuantity = (int) ($review['quantity'] ?? $item->quantity);
-                        // Treat unit_price as piece+service only; additions are added once
-                        // (same as the accepted branch — avoids double-counting).
-                        $modifiedUnitPrice = (float) ($review['unit_price'] ?? ((float) $item->piece_price + (float) $item->service_price));
+                        // For expanded sibling rows, keep each service's own base price unless this
+                        // row is the explicitly reviewed primary item_id.
+                        $isExplicitReview = (int) ($review['explicit_item_id'] ?? $review['item_id']) === (int) $item->id;
+                        $modifiedUnitPrice = $isExplicitReview
+                            ? (float) ($review['unit_price'] ?? ((float) $item->piece_price + (float) $item->service_price))
+                            : ((float) $item->piece_price + (float) $item->service_price);
                         $modifiedItemTotal = ($modifiedUnitPrice * $modifiedQuantity) + $additionalServicesTotal;
                         $modifiedTotalPrice = round($modifiedItemTotal, 2);
 
@@ -687,5 +708,63 @@ class VendorOrderReviewService
             "Client rejected modifications and order #{$order->order_number} was cancelled",
             'client_rejected_modifications',
         );
+    }
+
+    /**
+     * When the vendor reviews one row of a multi-service piece line, apply the same
+     * decision to every main-service sibling on that piece (same line_group / bucket).
+     * Otherwise unreviewed siblings are auto-accepted and only one service looks rejected.
+     *
+     * @param  list<array<string, mixed>>  $itemsReview
+     * @return list<array<string, mixed>>
+     */
+    private function expandReviewsToPieceServiceSiblings(Order $order, array $itemsReview): array
+    {
+        $idToSiblingIds = [];
+        foreach (OrderItemGrouper::buckets($order->items) as $group) {
+            $ids = $group->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            foreach ($ids as $id) {
+                $idToSiblingIds[$id] = $ids;
+            }
+        }
+
+        $expanded = [];
+        $seen = [];
+
+        foreach ($itemsReview as $review) {
+            $explicitId = (int) ($review['item_id'] ?? 0);
+            if ($explicitId <= 0) {
+                continue;
+            }
+
+            $siblingIds = $idToSiblingIds[$explicitId] ?? [$explicitId];
+            if (! empty($review['item_ids']) && is_array($review['item_ids'])) {
+                $siblingIds = array_values(array_unique(array_merge(
+                    $siblingIds,
+                    collect($review['item_ids'])->map(fn ($id) => (int) $id)->all()
+                )));
+            }
+
+            foreach ($siblingIds as $siblingId) {
+                if (isset($seen[$siblingId])) {
+                    continue;
+                }
+                $seen[$siblingId] = true;
+
+                $copy = $review;
+                $copy['item_id'] = $siblingId;
+                $copy['explicit_item_id'] = $explicitId;
+
+                // Additional-services payload only applies to the explicitly reviewed row;
+                // siblings without an explicit additions review follow status defaults.
+                if ($siblingId !== $explicitId) {
+                    unset($copy['additional_services']);
+                }
+
+                $expanded[] = $copy;
+            }
+        }
+
+        return $expanded;
     }
 }
