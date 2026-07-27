@@ -427,6 +427,7 @@ class OrderController extends Controller
             // Calculate items total and validate
             $discountAmount = 0;
             $appliedDiscount = null;
+            $couponSuccessMessage = null;
             $totalAmount = 0;
             $itemsSummary = [];
             $pieces = null;
@@ -449,6 +450,7 @@ class OrderController extends Controller
                 $discountAmount = $result['data']['discount_amount'];
                 $appliedDiscount = $result['data']['discount'];
                 $pieces = $result['data']['pieces'];
+                $couponSuccessMessage = $result['message'];
             } else {
                 $pieceIds = collect($request->items)->pluck('piece_id')->unique();
                 $pieces = Piece::with([
@@ -625,7 +627,7 @@ class OrderController extends Controller
                     'value' => (float) $appliedDiscount->value,
                     'discount_amount' => (float) $discountAmount,
                 ] : null,
-            ], __('order.order_calculation_completed'));
+            ], $couponSuccessMessage ?? __('order.order_calculation_completed'));
 
         } catch (\Exception $e) {
             return serverErrorResponse(__('order.failed_to_calculate').': '.$e->getMessage());

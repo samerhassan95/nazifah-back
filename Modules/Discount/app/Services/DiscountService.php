@@ -158,10 +158,7 @@ class DiscountService
         // Calculate discount amount
         $discountAmount = $this->calculateDiscountAmount($discount, $orderAmount);
 
-        $successMessage = match ($discount->discount_type) {
-            Discount::DISCOUNT_TYPE_DELIVERY_FREE => $lang === 'ar' ? 'تم تطبيق إعفاء رسوم التوصيل بنجاح' : 'Free delivery applied successfully',
-            default => $lang === 'ar' ? 'تم تطبيق الخصم بنجاح' : 'Discount applied successfully',
-        };
+        $successMessage = $this->appliedSuccessMessage($discount, $lang);
 
         return [
             'success' => true,
@@ -567,6 +564,21 @@ class DiscountService
     public function amountForOrderTotal(Discount $discount, float $orderAmount): float
     {
         return $this->calculateDiscountAmount($discount, $orderAmount);
+    }
+
+    /**
+     * Localized success message after a coupon/discount is applied.
+     */
+    public function appliedSuccessMessage(Discount $discount, string $lang): string
+    {
+        return match ($discount->discount_type) {
+            Discount::DISCOUNT_TYPE_DELIVERY_FREE => $lang === 'ar'
+                ? 'تم تطبيق الخصم بنجاح'
+                : 'Discount applied successfully',
+            default => $lang === 'ar'
+                ? 'تم تطبيق الكوبون بنجاح'
+                : 'Coupon applied successfully',
+        };
     }
 
     /**
