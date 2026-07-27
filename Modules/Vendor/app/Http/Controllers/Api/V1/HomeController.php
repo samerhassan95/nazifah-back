@@ -568,6 +568,7 @@ class HomeController extends Controller
             }
 
             $primaryServiceData = $servicesData[0] ?? null;
+            $servicesTotalPrice = (float) collect($servicesData)->sum('price');
 
             $pieceData = null;
             if ($primaryItem && $primaryItem->piece) {
@@ -583,7 +584,7 @@ class HomeController extends Controller
                 'item_ids' => $groupItemIds,
                 'piece_id' => $primaryItem->piece_id ?? null,
                 'item_name' => $pieceName,
-                'service_price' => (float) ($primaryServiceData['price'] ?? 0),
+                'service_price' => $servicesTotalPrice,
                 'additional_services_total' => (float) ($grouped['additional_services_total'] ?? 0),
                 'quantity' => (int) ($grouped['quantity'] ?? 1),
                 'unit_price' => (float) ($grouped['unit_price'] ?? 0),

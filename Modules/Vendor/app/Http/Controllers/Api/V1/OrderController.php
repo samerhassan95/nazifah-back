@@ -635,20 +635,32 @@ class OrderController extends Controller
                 ], \App\Support\CatalogActivePresenter::piece($primaryItem->piece, $branchId));
             }
 
+            $groupModels = collect($groupItemIds)
+                ->map(fn ($itemId) => $order->items->firstWhere('id', $itemId))
+                ->filter()
+                ->values();
+            $servicesTotalPrice = (float) collect($servicesData)->sum('price');
+            $originalUnitPrice = (float) $groupModels->sum(
+                fn ($item) => (float) ($item->original_unit_price ?? $item->unit_price ?? 0)
+            );
+            $originalTotalPrice = (float) $groupModels->sum(
+                fn ($item) => (float) ($item->original_total_price ?? $item->total_price ?? 0)
+            );
+
             return [
                 'item_id' => $primaryItemId,
                 'item_ids' => $groupItemIds,
                 'piece_id' => $primaryItem->piece_id ?? null,
                 'item_name' => $pieceName,
-                'service_price' => (float) ($servicesData[0]['price'] ?? 0),
+                'service_price' => $servicesTotalPrice,
                 'additional_services_total' => (float) ($g['additional_services_total'] ?? 0),
                 'quantity' => (int) ($g['quantity'] ?? 1),
                 'unit_price' => (float) ($g['unit_price'] ?? 0),
                 'total_price' => (float) ($g['total_price'] ?? 0),
                 'status' => $g['status'] ?? 'accepted',
                 'original_quantity' => $primaryItem->original_quantity ?? $primaryItem->quantity ?? null,
-                'original_unit_price' => (float) ($primaryItem->original_unit_price ?? $primaryItem->unit_price ?? 0),
-                'original_total_price' => (float) ($primaryItem->original_total_price ?? $primaryItem->total_price ?? 0),
+                'original_unit_price' => $originalUnitPrice,
+                'original_total_price' => $originalTotalPrice,
                 'modified_quantity' => $primaryItem->modified_quantity ?? null,
                 'modified_unit_price' => $primaryItem->modified_unit_price !== null ? (float) $primaryItem->modified_unit_price : null,
                 'modified_total_price' => $primaryItem->modified_total_price !== null ? (float) $primaryItem->modified_total_price : null,
