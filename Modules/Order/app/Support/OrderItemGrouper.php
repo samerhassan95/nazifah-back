@@ -24,7 +24,12 @@ class OrderItemGrouper
     ): array {
         $lines = [];
         foreach (self::buckets($items) as $groupItems) {
-            $lines[] = self::mapGroup($groupItems, $branchId, $lang, $imageResolver);
+            // If vendor accepted some services and rejected others on the same piece,
+            // split so accepted services keep their price and rejected stay separate.
+            $byStatus = $groupItems->groupBy(fn ($item) => $item->vendor_status ?? 'accepted');
+            foreach ($byStatus as $statusItems) {
+                $lines[] = self::mapGroup(collect($statusItems)->values(), $branchId, $lang, $imageResolver);
+            }
         }
 
         return $lines;
