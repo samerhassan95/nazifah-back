@@ -602,15 +602,26 @@ class HomeController extends Controller
         $acceptedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') !== 'rejected')->values();
         $rejectedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') === 'rejected')->values();
 
-        $toBreakdownLine = fn ($item) => [
-            'Item_name' => $item['item_name'],
-            'name_operation' => $item['service']['name'] ?? 'Service',
-            'Quantity' => $item['quantity'],
-            'unit_price' => (float) $item['unit_price'],
-            'total_price' => (float) $item['total_price'],
-            'status' => $item['status'] ?? 'accepted',
-            'service_additions' => $item['service_additions'] ?? [],
-        ];
+        $toBreakdownLine = function (array $item): array {
+            $serviceNames = collect($item['services'] ?? [])
+                ->pluck('name')
+                ->filter()
+                ->values()
+                ->all();
+
+            return [
+                'Item_name' => $item['item_name'],
+                'name_operation' => $serviceNames !== []
+                    ? implode('، ', $serviceNames)
+                    : ($item['service']['name'] ?? 'Service'),
+                'Quantity' => $item['quantity'],
+                'unit_price' => (float) $item['unit_price'],
+                'total_price' => (float) $item['total_price'],
+                'status' => $item['status'] ?? 'accepted',
+                'service_additions' => $item['service_additions'] ?? [],
+                'services' => $item['services'] ?? [],
+            ];
+        };
 
         // Use stored order totals so all order APIs return same amounts
         $priceBreakdown = [

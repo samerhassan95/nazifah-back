@@ -628,15 +628,26 @@ class OrderController extends Controller
         $tax = (float) $order->tax_amount;
         $finalTotal = (float) $order->final_amount;
 
-        $toBreakdownLine = fn ($i) => [
-            'Item_name' => $i['item_name'],
-            'name_operation' => $i['service']['name'] ?? 'Service',
-            'Quantity' => $i['quantity'],
-            'unit_price' => (float) $i['unit_price'],
-            'total_price' => (float) $i['total_price'],
-            'status' => $i['status'] ?? 'accepted',
-            'service_additions' => $i['service_additions'] ?? [],
-        ];
+        $toBreakdownLine = function (array $i): array {
+            $serviceNames = collect($i['services'] ?? [])
+                ->pluck('name')
+                ->filter()
+                ->values()
+                ->all();
+
+            return [
+                'Item_name' => $i['item_name'],
+                'name_operation' => $serviceNames !== []
+                    ? implode('، ', $serviceNames)
+                    : ($i['service']['name'] ?? 'Service'),
+                'Quantity' => $i['quantity'],
+                'unit_price' => (float) $i['unit_price'],
+                'total_price' => (float) $i['total_price'],
+                'status' => $i['status'] ?? 'accepted',
+                'service_additions' => $i['service_additions'] ?? [],
+                'services' => $i['services'] ?? [],
+            ];
+        };
 
         $priceBreakdown = [
             'accepted_items' => $acceptedItems->map($toBreakdownLine)->values(),

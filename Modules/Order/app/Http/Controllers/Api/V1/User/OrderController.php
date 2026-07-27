@@ -3375,10 +3375,19 @@ class OrderController extends Controller
         $vendorHandoffService = app(\App\Services\VendorOrderHandoffService::class);
         $onTheWayStatuses = OrderStatus::clientDriverVisitTrackingStatusValues();
 
-        $query = Order::with(['driver', 'pickupAddress', 'deliveryAddress', 'branch'])
+        $query = Order::with([
+            'driver',
+            'pickupAddress',
+            'deliveryAddress',
+            'branch',
+            'items.piece',
+            'items.service',
+            'items.additionalServicesPivot.serviceAddition',
+        ])
             ->where('client_id', $user->id)
             ->where(function ($builder) use ($onTheWayStatuses) {
                 $builder->whereIn('status', $onTheWayStatuses)
+                    ->orWhere('status', OrderStatus::BRANCH_REVIEW->value)
                     ->orWhere(function ($pendingBranchPickup) {
                         $pendingBranchPickup
                             ->where('status', OrderStatus::COMPLETED->value)
@@ -3393,7 +3402,15 @@ class OrderController extends Controller
 
         $orders = $query->orderBy('created_at', 'desc')->get();
         if ($orderId && $orders->isEmpty()) {
-            $order = Order::with(['driver', 'pickupAddress', 'deliveryAddress', 'branch'])
+            $order = Order::with([
+                'driver',
+                'pickupAddress',
+                'deliveryAddress',
+                'branch',
+                'items.piece',
+                'items.service',
+                'items.additionalServicesPivot.serviceAddition',
+            ])
                 ->where('client_id', $user->id)
                 ->where('id', $orderId)
                 ->first();
@@ -3424,40 +3441,120 @@ class OrderController extends Controller
                 $statusLabel = OrderStatus::tryFrom($currentStatus)?->localizedLabel($order->payment_method) ?? $currentStatus;
 
                 if ($currentStatus === OrderStatus::BRANCH_REVIEW->value) {
-                    return errorResponse(__('order.order_waiting_branch_review_approval'), 400);
-                }
-
-                if ($currentStatus === OrderStatus::WAITING_PAYMENT->value) {
-                    $isCashOnDelivery = ($order->payment_method ?? null) === PaymentMethod::CASH_ON_DELIVERY->value;
-                    if (! $isCashOnDelivery) {
-                        return errorResponse(__('order.order_waiting_payment_complete'), 400);
-                    }
-                }
-
-                if ($handoffService->isPendingBranchPickupReceipt($order)) {
-                    $order = $handoffService->repairInconsistentBranchPickupStatus($order);
-                    $orders = collect([$order->fresh()]);
-                } elseif (
-                    $this->isVendorSelfServiceOrder($order)
-                    && in_array($currentStatus, $this->vendorSelfServiceTrackingStatuses(), true)
-                ) {
+                    // Laundry reviewed with changes — client must approve/reject.
+                    // Return on-the-way payload with review summary instead of 400.
                     $orders = collect([$order]);
-                } elseif ($vendorHandoffService->isClientHandoffTrackable($order)) {
-                    $orders = collect([$order]);
-                } elseif ($visitService->canRespond($order)) {
-                    $orders = collect([$order]);
-                } elseif ($handoffService->canConfirmHandoff($order)) {
-                    $orders = collect([$order]);
-                } elseif ($currentStatus === OrderStatus::PAYMENT_CONFIRMED->value) {
-                    return errorResponse(__('order.order_payment_confirmed_driver_pending'), 400);
                 } else {
-                    return errorResponse(__('order.order_not_on_the_way', ['status' => $statusLabel]), 400);
+                    if ($currentStatus === OrderStatus::WAITING_PAYMENT->value) {
+                        $isCashOnDelivery = ($order->payment_method ?? null) === PaymentMethod::CASH_ON_DELIVERY->value;
+                        if (! $isCashOnDelivery) {
+                            return errorResponse(__('order.order_waiting_payment_complete'), 400);
+                        }
+                    }
+
+                    if ($handoffService->isPendingBranchPickupReceipt($order)) {
+                        $order = $handoffService->repairInconsistentBranchPickupStatus($order);
+                        $orders = collect([$order->fresh()]);
+                    } elseif (
+                        $this->isVendorSelfServiceOrder($order)
+                        && in_array($currentStatus, $this->vendorSelfServiceTrackingStatuses(), true)
+                    ) {
+                        $orders = collect([$order]);
+                    } elseif ($vendorHandoffService->isClientHandoffTrackable($order)) {
+                        $orders = collect([$order]);
+                    } elseif ($visitService->canRespond($order)) {
+                        $orders = collect([$order]);
+                    } elseif ($handoffService->canConfirmHandoff($order)) {
+                        $orders = collect([$order]);
+                    } elseif ($currentStatus === OrderStatus::PAYMENT_CONFIRMED->value) {
+                        return errorResponse(__('order.order_payment_confirmed_driver_pending'), 400);
+                    } else {
+                        return errorResponse(__('order.order_not_on_the_way', ['status' => $statusLabel]), 400);
+                    }
                 }
             }
         }
 
         $ordersData = $orders->map(function ($order) use ($lang, $handoffService, $visitService, $vendorHandoffService) {
-            $order = $handoffService->repairInconsistentBranchPickupStatus($order)->fresh();
+            $order = $handoffService->repairInconsistentBranchPickupStatus($order)->fresh([
+                'driver',
+                'pickupAddress',
+                'deliveryAddress',
+                'branch',
+                'items.piece',
+                'items.service',
+                'items.additionalServicesPivot.serviceAddition',
+            ]);
+
+            // Laundry review pending client approval — return review summary for the app card.
+            if ($order->status === OrderStatus::BRANCH_REVIEW->value) {
+                $categorized = $this->categorizePendingApprovalItems($order, $lang);
+
+                return [
+                    'id' => $order->id,
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'status' => $order->status,
+                    'status_label' => $order->status_label,
+                    'title' => $lang === 'ar' ? 'تم تحديث طلبك' : 'Your order has been updated',
+                    'message' => $lang === 'ar'
+                        ? 'قامت المغسلة بمراجعة الطلب، وكانت النتيجة كالتالي:'
+                        : 'The laundry has reviewed the order. Here is the result:',
+                    'requires_handoff_confirmation' => false,
+                    'requires_visit_response' => false,
+                    'requires_vendor_action' => false,
+                    'requires_review_approval' => true,
+                    'required_action' => 'approve_or_reject',
+                    'waiting_for' => 'client',
+                    'vendor_pending_action' => null,
+                    'time_remaining' => null,
+                    'distance' => null,
+                    'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+                    'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
+                    'available_actions' => [
+                        [
+                            'action' => 'approve',
+                            'label' => $lang === 'ar' ? 'قبول' : 'Accept',
+                            'endpoint' => '/api/v1/user/orders/'.$order->id.'/receipt-status',
+                            'method' => 'PUT',
+                            'payload' => ['status' => 'approved'],
+                        ],
+                        [
+                            'action' => 'reject',
+                            'label' => $lang === 'ar' ? 'رفض' : 'Reject',
+                            'endpoint' => '/api/v1/user/orders/'.$order->id.'/receipt-status',
+                            'method' => 'PUT',
+                            'payload' => ['status' => 'rejected'],
+                        ],
+                    ],
+                    'handoff' => null,
+                    'visit' => null,
+                    'vendor_handoff' => null,
+                    'accepted_items' => $categorized['accepted'],
+                    'rejected_items' => $categorized['rejected'],
+                    'modified_items' => $categorized['modified'],
+                    'items_summary' => [
+                        'total_items' => $order->items->count(),
+                        'accepted_count' => count($categorized['accepted']),
+                        'rejected_count' => count($categorized['rejected']),
+                        'modified_count' => count($categorized['modified']),
+                    ],
+                    'pricing' => [
+                        'original_total_amount' => (float) $order->original_total_amount,
+                        'original_final_amount' => (float) $order->original_final_amount,
+                        'new_total_amount' => (float) $order->total_amount,
+                        'new_discount_amount' => (float) $order->discount_amount,
+                        'new_tax_amount' => (float) $order->tax_amount,
+                        'new_delivery_fee' => (float) $order->delivery_fee,
+                        'new_final_amount' => (float) $order->final_amount,
+                        'price_difference' => (float) ($order->final_amount - $order->original_final_amount),
+                    ],
+                    'pickup_time' => $order->pickup_time?->toIso8601String(),
+                    'estimated_delivery_time' => $order->estimated_delivery_time?->toIso8601String(),
+                    'driver' => null,
+                ];
+            }
+
             $isVendorSelfService = $this->isVendorSelfServiceOrder($order);
             $isBranchHandoffOrder = (bool) $order->pickup_at_vendor || (bool) $order->delivery_at_vendor;
 
