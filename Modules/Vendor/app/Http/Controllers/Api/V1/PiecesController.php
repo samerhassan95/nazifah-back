@@ -220,7 +220,7 @@ class PiecesController extends Controller
             if (! $branch) {
                 return notFoundResponse(__('branch.branch_not_found_or_not_yours'));
             }
-            $this->syncServicesToPieceAtBranch($piece, $branch, $request->services ?? [], $lang);
+            $this->syncServicesToPieceAtBranch($piece, $branch, $request->services ?? [], $lang, true);
             flushCacheTags(["branch_{$branchId}", 'services', 'pieces', 'branches']);
         }
 
@@ -450,7 +450,13 @@ class PiecesController extends Controller
 
         // 1) Main services (branch required)
         if ($hasMainServices && $branch) {
-            $syncResult = $this->syncServicesToPieceAtBranch($piece, $branch, $request->services, app()->getLocale());
+            $syncResult = $this->syncServicesToPieceAtBranch(
+                $piece,
+                $branch,
+                $request->services,
+                app()->getLocale(),
+                true
+            );
             $assignedMainServices = $syncResult['services'];
             $errors = array_merge($errors, $syncResult['errors']);
         }
@@ -547,6 +553,8 @@ class PiecesController extends Controller
      *       name? ({ ar, en }) — branch-specific display name; does not change catalog pieces.name.
      * - Attaches piece to branch; service_addition price comes from service_additions catalog, not request.
      * - Top-level "price" on the piece is not used (pieces have no standalone price).
+     * - When services or service_additions is sent, the list replaces existing links at this branch
+     *   (omitted ids are removed; an empty array clears that side).
      * - For catalog-only piece create, use POST /vendor/pieces without branch_id or services.
      */
     public function assignServiceAdditionsToPieces(Request $request, $branchId): JsonResponse
@@ -605,7 +613,13 @@ class PiecesController extends Controller
         $assignedAdditions = [];
 
         if ($hasServices) {
-            $syncResult = $this->syncServicesToPieceAtBranch($piece, $branch, $request->input('services'), $locale);
+            $syncResult = $this->syncServicesToPieceAtBranch(
+                $piece,
+                $branch,
+                $request->input('services'),
+                $locale,
+                true
+            );
             $assignedServices = $syncResult['services'];
             $errors = array_merge($errors, $syncResult['errors']);
         } elseif (! $pieceWasAlreadyInBranch) {
@@ -670,17 +684,40 @@ class PiecesController extends Controller
 
     /**
      * Assign main services to a piece at a branch (service_piece prices).
+     * When $replaceExisting is true, service_piece rows for this branch not in the request are removed.
      *
      * @return array{services: array<int, array{service_id: int, service_name: string, price: float}>, errors: array<int, string>}
      */
-    private function syncServicesToPieceAtBranch(Piece $piece, Branch $branch, array $servicesInput, string $lang): array
-    {
+    private function syncServicesToPieceAtBranch(
+        Piece $piece,
+        Branch $branch,
+        array $servicesInput,
+        string $lang,
+        bool $replaceExisting = false
+    ): array {
         $branchId = (int) $branch->id;
         $assigned = [];
         $errors = [];
+        $idsToKeep = [];
 
         if (! $branch->pieces()->where('pieces.id', $piece->id)->exists()) {
             $branch->pieces()->attach($piece->id);
+        }
+
+        foreach ($servicesInput as $serviceData) {
+            $idsToKeep[] = (int) $serviceData['service_id'];
+        }
+
+        if ($replaceExisting) {
+            $deleteQuery = DB::table('service_piece')
+                ->where('piece_id', $piece->id)
+                ->where('branch_id', $branchId);
+
+            if ($idsToKeep !== []) {
+                $deleteQuery->whereNotIn('service_id', $idsToKeep);
+            }
+
+            $deleteQuery->delete();
         }
 
         foreach ($servicesInput as $serviceData) {
