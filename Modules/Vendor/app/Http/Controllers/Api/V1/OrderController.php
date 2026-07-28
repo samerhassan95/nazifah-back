@@ -183,8 +183,9 @@ class OrderController extends Controller
                     }
                 }
 
-                $unitPrice = $servicesTotal + $additionalServicesTotal;
-                $itemTotal = $unitPrice * (int) $item['quantity'];
+                $unitPrice = $servicesTotal;
+                $lineTotalPrice = $unitPrice + $additionalServicesTotal;
+                $itemTotal = $lineTotalPrice * (int) $item['quantity'];
                 $totalAmount += $itemTotal;
 
                 $quantity = (int) $item['quantity'];
@@ -207,7 +208,7 @@ class OrderController extends Controller
                         'additional_services_total' => $additionalServicesTotal,
                         'quantity' => 1,
                         'unit_price' => $unitPrice,
-                        'total_price' => $unitPrice,
+                        'total_price' => $lineTotalPrice,
                         'note' => $item['note'] ?? null,
                     ];
                 }
