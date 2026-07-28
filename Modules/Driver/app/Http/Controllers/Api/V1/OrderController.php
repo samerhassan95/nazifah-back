@@ -335,7 +335,7 @@ class OrderController extends Controller
                 : $order->vendor->name;
         }
 
-        $piecesCount = $order->items->sum('quantity');
+        $piecesCount = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($order->items);
         $distance = null;
         if ($driver->latitude && $driver->longitude) {
             $targetLat = null;
@@ -800,7 +800,8 @@ class OrderController extends Controller
             $order->items,
             $branchId,
             $lang,
-            fn ($item) => $item->images ? $uploadService->getFullUrl($item->images) : null
+            fn ($item) => $item->images ? $uploadService->getFullUrl($item->images) : null,
+            splitByVendorStatus: false
         ))->map(function (array $g) {
             $services = $g['services'] ?? [];
             $serviceNames = collect($services)->pluck('name')->filter()->values()->all();
@@ -824,6 +825,8 @@ class OrderController extends Controller
                 'additional_services' => $g['additional_services'] ?? [],
             ];
         })->values()->toArray();
+
+        $response['pieces_count'] = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($order->items);
 
         $response['delivery_fee'] = (float) $order->getDeliveryFeeForDriver($driver->id);
 

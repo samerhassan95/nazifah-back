@@ -265,7 +265,7 @@ class HomeController extends Controller
                             ? $firstItem->piece->getTranslation('name', $lang)
                             : $firstItem->piece->name;
                     }
-                    $piecesCount = $order->items->sum('quantity');
+                    $piecesCount = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($order->items);
                     if ($firstItem && $firstItem->service) {
                         $subTitle = method_exists($firstItem->service, 'getTranslation')
                             ? $firstItem->service->getTranslation('service_name', $lang)

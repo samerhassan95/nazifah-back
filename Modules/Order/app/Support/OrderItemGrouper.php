@@ -20,19 +20,41 @@ class OrderItemGrouper
         Collection $items,
         int $branchId,
         string $lang,
-        ?callable $imageResolver = null
+        ?callable $imageResolver = null,
+        bool $splitByVendorStatus = true
     ): array {
         $lines = [];
         foreach (self::buckets($items) as $groupItems) {
-            // If vendor accepted some services and rejected others on the same piece,
-            // split so accepted services keep their price and rejected stay separate.
-            $byStatus = $groupItems->groupBy(fn ($item) => $item->vendor_status ?? 'accepted');
-            foreach ($byStatus as $statusItems) {
-                $lines[] = self::mapGroup(collect($statusItems)->values(), $branchId, $lang, $imageResolver);
+            if ($splitByVendorStatus) {
+                // If vendor accepted some services and rejected others on the same piece,
+                // split so accepted services keep their price and rejected stay separate.
+                $byStatus = $groupItems->groupBy(fn ($item) => $item->vendor_status ?? 'accepted');
+                foreach ($byStatus as $statusItems) {
+                    $lines[] = self::mapGroup(collect($statusItems)->values(), $branchId, $lang, $imageResolver);
+                }
+
+                continue;
             }
+
+            $lines[] = self::mapGroup($groupItems, $branchId, $lang, $imageResolver);
         }
 
         return $lines;
+    }
+
+    /**
+     * Count physical piece lines (multi-service siblings count as one piece).
+     *
+     * @param  Collection<int, mixed>  $items
+     */
+    public static function totalPiecesCount(Collection $items): int
+    {
+        $total = 0;
+        foreach (self::buckets($items) as $groupItems) {
+            $total += (int) ($groupItems->first()->quantity ?? 1);
+        }
+
+        return $total;
     }
 
     /**
