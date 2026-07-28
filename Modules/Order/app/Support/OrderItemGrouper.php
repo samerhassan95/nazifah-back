@@ -119,6 +119,7 @@ class OrderItemGrouper
         $servicesTotal = 0.0;
         $additionalServices = [];
         $acceptedAdditionsTotal = 0.0;
+        $allAdditionsTotal = 0.0;
         $ids = [];
 
         foreach ($groupItems as $item) {
@@ -142,18 +143,16 @@ class OrderItemGrouper
                 $additionalServices = array_merge($additionalServices, $mappedAdditions['additional_services']);
             }
             $acceptedAdditionsTotal += $mappedAdditions['additional_services_total'];
+            $allAdditionsTotal += $mappedAdditions['all_additional_services_total'];
         }
 
         $quantity = (int) $primary->quantity;
         $itemStatus = $primary->vendor_status ?? 'accepted';
-        if ($itemStatus === 'rejected') {
-            $unitPrice = 0.0;
-            $totalPrice = 0.0;
-        } else {
-            // unit_price = main services only; total_price adds accepted additions once per line.
-            $unitPrice = round($servicesTotal, 2);
-            $totalPrice = round(($unitPrice * $quantity) + $acceptedAdditionsTotal, 2);
-        }
+        $unitPrice = round($servicesTotal, 2);
+        $displayAdditionsTotal = $itemStatus === 'rejected'
+            ? $allAdditionsTotal
+            : $acceptedAdditionsTotal;
+        $totalPrice = round(($unitPrice * $quantity) + $displayAdditionsTotal, 2);
 
         return [
             'id' => $primary->id,
@@ -169,7 +168,7 @@ class OrderItemGrouper
             'quantity' => $quantity,
             'unit_price' => $unitPrice,
             'total_price' => $totalPrice,
-            'additional_services_total' => round($acceptedAdditionsTotal, 2),
+            'additional_services_total' => round($displayAdditionsTotal, 2),
             'additional_services' => $additionalServices,
             'status' => $itemStatus,
             'note' => $primary->notes,
@@ -190,17 +189,19 @@ class OrderItemGrouper
     }
 
     /**
-     * @return array{additional_services: list<array<string, mixed>>, additional_services_total: float}
+     * @return array{additional_services: list<array<string, mixed>>, additional_services_total: float, all_additional_services_total: float}
      */
     private static function mapAdditions(mixed $item, int $branchId, string $lang): array
     {
         $additionalServices = [];
         $acceptedAdditionsTotal = 0.0;
+        $allAdditionsTotal = 0.0;
 
         if (! $item->relationLoaded('additionalServicesPivot')) {
             return [
                 'additional_services' => $additionalServices,
                 'additional_services_total' => $acceptedAdditionsTotal,
+                'all_additional_services_total' => $allAdditionsTotal,
             ];
         }
 
@@ -225,6 +226,7 @@ class OrderItemGrouper
                 'notes' => $pivot->vendor_notes,
             ];
             $additionalServices[] = $row;
+            $allAdditionsTotal += $total;
             if (($row['status'] ?? 'accepted') !== 'rejected') {
                 $acceptedAdditionsTotal += $total;
             }
@@ -233,6 +235,7 @@ class OrderItemGrouper
         return [
             'additional_services' => $additionalServices,
             'additional_services_total' => $acceptedAdditionsTotal,
+            'all_additional_services_total' => $allAdditionsTotal,
         ];
     }
 }

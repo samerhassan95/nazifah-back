@@ -2400,6 +2400,7 @@ class OrderController extends Controller
                 $notes = $vendorNotes !== [] ? implode(' | ', array_unique($vendorNotes)) : null;
 
                 if ($status === 'rejected') {
+                    $allAdditionsTotal = collect($additionalServices)->sum('total');
                     $rejectedItems[] = [
                         'id' => $ids[0],
                         'ids' => $ids,
@@ -2407,8 +2408,8 @@ class OrderController extends Controller
                         'service_name' => $serviceName,
                         'services' => $services,
                         'quantity' => $quantity,
-                        'unit_price' => 0.0,
-                        'total_price' => 0.0,
+                        'unit_price' => round($servicesTotal, 2),
+                        'total_price' => round(($servicesTotal * $quantity) + $allAdditionsTotal, 2),
                         'vendor_notes' => $notes,
                         'additional_services' => $additionalServices,
                     ];
