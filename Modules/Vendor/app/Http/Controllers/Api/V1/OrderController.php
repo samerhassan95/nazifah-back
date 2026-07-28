@@ -703,6 +703,17 @@ class OrderController extends Controller
                 }
 
                 $additionsTotal = (float) collect($rejectedAdditions)->sum(fn ($a) => (float) ($a['total_price'] ?? 0));
+                // Mobile renders service_additions as expandable sub-rows; expose rejected additions via services instead.
+                $servicesFromRejectedAdditions = collect($rejectedAdditions)
+                    ->map(fn (array $addition) => [
+                        'id' => $addition['id'],
+                        'name' => $addition['name'],
+                        'price' => (float) ($addition['price'] ?? 0),
+                        'icon' => $addition['icon'] ?? null,
+                    ])
+                    ->values()
+                    ->all();
+                $pieceQuantity = (int) ($item['quantity'] ?? 1);
 
                 return [
                     'item_id' => $item['item_id'],
@@ -711,11 +722,11 @@ class OrderController extends Controller
                     'item_name' => $item['item_name'],
                     'service_price' => 0.0,
                     'additional_services_total' => $additionsTotal,
-                    'quantity' => 1,
+                    'quantity' => $pieceQuantity,
                     'unit_price' => $additionsTotal,
                     'total_price' => $additionsTotal,
                     'status' => 'rejected',
-                    'original_quantity' => 1,
+                    'original_quantity' => $pieceQuantity,
                     'original_unit_price' => $additionsTotal,
                     'original_total_price' => $additionsTotal,
                     'modified_quantity' => null,
@@ -725,15 +736,27 @@ class OrderController extends Controller
                     'note' => $item['note'] ?? null,
                     'image' => $item['image'] ?? null,
                     'modifiers' => [],
-                    'service_additions' => $rejectedAdditions,
-                    'service' => null,
-                    'services' => [],
+                    'service_additions' => [],
+                    'service' => $servicesFromRejectedAdditions[0] ?? null,
+                    'services' => $servicesFromRejectedAdditions,
                     'piece' => $item['piece'] ?? null,
                 ];
             })
             ->filter()
             ->values();
         $rejectedItems = $rejectedItems->concat($rejectedAdditionItems)->values();
+
+        $acceptedItems = $acceptedItems->map(function (array $item) {
+            $acceptedAdditions = collect($item['service_additions'] ?? [])
+                ->filter(fn ($addition) => (($addition['vendor_status'] ?? $addition['status'] ?? 'accepted') !== 'rejected'))
+                ->values()
+                ->all();
+            $item['service_additions'] = $acceptedAdditions;
+            $item['additional_services_total'] = (float) collect($acceptedAdditions)
+                ->sum(fn ($addition) => (float) ($addition['total_price'] ?? 0));
+
+            return $item;
+        })->values();
 
         $subtotal = (float) $order->total_amount;
         $deliveryFee = (float) $order->delivery_fee;
