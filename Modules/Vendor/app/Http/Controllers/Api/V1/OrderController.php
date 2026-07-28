@@ -397,33 +397,44 @@ class OrderController extends Controller
      */
     private function mapOrderItemsForCalculate(Order $order): array
     {
-        $order->loadMissing(['items.additionalServices', 'items.service', 'items.piece']);
+        $order->loadMissing(['items.additionalServicesPivot', 'items.service', 'items.piece']);
 
         $result = [];
         foreach (\Modules\Order\Support\OrderItemGrouper::buckets($order->items) as $group) {
-            $primary = $group->first();
-            $additionIds = $primary->additionalServices
-                ->pluck('service_addition_id')
-                ->filter()
-                ->map(fn ($id) => (int) $id)
-                ->values()
-                ->all();
+            foreach ($group->groupBy(fn ($item) => $item->vendor_status ?? 'accepted') as $status => $statusItems) {
+                if ($status === 'rejected') {
+                    continue;
+                }
 
-            $serviceIds = $group->pluck('service_id')
-                ->filter()
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values()
-                ->all();
+                $primary = collect($statusItems)->first();
+                $additionIds = collect($primary->additionalServicesPivot ?? [])
+                    ->filter(fn ($pivot) => ($pivot->vendor_status ?? 'accepted') !== 'rejected')
+                    ->pluck('service_addition_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all();
 
-            $result[] = [
-                'piece_id' => (int) $primary->piece_id,
-                'service_id' => (int) ($serviceIds[0] ?? $primary->service_id),
-                'service_ids' => $serviceIds,
-                'quantity' => max(1, (int) $primary->quantity),
-                'additional_service_ids' => $additionIds,
-                'note' => $primary->notes,
-            ];
+                $serviceIds = collect($statusItems)->pluck('service_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if ($serviceIds === []) {
+                    continue;
+                }
+
+                $result[] = [
+                    'piece_id' => (int) $primary->piece_id,
+                    'service_id' => (int) ($serviceIds[0] ?? $primary->service_id),
+                    'service_ids' => $serviceIds,
+                    'quantity' => max(1, (int) $primary->quantity),
+                    'additional_service_ids' => $additionIds,
+                    'note' => $primary->notes,
+                ];
+            }
         }
 
         return $result;
