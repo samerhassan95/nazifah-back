@@ -677,6 +677,39 @@ class OrderController extends Controller
 
         $acceptedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') !== 'rejected')->values();
         $rejectedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') === 'rejected')->values();
+        $rejectedAdditionItems = $items->flatMap(function (array $item) {
+            return collect($item['service_additions'] ?? [])
+                ->filter(fn ($addition) => (($addition['vendor_status'] ?? $addition['status'] ?? 'accepted') === 'rejected'))
+                ->map(function (array $addition) use ($item) {
+                    return [
+                        'item_id' => $item['item_id'],
+                        'item_ids' => $item['item_ids'] ?? [$item['item_id']],
+                        'piece_id' => $item['piece_id'] ?? null,
+                        'item_name' => $item['item_name'],
+                        'service_price' => 0.0,
+                        'additional_services_total' => (float) ($addition['total_price'] ?? 0),
+                        'quantity' => (int) ($addition['quantity'] ?? 1),
+                        'unit_price' => (float) ($addition['price'] ?? 0),
+                        'total_price' => (float) ($addition['total_price'] ?? 0),
+                        'status' => 'rejected',
+                        'original_quantity' => (int) ($addition['quantity'] ?? 1),
+                        'original_unit_price' => (float) ($addition['price'] ?? 0),
+                        'original_total_price' => (float) ($addition['total_price'] ?? 0),
+                        'modified_quantity' => null,
+                        'modified_unit_price' => null,
+                        'modified_total_price' => null,
+                        'vendor_notes' => $addition['vendor_notes'] ?? null,
+                        'note' => $item['note'] ?? null,
+                        'image' => $item['image'] ?? null,
+                        'modifiers' => [],
+                        'service_additions' => [$addition],
+                        'service' => null,
+                        'services' => [],
+                        'piece' => $item['piece'] ?? null,
+                    ];
+                });
+        })->values();
+        $rejectedItems = $rejectedItems->concat($rejectedAdditionItems)->values();
 
         $subtotal = (float) $order->total_amount;
         $deliveryFee = (float) $order->delivery_fee;
@@ -695,7 +728,7 @@ class OrderController extends Controller
                 'Item_name' => $i['item_name'],
                 'name_operation' => $serviceNames !== []
                     ? implode('، ', $serviceNames)
-                    : ($i['service']['name'] ?? 'Service'),
+                    : (($i['service_additions'][0]['name'] ?? null) ?: ($i['service']['name'] ?? 'Service')),
                 'Quantity' => $i['quantity'],
                 'unit_price' => (float) $i['unit_price'],
                 'total_price' => (float) $i['total_price'],
