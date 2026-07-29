@@ -11,7 +11,25 @@ class CatalogActiveFilter
     {
         return $relation
             ->where('services.is_active', true)
-            ->where('branch_service.is_active', true);
+            ->where('branch_service.is_active', true)
+            ->whereExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('vendor_service')
+                    ->join('branches', 'branches.vendor_id', '=', 'vendor_service.vendor_id')
+                    ->whereColumn('branches.id', 'branch_service.branch_id')
+                    ->whereColumn('vendor_service.service_id', 'services.id')
+                    ->where('vendor_service.is_active', true);
+            });
+    }
+
+    /**
+     * Vendor catalog: admin-active services the vendor has adopted.
+     */
+    public static function activeVendorCatalogServices(BelongsToMany $relation): BelongsToMany
+    {
+        return $relation
+            ->where('services.is_active', true)
+            ->where('vendor_service.is_active', true);
     }
 
     public static function activePiecesOnBranch(BelongsToMany $relation): BelongsToMany

@@ -132,9 +132,11 @@ class ServicesController extends Controller
     {
         $locale = app()->getLocale();
 
-        return Service::whereHas('vendors', function ($q) use ($vendorId) {
-            $q->where('vendors.id', $vendorId);
-        })
+        return Service::where('services.is_active', true)
+            ->whereHas('vendors', function ($q) use ($vendorId) {
+                $q->where('vendors.id', $vendorId)
+                    ->where('vendor_service.is_active', true);
+            })
             ->whereDoesntHave('branches', function ($q) use ($branchId) {
                 $q->where('branches.id', $branchId);
             })
@@ -159,7 +161,7 @@ class ServicesController extends Controller
                     'rating' => 0,
                     'branch_id' => $branchId,
                     'source' => 'available_for_branch',
-                ], \App\Support\CatalogActivePresenter::service($service));
+                ], \App\Support\CatalogActivePresenter::service($service, null, null, $vendorId));
             });
     }
 
@@ -171,6 +173,7 @@ class ServicesController extends Controller
         $locale = app()->getLocale();
 
         $query = Service::with('category')
+            ->where('services.is_active', true)
             ->orderBy('order')
             ->orderBy('id');
 
@@ -206,12 +209,13 @@ class ServicesController extends Controller
         $locale = app()->getLocale();
         $branchIdsForRating = Branch::where('vendor_id', $vendorId)->pluck('id')->toArray();
 
-        $services = Service::whereHas('vendors', function ($q) use ($vendorId) {
-            $q->where('vendors.id', $vendorId);
-        })
+        $services = Service::where('services.is_active', true)
+            ->whereHas('vendors', function ($q) use ($vendorId) {
+                $q->where('vendors.id', $vendorId);
+            })
             ->with(['vendors' => function ($q) use ($vendorId) {
                 $q->where('vendors.id', $vendorId)
-                    ->withPivot('icon_id', 'description', 'name');
+                    ->withPivot('icon_id', 'description', 'name', 'is_active');
             }])
             ->orderBy('id')
             ->get()
@@ -241,7 +245,13 @@ class ServicesController extends Controller
                     'rating' => round((float) $rating, 2),
                     'vendor_id' => $vendorId,
                     'source' => 'vendor_catalog',
-                ], \App\Support\CatalogActivePresenter::service($service));
+                ], \App\Support\CatalogActivePresenter::service(
+                    $service,
+                    null,
+                    null,
+                    $vendorId,
+                    $service->vendors->first()?->pivot
+                ));
             });
 
         return successResponse($services, __('service.services_retrieved'));
@@ -256,16 +266,17 @@ class ServicesController extends Controller
 
         $locale = app()->getLocale();
 
-        $services = Service::whereHas('branches', function ($q) use ($branchId) {
-            $q->where('branches.id', $branchId);
-        })
+        $services = Service::where('services.is_active', true)
+            ->whereHas('branches', function ($q) use ($branchId) {
+                $q->where('branches.id', $branchId);
+            })
             ->with(['branches' => function ($q) use ($branchId) {
                 $q->where('branches.id', $branchId)
-                    ->withPivot('icon_id', 'description', 'name');
+                    ->withPivot('icon_id', 'description', 'name', 'is_active');
             }])
             ->orderBy('id')
             ->get()
-            ->map(function ($service) use ($branchId, $locale) {
+            ->map(function ($service) use ($branchId, $vendorId, $locale) {
                 $rating = Order::whereHas('items.service', function ($query) use ($service) {
                     $query->where('services.id', $service->id);
                 })
@@ -318,7 +329,7 @@ class ServicesController extends Controller
                     'rating' => round((float) $rating, 2),
                     'branch_id' => $branchId,
                     'source' => 'branch',
-                ], \App\Support\CatalogActivePresenter::service($service, $branchId, $pivot));
+                ], \App\Support\CatalogActivePresenter::service($service, $branchId, $pivot, $vendorId));
             });
 
         return successResponse($services, __('service.services_retrieved'));
@@ -344,6 +355,10 @@ class ServicesController extends Controller
         $service = Service::find($request->service_id);
         if (! $service) {
             return notFoundResponse(__('service.service_not_found'));
+        }
+
+        if (! ($service->is_active ?? true)) {
+            return errorResponse(__('service.service_not_available'), null, 400);
         }
 
         $alreadyInCatalog = Vendor::find($vendorId)

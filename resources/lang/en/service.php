@@ -12,6 +12,7 @@ return [
     'deleted_successfully' => 'Service deleted successfully',
     'not_found' => 'Service not found',
     'service_not_found' => 'Service not found',
+    'service_not_available' => 'This service is not available',
     'service_not_available_at_branch' => 'Service is not available at this branch',
     'additional_services_available_for_branch_retrieved' => 'Additional services available to add to this branch retrieved successfully',
     'services_available_for_branch_retrieved' => 'Services available to add to this branch retrieved successfully',

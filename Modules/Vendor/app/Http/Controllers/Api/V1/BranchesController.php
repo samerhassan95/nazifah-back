@@ -15,6 +15,7 @@ use Modules\Piece\Models\Piece;
 use Modules\Service\Models\Service;
 use Modules\Service\Models\ServiceAddition;
 use Modules\Service\Support\ServiceAdditionBranchOffering;
+use Modules\Service\Support\ServiceVendorOffering;
 use Modules\Vendor\Models\VendorBankAccount;
 use Modules\Zone\Models\Zone;
 
@@ -682,10 +683,11 @@ class BranchesController extends Controller
             return notFoundResponse(__('branch.branch_not_found'));
         }
 
-        // Get services for this branch
+        // Get services for this branch (admin-deactivated system services are hidden)
         $services = $branch->services()
+            ->where('services.is_active', true)
             ->get()
-            ->map(function ($service) use ($branch) {
+            ->map(function ($service) use ($branch, $vendorId) {
                 $rating = Order::whereHas('items.service', function ($query) use ($service) {
                     $query->where('services.id', $service->id);
                 })
@@ -721,7 +723,7 @@ class BranchesController extends Controller
                     'rating' => round((float) $rating, 2),
                     'icon' => $iconPath,
                     'icon_id' => $service->pivot->icon_id,
-                ], \App\Support\CatalogActivePresenter::service($service, (int) $branch->id, $service->pivot));
+                ], \App\Support\CatalogActivePresenter::service($service, (int) $branch->id, $service->pivot, (int) $vendorId));
             });
 
         return successResponse($services, __('branch.branch_services_retrieved'));
@@ -768,9 +770,22 @@ class BranchesController extends Controller
             return notFoundResponse(__('branch.service_not_found'));
         }
 
-        if (! $branch->vendor->catalogServices()->where('services.id', $service->id)->exists()) {
+        if (! ($service->is_active ?? true)) {
+            return validationErrorResponse([
+                'service_id' => [__('service.service_not_available')],
+            ]);
+        }
+
+        $vendorOffering = ServiceVendorOffering::find($vendorId, $service->id);
+        if (! $vendorOffering) {
             return validationErrorResponse([
                 'service_id' => [__('service.service_not_in_vendor_catalog')],
+            ]);
+        }
+
+        if (! ($vendorOffering->is_active ?? true)) {
+            return validationErrorResponse([
+                'service_id' => [__('service.service_not_available')],
             ]);
         }
 

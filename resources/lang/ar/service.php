@@ -12,6 +12,7 @@ return [
     'deleted_successfully' => 'تم حذف الخدمة بنجاح',
     'not_found' => 'الخدمة غير موجودة',
     'service_not_found' => 'الخدمة غير موجودة',
+    'service_not_available' => 'هذه الخدمة غير متاحة',
     'service_not_available_at_branch' => 'الخدمة غير متوفرة في هذا الفرع',
     'additional_services_available_for_branch_retrieved' => 'تم استرجاع الخدمات الإضافية المتاحة لإضافتها لهذا الفرع بنجاح',
     'services_available_for_branch_retrieved' => 'تم استرجاع الخدمات المتاحة لإضافتها لهذا الفرع بنجاح',

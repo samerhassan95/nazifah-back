@@ -203,18 +203,19 @@ class HomeController extends Controller
             ];
         }
 
-        // Services (only services related to vendor's branches)
-        $services = Service::whereHas('branches', function ($query) use ($branchIds) {
-            $query->whereIn('branches.id', $branchIds);
-        })
+        // Services (only admin-active services related to vendor's branches)
+        $services = Service::where('services.is_active', true)
+            ->whereHas('branches', function ($query) use ($branchIds) {
+                $query->whereIn('branches.id', $branchIds);
+            })
             ->with(['category'])
             ->get()
-            ->map(function ($service) {
+            ->map(function ($service) use ($vendorId) {
                 return array_merge([
                     'service_id' => $service->id,
                     'name' => $service->service_name,
                     'icon' => $this->uploadFilesService->getFullUrl($service->iconRelation?->full_path ?? $service->iconRelation?->path),
-                ], \App\Support\CatalogActivePresenter::service($service));
+                ], \App\Support\CatalogActivePresenter::service($service, null, null, (int) $vendorId));
             });
 
         // Staff (Drivers) - Get available drivers assigned to vendor's branches
@@ -281,6 +282,7 @@ class HomeController extends Controller
         // If system_service=true, return all system services with global ratings
         if ($systemService) {
             $services = Service::with(['category'])
+                ->where('services.is_active', true)
                 ->get()
                 ->map(function ($service) {
                     // Global rating from all orders
@@ -310,12 +312,13 @@ class HomeController extends Controller
         $branchIds = $branchIdsQuery->pluck('id');
 
         // Get services related to vendor's branches
-        $services = Service::whereHas('branches', function ($query) use ($branchIds) {
-            $query->whereIn('branches.id', $branchIds);
-        })
+        $services = Service::where('services.is_active', true)
+            ->whereHas('branches', function ($query) use ($branchIds) {
+                $query->whereIn('branches.id', $branchIds);
+            })
             ->with(['category'])
             ->get()
-            ->map(function ($service) use ($branchIds) {
+            ->map(function ($service) use ($branchIds, $vendorId) {
                 // Calculate rating only for orders from this vendor's branches
                 $rating = Order::whereHas('items.service', function ($query) use ($service) {
                     $query->where('services.id', $service->id);
@@ -330,7 +333,7 @@ class HomeController extends Controller
                     'price' => (float) ($service->price ?? 0),
                     'rating' => round((float) $rating, 2),
                     'icon' => $this->uploadFilesService->getFullUrl($service->iconRelation?->full_path ?? $service->iconRelation?->path),
-                ], \App\Support\CatalogActivePresenter::service($service));
+                ], \App\Support\CatalogActivePresenter::service($service, null, null, (int) $vendorId));
             });
 
         return successResponse($services, __('vendor.services_retrieved_successfully'));

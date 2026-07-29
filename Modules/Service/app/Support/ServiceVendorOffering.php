@@ -16,6 +16,10 @@ class ServiceVendorOffering
             'updated_at' => now(),
         ];
 
+        if (array_key_exists('is_active', $data)) {
+            $row['is_active'] = (bool) $data['is_active'];
+        }
+
         $existing = self::find($vendorId, $service->id);
 
         if ($existing) {
@@ -30,9 +34,26 @@ class ServiceVendorOffering
             DB::table('vendor_service')->insert(array_merge($row, [
                 'vendor_id' => $vendorId,
                 'service_id' => $service->id,
+                'is_active' => $data['is_active'] ?? true,
                 'created_at' => now(),
             ]));
         }
+    }
+
+    public static function toggleActive(int $vendorId, int $serviceId): ?bool
+    {
+        $existing = self::find($vendorId, $serviceId);
+        if (! $existing) {
+            return null;
+        }
+
+        $isActive = ! ((bool) ($existing->is_active ?? true));
+        DB::table('vendor_service')
+            ->where('vendor_id', $vendorId)
+            ->where('service_id', $serviceId)
+            ->update(['is_active' => $isActive, 'updated_at' => now()]);
+
+        return $isActive;
     }
 
     public static function find(int $vendorId, int $serviceId): ?object

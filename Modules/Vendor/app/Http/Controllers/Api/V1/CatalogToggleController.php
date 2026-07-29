@@ -11,12 +11,14 @@ use Modules\Piece\Models\Piece;
 use Modules\Service\Models\Service;
 use Modules\Service\Models\ServiceAddition;
 use Modules\Service\Support\ServiceAdditionBranchOffering;
+use Modules\Service\Support\ServiceVendorOffering;
 use Modules\Vendor\Models\Vendor;
 
 class CatalogToggleController extends Controller
 {
     /**
-     * Toggle catalog service (services.is_active).
+     * Toggle vendor catalog service (vendor_service.is_active).
+     * Does not change the admin system catalog row (services.is_active).
      * POST /api/v1/vendor/services/{serviceId}/toggle-active
      */
     public function toggleService(Request $request, int $serviceId): JsonResponse
@@ -33,17 +35,24 @@ class CatalogToggleController extends Controller
             return notFoundResponse(__('branch.service_not_found'));
         }
 
+        if (! ($service->is_active ?? true)) {
+            return notFoundResponse(__('service.service_not_available'));
+        }
+
         if (! $vendor->catalogServices()->where('services.id', $serviceId)->exists()) {
             return notFoundResponse(__('service.service_not_in_vendor_catalog'));
         }
 
-        $service->update(['is_active' => ! $service->is_active]);
+        $isActive = ServiceVendorOffering::toggleActive($vendorId, $serviceId);
+        if ($isActive === null) {
+            return notFoundResponse(__('service.service_not_in_vendor_catalog'));
+        }
 
         $this->clearCatalogCache($serviceId);
 
         return successResponse([
-            'service_id' => $service->id,
-            'is_active' => (bool) $service->is_active,
+            'service_id' => $serviceId,
+            'is_active' => $isActive,
         ], __('service.service_status_updated'));
     }
 

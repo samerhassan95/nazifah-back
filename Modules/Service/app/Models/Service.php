@@ -107,7 +107,7 @@ class Service extends Model
             'vendor_service',
             'service_id',
             'vendor_id'
-        )->withPivot('name', 'description', 'icon_id')
+        )->withPivot('name', 'description', 'icon_id', 'is_active')
             ->withTimestamps();
     }
 

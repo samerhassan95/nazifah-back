@@ -9,17 +9,34 @@ use Modules\Service\Models\ServiceAddition;
 
 /**
  * Consistent is_active fields for catalog API responses.
- * is_active = vendor/catalog level (priority). branch_is_active = branch pivot when branch context exists.
+ *
+ * - Vendor catalog context ($vendorId): is_active = vendor_service.is_active
+ * - Branch context: branch_is_active = branch_service.is_active (plus vendor is_active above when $vendorId set)
+ * - System/client context (no $vendorId): is_active = services.is_active (admin catalog; inactive rows are filtered out)
  */
 class CatalogActivePresenter
 {
-    public static function service(?Service $service, ?int $branchId = null, ?object $branchPivot = null): array
-    {
+    public static function service(
+        ?Service $service,
+        ?int $branchId = null,
+        ?object $branchPivot = null,
+        ?int $vendorId = null,
+        ?object $vendorPivot = null
+    ): array {
         if (! $service) {
             return ['is_active' => false];
         }
 
-        $flags = ['is_active' => (bool) ($service->is_active ?? true)];
+        if ($vendorId !== null) {
+            $pivot = $vendorPivot ?? DB::table('vendor_service')
+                ->where('vendor_id', $vendorId)
+                ->where('service_id', $service->id)
+                ->first();
+
+            $flags = ['is_active' => $pivot ? (bool) ($pivot->is_active ?? true) : true];
+        } else {
+            $flags = ['is_active' => (bool) ($service->is_active ?? true)];
+        }
 
         if ($branchId !== null) {
             $pivot = $branchPivot ?? DB::table('branch_service')
