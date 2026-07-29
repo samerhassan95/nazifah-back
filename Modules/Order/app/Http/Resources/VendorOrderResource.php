@@ -4,6 +4,7 @@ namespace Modules\Order\Http\Resources;
 
 use App\Services\UploadFilesService;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Order\Support\OrderItemGrouper;
 
 class VendorOrderResource extends JsonResource
 {
@@ -40,7 +41,7 @@ class VendorOrderResource extends JsonResource
             'client_name' => $this->client?->full_name ?? 'Customer',
             'driver_name' => $this->driver?->full_name,
             'pickup_address' => $this->pickupAddress?->street_name ?? $this->pickupAddress?->address_line_1,
-            'number_pieces' => $this->items->sum('quantity'),
+            'number_pieces' => OrderItemGrouper::totalPiecesCount($this->items),
             'distance' => (float) ($this->distance ?? 0),
             'first_item_image' => $firstItemImage,
             'branch_location' => $branchLocation,

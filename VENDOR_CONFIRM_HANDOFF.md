@@ -2,16 +2,20 @@
 
 ## Overview
 
-Two order handoff confirmations have moved from the **driver** to the **vendor (laundry)**:
+The handoff flow is now **two-step**:
 
-1. **Pickup handoff** — Laundry confirms receiving the order from the pickup driver.
-2. **Delivery handoff** — Laundry confirms handing the order to the delivery driver.
+1. The **driver** confirms QR to enable the appropriate vendor handoff flag.
+2. The **vendor (laundry)** confirms the handoff to perform the actual order status transition.
 
-A single new endpoint handles both cases. The system determines which action to perform based on the current order status.
+This means:
+
+- `POST /api/v1/driver/orders/{id}/confirm-qr` no longer changes the order status for the two vendor-owned handoff steps.
+- `POST /api/v1/vendor/orders/{id}/confirm-handoff` is the endpoint that changes the order status.
+- `can_confirm_pickup_from_driver` and `can_confirm_handover_to_delivery` are now **persisted boolean fields on the order**, not just computed from the current status.
 
 ---
 
-## New Endpoint
+## Vendor Endpoint
 
 ```
 POST /api/v1/vendor/orders/{orderId}/confirm-handoff
@@ -39,7 +43,7 @@ With note:
 }
 ```
 
-### Response
+### Vendor Response Example
 
 ```json
 {
@@ -47,7 +51,7 @@ With note:
   "code": 200,
   "message": "Laundry confirmed receiving the order from the pickup driver",
   "data": {
-    "id": 334,
+    "id": 379,
     "status": "delivered_to_branch",
     "status_label": "Delivered to Branch",
     "pickup_at_vendor": false,
@@ -55,26 +59,68 @@ With note:
     "requires_handoff_action": true,
     "available_handoff_actions": [],
     "can_confirm_pickup_from_driver": false,
-    "can_confirm_handover_to_delivery": false,
-    "vendor_pickup_received_at": null,
-    "vendor_delivery_ready_at": null,
-    "vendor_client_delivery_handoff_at": null
+    "can_confirm_handover_to_delivery": false
   }
 }
 ```
 
 ---
 
-## New Response Flags
+## Driver QR Endpoint
 
-Two new boolean flags are now returned in **both** `GET /api/v1/vendor/orders/{id}` and `GET /api/v1/driver/orders/{id}`:
+```
+POST /api/v1/driver/orders/{orderId}/confirm-qr
+```
 
-| Flag                               | Meaning                                                        |
-|------------------------------------|-----------------------------------------------------------------|
-| `can_confirm_pickup_from_driver`   | Vendor can confirm receiving the order from the pickup driver   |
-| `can_confirm_handover_to_delivery` | Vendor can confirm handing the order to the delivery driver     |
+**Auth:** `Bearer <driver_token>`
 
-Use these flags to show/hide a confirmation button in the app UI.
+### Request Body
+
+| Field     | Type   | Required | Description                 |
+|-----------|--------|----------|-----------------------------|
+| `qr_code` | string | No       | Optional QR value if needed |
+
+Minimal request:
+
+```json
+{}
+```
+
+### Driver QR Response Example
+
+```json
+{
+  "status": true,
+  "code": 200,
+  "message": "Laundry can now confirm receiving the order from the pickup driver.",
+  "data": {
+    "order_id": 379,
+    "status": "picked_up",
+    "status_label": "Picked Up",
+    "driver_role": "pickup",
+    "can_confirm_pickup_from_driver": true,
+    "can_confirm_handover_to_delivery": false
+  }
+}
+```
+
+Important:
+
+- `confirm-qr` **enables a flag**
+- It does **not** change the order status for the vendor-owned handoff steps
+
+---
+
+## Persisted Response Flags
+
+Two boolean flags are now returned in **both** `GET /api/v1/vendor/orders/{id}` and `GET /api/v1/driver/orders/{id}`:
+
+| Flag                               | Meaning                                                   |
+|------------------------------------|-----------------------------------------------------------|
+| `can_confirm_pickup_from_driver`   | Vendor can now confirm receiving the order from pickup driver |
+| `can_confirm_handover_to_delivery` | Vendor can now confirm handing the order to delivery driver   |
+
+These are now **stored on the order** and are toggled by the flow itself.
 
 ---
 
@@ -85,6 +131,10 @@ Use these flags to show/hide a confirmation button in the app UI.
 ```
 Status: picked_up
   ↓
+  Driver calls: POST /driver/orders/{id}/confirm-qr
+  ↓
+  status remains: picked_up
+  ↓
   can_confirm_pickup_from_driver = true
   ↓
   Vendor calls: POST /vendor/orders/{id}/confirm-handoff
@@ -94,24 +144,14 @@ Status: delivered_to_branch
   can_confirm_pickup_from_driver = false
 ```
 
-**When does `can_confirm_pickup_from_driver` become `true`?**
-
-- The order needs a pickup driver (not `pickup_at_vendor`)
-- A `pickup_driver_id` is assigned
-- Current status is `picked_up`
-
-**What happens after confirm?**
-
-- Status changes to `delivered_to_branch`
-- The flag resets to `false`
-- Next step: assign a delivery driver (if needed)
-
----
-
 ### Case 2: Laundry → Delivery Driver
 
 ```
 Status: driver_delivery_accepted
+  ↓
+  Driver calls: POST /driver/orders/{id}/confirm-qr
+  ↓
+  status remains: driver_delivery_accepted
   ↓
   can_confirm_handover_to_delivery = true
   ↓
@@ -122,110 +162,131 @@ Status: on_way_to_delivery
   can_confirm_handover_to_delivery = false
 ```
 
-**When does `can_confirm_handover_to_delivery` become `true`?**
-
-- The order needs a delivery driver (not `delivery_at_vendor`)
-- A `delivery_driver_id` is assigned
-- Current status is `driver_delivery_accepted`
-
-**What happens after confirm?**
-
-- Status changes to `on_way_to_delivery`
-- The flag resets to `false`
-- Delivery driver is now officially on the way to the client
-
 ---
 
-## Full Order Lifecycle (with vendor confirms)
+## Full Lifecycle For These Steps
 
 ```
-pending
-  → confirmed
-  → waiting_payment / payment_confirmed
-  → driver_pickup_assigned
-  → driver_pickup_accepted
-  → on_way_to_pickup
-  → picked_up
-  ──────────────────────────────────────────────
-  → [VENDOR confirms pickup from driver]        ← NEW
-  ──────────────────────────────────────────────
+picked_up
+  → [DRIVER confirms QR]
+  → can_confirm_pickup_from_driver = true
+  → [VENDOR confirms handoff]
   → delivered_to_branch
-  → driver_delivery_assigned
-  → driver_delivery_accepted
-  ──────────────────────────────────────────────
-  → [VENDOR confirms handover to delivery]      ← NEW
-  ──────────────────────────────────────────────
+  → can_confirm_pickup_from_driver = false
+
+driver_delivery_accepted
+  → [DRIVER confirms QR]
+  → can_confirm_handover_to_delivery = true
+  → [VENDOR confirms handoff]
   → on_way_to_delivery
-  → waiting_client_receipt
-  → delivered
-  → completed
+  → can_confirm_handover_to_delivery = false
 ```
 
 ---
 
-## Driver `confirm-qr` Change
+## Behavior Change Summary
 
-`POST /api/v1/driver/orders/{id}/confirm-qr` **no longer** transitions these two cases:
+### Old Behavior
 
-| Driver Status              | Old Behavior                    | New Behavior                                         |
-|----------------------------|---------------------------------|------------------------------------------------------|
-| `picked_up` (pickup)       | → `delivered_to_branch`         | Returns error: "Confirmation is now performed by the laundry" |
-| `driver_delivery_accepted` | → `on_way_to_delivery`          | Returns error: "Confirmation is now performed by the laundry" |
+| Endpoint | Status Before | Status After |
+|----------|---------------|--------------|
+| `driver/orders/{id}/confirm-qr` | `picked_up` | `delivered_to_branch` |
+| `driver/orders/{id}/confirm-qr` | `driver_delivery_accepted` | `on_way_to_delivery` |
 
-The driver app should hide the QR confirm button for these two statuses and instead show a message that the laundry will confirm.
+### New Behavior
+
+| Endpoint | Status Before | Status After | What Changes |
+|----------|---------------|--------------|--------------|
+| `driver/orders/{id}/confirm-qr` | `picked_up` | `picked_up` | Enables `can_confirm_pickup_from_driver=true` |
+| `driver/orders/{id}/confirm-qr` | `driver_delivery_accepted` | `driver_delivery_accepted` | Enables `can_confirm_handover_to_delivery=true` |
+| `vendor/orders/{id}/confirm-handoff` | `picked_up` | `delivered_to_branch` | Consumes and clears pickup flag |
+| `vendor/orders/{id}/confirm-handoff` | `driver_delivery_accepted` | `on_way_to_delivery` | Consumes and clears delivery flag |
 
 ---
 
 ## Where Flags Appear
 
-| Endpoint                            | `can_confirm_pickup_from_driver` | `can_confirm_handover_to_delivery` |
-|-------------------------------------|----------------------------------|------------------------------------|
-| `GET /api/v1/vendor/orders/{id}`    | ✓                                | ✓                                  |
-| `GET /api/v1/driver/orders/{id}`    | ✓                                | ✓                                  |
-| `POST /vendor/orders/{id}/confirm-handoff` (response) | ✓                   | ✓                                  |
-| `PUT /vendor/orders/{id}/status` (response)           | ✓                   | ✓                                  |
+| Endpoint | `can_confirm_pickup_from_driver` | `can_confirm_handover_to_delivery` |
+|----------|----------------------------------|------------------------------------|
+| `GET /api/v1/vendor/orders/{id}` | ✓ | ✓ |
+| `GET /api/v1/driver/orders/{id}` | ✓ | ✓ |
+| `POST /api/v1/driver/orders/{id}/confirm-qr` response | ✓ | ✓ |
+| `POST /api/v1/vendor/orders/{id}/confirm-handoff` response | ✓ | ✓ |
+| `PUT /api/v1/vendor/orders/{id}/status` response | ✓ | ✓ |
+
+---
+
+## Validation Rules
+
+### Vendor `confirm-handoff`
+
+Vendor confirm succeeds only when:
+
+- The correct flag is `true`
+- The order still has the correct status
+  - `picked_up` for pickup handoff
+  - `driver_delivery_accepted` for delivery handoff
+
+If the flag is `true` but the status changed, vendor confirm is rejected as a safety check.
 
 ---
 
 ## Error Responses
 
-| Scenario                                        | HTTP | Message (EN)                                                |
-|-------------------------------------------------|------|-------------------------------------------------------------|
-| Order not found or wrong vendor                 | 404  | Order not found                                             |
-| No handoff action available for current status  | 400  | Handoff action is not available for this order in its current state |
-| Invalid status transition                       | 400  | (Specific transition error message)                         |
+| Scenario | HTTP | Message (EN) |
+|----------|------|--------------|
+| Order not found or wrong vendor | 404 | Order not found |
+| No handoff action available for current state | 400 | Handoff action is not available for this order in its current state |
+| Invalid status transition | 400 | Specific transition error message |
+| Invalid QR | 400 | Invalid QR code |
 
 ---
 
 ## Quick Test
 
 ```bash
-# 1. Check order
+# 1. Driver QR
+POST /api/v1/driver/orders/{id}/confirm-qr
+→ Status stays the same, appropriate flag becomes true
+
+# 2. Check order from driver or vendor side
+GET /api/v1/driver/orders/{id}
 GET /api/v1/vendor/orders/{id}
 → Look at: status, can_confirm_pickup_from_driver, can_confirm_handover_to_delivery
 
-# 2. If either flag is true, call:
+# 3. Vendor confirms handoff
 POST /api/v1/vendor/orders/{id}/confirm-handoff
 Body: {} or {"notes": "..."}
 
-# 3. Check order again
+# 4. Check order again
 GET /api/v1/vendor/orders/{id}
-→ Status should have changed, flag should be false
+→ Status should have changed, used flag should be false
 ```
 
 ---
 
-## Summary for Flutter Implementation
+## Summary For Flutter Implementation
 
 ### Vendor App
-- On the order details screen, read `can_confirm_pickup_from_driver` and `can_confirm_handover_to_delivery`.
-- If either is `true`, show a confirmation button with the appropriate label:
+
+- On the order details screen, read:
+  - `can_confirm_pickup_from_driver`
+  - `can_confirm_handover_to_delivery`
+- If either flag is `true`, show the corresponding confirmation button:
   - `can_confirm_pickup_from_driver`: "تأكيد استلام الطلب من المندوب" / "Confirm order received from driver"
   - `can_confirm_handover_to_delivery`: "تأكيد تسليم الطلب للمندوب" / "Confirm order handed to driver"
-- On tap, call `POST /vendor/orders/{id}/confirm-handoff`.
-- Refresh the order details after a successful response.
+- On tap, call `POST /vendor/orders/{id}/confirm-handoff`
+- Refresh order details after success
 
 ### Driver App
-- On `picked_up` and `driver_delivery_accepted` statuses, **do not** show the QR confirm button.
-- Optionally show an info message: "التأكيد يتم من جهة المغسلة" / "Confirmation is performed by the laundry".
-- The flags `can_confirm_pickup_from_driver` / `can_confirm_handover_to_delivery` are available in the driver order response for reference if needed.
+
+- Keep the QR confirm action for `picked_up` and `driver_delivery_accepted`
+- After QR success:
+  - Do not expect order status to change immediately
+  - Expect the correct vendor handoff flag to become `true`
+- Refresh the order after QR if the app wants to show the new flag state
+
+### UI Meaning
+
+- QR success means: "driver finished their part, vendor can now confirm"
+- Vendor confirm success means: "handoff finalized, order status changed"

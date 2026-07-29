@@ -477,7 +477,7 @@ class OrderController extends Controller
 
         $order = $order->fresh(['vendor', 'client', 'items', 'statusLogs']);
 
-        return successResponse($order, 'Order status updated successfully');
+        return successResponse($order, __('order.order_status_updated'));
     }
 
     /**

@@ -350,8 +350,8 @@ return [
     'vendor_handoff_log_handover_to_delivery_confirmed' => 'Laundry confirmed handing the order to the delivery driver',
     'vendor_handoff_log_ready_for_pickup' => 'Laundry marked order ready for client pickup',
     'vendor_handoff_log_client_pickup_received' => 'Laundry confirmed client picked up order at branch',
-    'vendor_handoff_driver_qr_enabled_pickup' => 'Pickup QR confirmed. Laundry can now confirm receiving the order from the pickup driver.',
-    'vendor_handoff_driver_qr_enabled_delivery' => 'Delivery QR confirmed. Laundry can now confirm handing the order to the delivery driver.',
+    'vendor_handoff_driver_qr_enabled_pickup' => 'Laundry can now confirm receiving the order from the pickup driver.',
+    'vendor_handoff_driver_qr_enabled_delivery' => 'Laundry can now confirm handing the order to the delivery driver.',
     'vendor_handoff_driver_confirm_disabled_pickup' => 'Pickup-to-laundry confirmation is now performed by the laundry.',
     'vendor_handoff_driver_confirm_disabled_delivery' => 'Laundry-to-delivery handoff confirmation is now performed by the laundry.',
 
