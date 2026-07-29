@@ -31,6 +31,27 @@ class VendorOrderHandoffService
         return $this->resolveClientDeliveryHandoffContext($order) !== null;
     }
 
+    public function canConfirmPickupFromDriver(Order $order): bool
+    {
+        return $this->resolvePickupFromDriverContext($order) !== null;
+    }
+
+    public function canConfirmHandoverToDelivery(Order $order): bool
+    {
+        return $this->resolveHandoverToDeliveryContext($order) !== null;
+    }
+
+    /**
+     * @return array{can_confirm_pickup_from_driver: bool, can_confirm_handover_to_delivery: bool}
+     */
+    public function vendorConfirmFlags(Order $order): array
+    {
+        return [
+            'can_confirm_pickup_from_driver' => $this->canConfirmPickupFromDriver($order),
+            'can_confirm_handover_to_delivery' => $this->canConfirmHandoverToDelivery($order),
+        ];
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -49,6 +70,20 @@ class VendorOrderHandoffService
                 'method' => 'PUT',
                 'body' => $context['reject_body'] ?? ['status' => OrderStatus::CANCELLED->value],
                 'confirm_label' => $context['reject_label'] ?? __('order.vendor_handoff_reject_pickup_received'),
+            ]);
+        }
+
+        if ($context = $this->resolvePickupFromDriverContext($order)) {
+            $actions[] = array_merge($context, [
+                'action' => 'confirm_pickup_from_driver',
+                'method' => 'POST',
+            ]);
+        }
+
+        if ($context = $this->resolveHandoverToDeliveryContext($order)) {
+            $actions[] = array_merge($context, [
+                'action' => 'confirm_handover_to_delivery',
+                'method' => 'POST',
             ]);
         }
 
@@ -144,6 +179,50 @@ class VendorOrderHandoffService
         return $order->fresh();
     }
 
+    public function confirmPickupFromDriver(Order $order, int $changedBy, ?string $notes = null): Order
+    {
+        if (! $this->canConfirmPickupFromDriver($order)) {
+            throw new \LogicException(__('order.vendor_handoff_error_not_awaiting_driver_pickup_handoff'));
+        }
+
+        if (! $this->statusService->canTransition($order, OrderStatus::DELIVERED_TO_BRANCH)) {
+            throw new InvalidStatusTransitionException(
+                OrderStatus::from($order->status),
+                OrderStatus::DELIVERED_TO_BRANCH,
+                $order
+            );
+        }
+
+        $this->statusService->transitionTo($order, OrderStatus::DELIVERED_TO_BRANCH, [
+            'notes' => $notes ?? __('order.vendor_handoff_log_pickup_from_driver_confirmed'),
+            'changed_by' => $changedBy,
+        ]);
+
+        return $order->fresh();
+    }
+
+    public function confirmHandoverToDelivery(Order $order, int $changedBy, ?string $notes = null): Order
+    {
+        if (! $this->canConfirmHandoverToDelivery($order)) {
+            throw new \LogicException(__('order.vendor_handoff_error_not_awaiting_delivery_driver_handoff'));
+        }
+
+        if (! $this->statusService->canTransition($order, OrderStatus::ON_WAY_TO_DELIVERY)) {
+            throw new InvalidStatusTransitionException(
+                OrderStatus::from($order->status),
+                OrderStatus::ON_WAY_TO_DELIVERY,
+                $order
+            );
+        }
+
+        $this->statusService->transitionTo($order, OrderStatus::ON_WAY_TO_DELIVERY, [
+            'notes' => $notes ?? __('order.vendor_handoff_log_handover_to_delivery_confirmed'),
+            'changed_by' => $changedBy,
+        ]);
+
+        return $order->fresh();
+    }
+
     /**
      * @return array{handoff_type: string, target_status: string, confirm_label: string, endpoint: string}|null
      */
@@ -233,6 +312,68 @@ class VendorOrderHandoffService
             'endpoint' => '/api/v1/vendor/home/assign-driver',
             'method' => 'POST',
             'note' => __('order.vendor_handoff_assign_delivery_driver_note'),
+        ];
+    }
+
+    /**
+     * Vendor confirms receiving the order from the pickup driver at the branch.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function resolvePickupFromDriverContext(Order $order): ?array
+    {
+        if (! $order->needsPickupDriver()) {
+            return null;
+        }
+
+        if (! $order->pickup_driver_id) {
+            return null;
+        }
+
+        if ($order->status !== OrderStatus::PICKED_UP->value) {
+            return null;
+        }
+
+        if (! $this->statusService->canTransition($order, OrderStatus::DELIVERED_TO_BRANCH)) {
+            return null;
+        }
+
+        return [
+            'handoff_type' => 'confirm_pickup_from_driver',
+            'target_status' => OrderStatus::DELIVERED_TO_BRANCH->value,
+            'confirm_label' => __('order.vendor_handoff_confirm_pickup_from_driver'),
+            'endpoint' => '/api/v1/vendor/orders/'.$order->id.'/confirm-handoff',
+        ];
+    }
+
+    /**
+     * Vendor confirms handing the order to the delivery driver.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function resolveHandoverToDeliveryContext(Order $order): ?array
+    {
+        if (! $order->needsDeliveryDriver()) {
+            return null;
+        }
+
+        if (! $order->delivery_driver_id) {
+            return null;
+        }
+
+        if ($order->status !== OrderStatus::DRIVER_DELIVERY_ACCEPTED->value) {
+            return null;
+        }
+
+        if (! $this->statusService->canTransition($order, OrderStatus::ON_WAY_TO_DELIVERY)) {
+            return null;
+        }
+
+        return [
+            'handoff_type' => 'confirm_handover_to_delivery',
+            'target_status' => OrderStatus::ON_WAY_TO_DELIVERY->value,
+            'confirm_label' => __('order.vendor_handoff_confirm_handover_to_delivery'),
+            'endpoint' => '/api/v1/vendor/orders/'.$order->id.'/confirm-handoff',
         ];
     }
 

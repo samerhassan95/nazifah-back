@@ -889,7 +889,11 @@ class OrderController extends Controller
         $response['vendor_chat'] = $this->getVendorChatForOrder($order, $driver->id);
         $response['rating'] = $order->rating !== null ? (int) $order->rating : null;
         $response['review'] = $order->review;
-        $response = array_merge($response, $order->clientVisitResponseFields());
+        $response = array_merge(
+            $response,
+            $order->clientVisitResponseFields(),
+            app(\App\Services\VendorOrderHandoffService::class)->vendorConfirmFlags($order)
+        );
 
         return successResponse($response, 'Order details retrieved successfully');
     }
@@ -1190,10 +1194,10 @@ class OrderController extends Controller
     }
 
     /**
-     * Confirm with QR code — does NOT transition to delivered (client does that via confirm-delivery).
+     * Confirm with QR code.
      *
-     * - Pickup driver (picked_up) → delivered_to_branch
-     * - Delivery driver at laundry (driver_delivery_accepted) → on_way_to_delivery only
+     * Driver QR no longer performs the vendor-owned branch handoff transitions;
+     * final delivery is still confirmed by the client via confirm-delivery.
      */
     public function confirmQR(ConfirmQRRequest $request, $orderId): JsonResponse
     {
@@ -1220,56 +1224,17 @@ class OrderController extends Controller
             }
         }
 
-        $statusService = app(\App\Services\OrderStatusService::class);
-
         // Determine the driver's role for this order
         $isPickupDriver = (int) $order->pickup_driver_id === (int) $driver->id;
         $isDeliveryDriver = (int) $order->delivery_driver_id === (int) $driver->id;
 
-        // Case 1: Pickup driver — delivering clothes TO the branch (laundry)
-        // Valid from status: picked_up → delivered_to_branch
+        // Vendor owns these two handoff confirmations now.
         if ($isPickupDriver && $order->status === OrderStatus::PICKED_UP->value) {
-            try {
-                $statusService->transitionTo($order, OrderStatus::DELIVERED_TO_BRANCH, [
-                    'notes' => 'Delivered to branch, confirmed with QR code by pickup driver',
-                    'changed_by' => $driver->id,
-                ]);
-            } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
-                return errorResponse($e->userMessage(), null, 400);
-            }
-
-            // Pickup driver task is complete — mark available
-            $driver->update(['is_available' => true]);
-
-            return successResponse($this->orderApiPayload($order->fresh(), [
-                'order_id' => $order->id,
-                'order_number' => $order->order_number,
-                'status' => $order->fresh()->status,
-                'status_label' => OrderStatus::tryFrom($order->fresh()->status)?->localizedLabel($order->payment_method) ?? $order->fresh()->status,
-                'driver_role' => 'pickup',
-                'delivered_to_branch_at' => now()->toISOString(),
-            ]), $lang === 'ar' ? 'تم تأكيد التسليم للمغسلة بنجاح' : 'Delivered to branch confirmed successfully');
+            return errorResponse(__('order.vendor_handoff_driver_confirm_disabled_pickup'), null, 400);
         }
 
         if ($isDeliveryDriver && $order->status === OrderStatus::DRIVER_DELIVERY_ACCEPTED->value) {
-            try {
-                $statusService->transitionTo($order, OrderStatus::ON_WAY_TO_DELIVERY, [
-                    'notes' => __('order.status_log_driver_qr_delivery_on_way'),
-                    'changed_by' => $driver->id,
-                ]);
-            } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
-                return errorResponse($e->userMessage(), null, 400);
-            }
-            $order->refresh();
-
-            return successResponse($this->orderApiPayload($order, [
-                'order_id' => $order->id,
-                'order_number' => $order->order_number,
-                'status' => $order->status,
-                'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
-                'driver_role' => 'delivery',
-                'pickup_from_vendor_confirmed_at' => now()->toISOString(),
-            ]), $lang === 'ar' ? 'تم استلام الطلب من المغسلة وأنت في الطريق للعميل' : 'Order received from laundry, on way to client');
+            return errorResponse(__('order.vendor_handoff_driver_confirm_disabled_delivery'), null, 400);
         }
 
         // Delivery driver never transitions to delivered via confirm-qr — only client confirm-delivery does
@@ -1334,7 +1299,8 @@ class OrderController extends Controller
         return array_merge(
             $payload,
             $order->couponResponseFields(),
-            $order->clientVisitResponseFields()
+            $order->clientVisitResponseFields(),
+            app(\App\Services\VendorOrderHandoffService::class)->vendorConfirmFlags($order)
         );
     }
 }
