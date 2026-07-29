@@ -47,9 +47,39 @@ class VendorOrderHandoffService
     public function vendorConfirmFlags(Order $order): array
     {
         return [
-            'can_confirm_pickup_from_driver' => $this->canConfirmPickupFromDriver($order),
-            'can_confirm_handover_to_delivery' => $this->canConfirmHandoverToDelivery($order),
+            'can_confirm_pickup_from_driver' => (bool) $order->can_confirm_pickup_from_driver,
+            'can_confirm_handover_to_delivery' => (bool) $order->can_confirm_handover_to_delivery,
         ];
+    }
+
+    public function enablePickupFromDriverConfirm(Order $order): Order
+    {
+        $order->update([
+            'can_confirm_pickup_from_driver' => true,
+            'can_confirm_handover_to_delivery' => false,
+        ]);
+
+        return $order->fresh();
+    }
+
+    public function enableHandoverToDeliveryConfirm(Order $order): Order
+    {
+        $order->update([
+            'can_confirm_pickup_from_driver' => false,
+            'can_confirm_handover_to_delivery' => true,
+        ]);
+
+        return $order->fresh();
+    }
+
+    public function clearVendorConfirmFlags(Order $order): Order
+    {
+        $order->update([
+            'can_confirm_pickup_from_driver' => false,
+            'can_confirm_handover_to_delivery' => false,
+        ]);
+
+        return $order->fresh();
     }
 
     /**
@@ -198,7 +228,9 @@ class VendorOrderHandoffService
             'changed_by' => $changedBy,
         ]);
 
-        return $order->fresh();
+        $order->refresh();
+
+        return $this->clearVendorConfirmFlags($order);
     }
 
     public function confirmHandoverToDelivery(Order $order, int $changedBy, ?string $notes = null): Order
@@ -220,7 +252,9 @@ class VendorOrderHandoffService
             'changed_by' => $changedBy,
         ]);
 
-        return $order->fresh();
+        $order->refresh();
+
+        return $this->clearVendorConfirmFlags($order);
     }
 
     /**
@@ -322,6 +356,10 @@ class VendorOrderHandoffService
      */
     public function resolvePickupFromDriverContext(Order $order): ?array
     {
+        if (! (bool) $order->can_confirm_pickup_from_driver) {
+            return null;
+        }
+
         if (! $order->needsPickupDriver()) {
             return null;
         }
@@ -353,6 +391,10 @@ class VendorOrderHandoffService
      */
     public function resolveHandoverToDeliveryContext(Order $order): ?array
     {
+        if (! (bool) $order->can_confirm_handover_to_delivery) {
+            return null;
+        }
+
         if (! $order->needsDeliveryDriver()) {
             return null;
         }

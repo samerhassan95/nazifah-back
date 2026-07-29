@@ -351,6 +351,8 @@ return [
     'vendor_handoff_log_handover_to_delivery_confirmed' => 'أكّدت المغسلة تسليم الطلب إلى مندوب التوصيل',
     'vendor_handoff_log_ready_for_pickup' => 'أكّدت المغسلة أن الطلب جاهز لاستلام العميل',
     'vendor_handoff_log_client_pickup_received' => 'أكّدت المغسلة أن العميل استلم الطلب من الفرع',
+    'vendor_handoff_driver_qr_enabled_pickup' => 'تم تأكيد QR من مندوب الاستلام. يمكن للمغسلة الآن تأكيد استلام الطلب من المندوب.',
+    'vendor_handoff_driver_qr_enabled_delivery' => 'تم تأكيد QR من مندوب التوصيل. يمكن للمغسلة الآن تأكيد تسليم الطلب إلى المندوب.',
     'vendor_handoff_driver_confirm_disabled_pickup' => 'تأكيد تسليم الطلب للمغسلة أصبح يتم من جهة المغسلة.',
     'vendor_handoff_driver_confirm_disabled_delivery' => 'تأكيد تسليم الطلب إلى مندوب التوصيل أصبح يتم من جهة المغسلة.',
 

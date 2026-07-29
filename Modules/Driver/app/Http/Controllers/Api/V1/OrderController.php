@@ -1196,8 +1196,8 @@ class OrderController extends Controller
     /**
      * Confirm with QR code.
      *
-     * Driver QR no longer performs the vendor-owned branch handoff transitions;
-     * final delivery is still confirmed by the client via confirm-delivery.
+     * For vendor-owned handoff legs, QR enables the corresponding vendor confirm flag
+     * without changing order status. Final delivery is still confirmed by the client.
      */
     public function confirmQR(ConfirmQRRequest $request, $orderId): JsonResponse
     {
@@ -1227,14 +1227,30 @@ class OrderController extends Controller
         // Determine the driver's role for this order
         $isPickupDriver = (int) $order->pickup_driver_id === (int) $driver->id;
         $isDeliveryDriver = (int) $order->delivery_driver_id === (int) $driver->id;
+        $handoffService = app(\App\Services\VendorOrderHandoffService::class);
 
-        // Vendor owns these two handoff confirmations now.
         if ($isPickupDriver && $order->status === OrderStatus::PICKED_UP->value) {
-            return errorResponse(__('order.vendor_handoff_driver_confirm_disabled_pickup'), null, 400);
+            $order = $handoffService->enablePickupFromDriverConfirm($order);
+
+            return successResponse($this->orderApiPayload($order, [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+                'driver_role' => 'pickup',
+            ]), __('order.vendor_handoff_driver_qr_enabled_pickup'));
         }
 
         if ($isDeliveryDriver && $order->status === OrderStatus::DRIVER_DELIVERY_ACCEPTED->value) {
-            return errorResponse(__('order.vendor_handoff_driver_confirm_disabled_delivery'), null, 400);
+            $order = $handoffService->enableHandoverToDeliveryConfirm($order);
+
+            return successResponse($this->orderApiPayload($order, [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+                'driver_role' => 'delivery',
+            ]), __('order.vendor_handoff_driver_qr_enabled_delivery'));
         }
 
         // Delivery driver never transitions to delivered via confirm-qr — only client confirm-delivery does
