@@ -2833,11 +2833,22 @@ class OrderController extends Controller
                     : 'You need to complete the payment';
             }
 
+            $cardTitle = $order->status === OrderStatus::BRANCH_REVIEW->value
+                ? ($lang === 'ar' ? 'تم تحديث طلبك' : 'Your order has been updated')
+                : ($lang === 'ar' ? 'الدفع مطلوب لإكمال الطلب' : 'Payment required to complete your order');
+            $cardDescription = $order->status === OrderStatus::BRANCH_REVIEW->value
+                ? ($lang === 'ar'
+                    ? 'قامت المغسلة بمراجعة الطلب، وكانت النتيجة كالتالي:'
+                    : 'The laundry has reviewed the order. Here is the result:')
+                : ($actionDescription ?? ($lang === 'ar' ? 'يجب إتمام الدفع' : 'You need to complete the payment'));
+            $cardPayload = $this->getOnTheWayCardPayload($order, $cardTitle, $cardDescription);
+
             return array_merge([
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->status,
                 'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+                ...$cardPayload,
                 'required_action' => $requiredAction,
                 'action_description' => $actionDescription,
                 'vendor' => [
