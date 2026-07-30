@@ -2761,6 +2761,25 @@ class OrderController extends Controller
     }
 
     /**
+     * Provide card-friendly aliases for on-the-way responses.
+     *
+     * @return array{name: string, description: string, image: ?string}
+     */
+    private function getOnTheWayCardPayload(Order $order, string $title, string $message): array
+    {
+        $itemWithImage = $order->items?->first(fn ($item) => ! empty($item->images));
+        $image = $itemWithImage?->images
+            ? $this->uploadFilesService->getFullUrl($itemWithImage->images)
+            : ($order->driver?->image ? $this->uploadFilesService->getFullUrl($order->driver->image) : null);
+
+        return [
+            'name' => $title,
+            'description' => $message,
+            'image' => $image,
+        ];
+    }
+
+    /**
      * Get order pending approval (vendor made modifications)
      */
     public function getPendingApproval(Request $request, ?int $orderId = null): JsonResponse
@@ -3523,6 +3542,11 @@ class OrderController extends Controller
             // Laundry review pending client approval — return review summary for the app card.
             if ($order->status === OrderStatus::BRANCH_REVIEW->value) {
                 $categorized = $this->categorizePendingApprovalItems($order, $lang);
+                $title = $lang === 'ar' ? 'تم تحديث طلبك' : 'Your order has been updated';
+                $message = $lang === 'ar'
+                    ? 'قامت المغسلة بمراجعة الطلب، وكانت النتيجة كالتالي:'
+                    : 'The laundry has reviewed the order. Here is the result:';
+                $cardPayload = $this->getOnTheWayCardPayload($order, $title, $message);
 
                 return [
                     'id' => $order->id,
@@ -3530,10 +3554,9 @@ class OrderController extends Controller
                     'order_number' => $order->order_number,
                     'status' => $order->status,
                     'status_label' => $order->status_label,
-                    'title' => $lang === 'ar' ? 'تم تحديث طلبك' : 'Your order has been updated',
-                    'message' => $lang === 'ar'
-                        ? 'قامت المغسلة بمراجعة الطلب، وكانت النتيجة كالتالي:'
-                        : 'The laundry has reviewed the order. Here is the result:',
+                    'title' => $title,
+                    'message' => $message,
+                    ...$cardPayload,
                     'requires_handoff_confirmation' => false,
                     'requires_visit_response' => false,
                     'requires_vendor_action' => false,
@@ -3690,6 +3713,7 @@ class OrderController extends Controller
                 'requires_vendor_action' => false,
                 'waiting_for' => $waitingForVendor ? 'vendor' : null,
             ]);
+            $cardPayload = $this->getOnTheWayCardPayload($order, $title, $message);
 
             $response = [
                 'id' => $order->id,
@@ -3699,6 +3723,7 @@ class OrderController extends Controller
                 'status_label' => $order->status_label,
                 'title' => $title,
                 'message' => $message,
+                ...$cardPayload,
                 'requires_handoff_confirmation' => $requiresHandoff,
                 'requires_visit_response' => $requiresVisitResponse,
                 'requires_vendor_action' => $requiresVendorAction,
