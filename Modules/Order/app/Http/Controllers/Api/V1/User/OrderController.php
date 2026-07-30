@@ -2479,15 +2479,36 @@ class OrderController extends Controller
                     'additional_services' => $acceptedAdditions,
                 ];
 
-                foreach ($rejectedAdditions as $rejectedAddition) {
+                // Group all rejected additions under one rejected line per piece
+                // (do not emit one rejected piece line per addition).
+                if ($rejectedAdditions !== []) {
+                    $rejectedAdditionsTotal = (float) collect($rejectedAdditions)->sum('total');
+                    $servicesFromRejectedAdditions = collect($rejectedAdditions)
+                        ->map(fn (array $addition) => [
+                            'id' => $addition['id'],
+                            'name' => $addition['name'],
+                            'price' => (float) $addition['price'],
+                        ])
+                        ->values()
+                        ->all();
+                    $rejectedAdditionNotes = collect($rejectedAdditions)
+                        ->pluck('vendor_notes')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+
                     $rejectedItems[] = [
-                        'order_item_id' => $ids[0],
+                        'id' => $ids[0],
+                        'ids' => $ids,
                         'piece_name' => $pieceName,
-                        'service_name' => $rejectedAddition['name'],
-                        'price' => $rejectedAddition['price'],
-                        'quantity' => $rejectedAddition['quantity'],
-                        'total' => $rejectedAddition['total'],
-                        'vendor_notes' => $rejectedAddition['vendor_notes'],
+                        'service_name' => collect($servicesFromRejectedAdditions)->pluck('name')->filter()->implode('، ') ?: 'Unknown',
+                        'services' => $servicesFromRejectedAdditions,
+                        'quantity' => $quantity,
+                        'unit_price' => round($rejectedAdditionsTotal, 2),
+                        'total_price' => round($rejectedAdditionsTotal, 2),
+                        'vendor_notes' => $rejectedAdditionNotes !== [] ? implode(' | ', $rejectedAdditionNotes) : null,
+                        'additional_services' => $rejectedAdditions,
                     ];
                 }
             }
