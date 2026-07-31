@@ -2782,20 +2782,56 @@ class OrderController extends Controller
     }
 
     /**
-     * Provide card-friendly aliases for on-the-way responses.
+     * Card fields for on-the-way / pending-approval: piece name, description, and image.
      *
-     * @return array{name: string, description: string, image: ?string}
+     * @return array{name: ?string, description: ?string, image: ?string}
      */
-    private function getOnTheWayCardPayload(Order $order, string $title, string $message): array
+    private function getOnTheWayCardPayload(Order $order, string $lang): array
     {
-        $itemWithImage = $order->items?->first(fn ($item) => ! empty($item->images));
+        $branchId = (int) ($order->branch_id ?? 0);
+        $items = $order->items ?? collect();
+
+        if ($items->isEmpty()) {
+            return [
+                'name' => null,
+                'description' => null,
+                'image' => null,
+            ];
+        }
+
+        $groupItems = OrderItemGrouper::buckets($items)[0] ?? collect([$items->first()]);
+        $primary = $groupItems->first();
+
+        $name = $primary?->piece
+            ? \App\Support\OrderItemDisplayNames::pieceName($primary->piece, $branchId, $lang)
+            : null;
+
+        $serviceNames = $groupItems
+            ->map(function ($item) use ($branchId, $lang) {
+                if (! $item->service) {
+                    return null;
+                }
+
+                return \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang);
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $description = $primary?->notes
+            ?: ($serviceNames !== [] ? implode($lang === 'ar' ? '، ' : ', ', $serviceNames) : null);
+
+        $itemWithImage = $groupItems->first(fn ($item) => ! empty($item->images))
+            ?? $items->first(fn ($item) => ! empty($item->images));
+
         $image = $itemWithImage?->images
             ? $this->uploadFilesService->getFullUrl($itemWithImage->images)
-            : ($order->driver?->image ? $this->uploadFilesService->getFullUrl($order->driver->image) : null);
+            : \App\Support\OrderItemDisplayNames::pieceIconUrl($primary?->piece);
 
         return [
-            'name' => $title,
-            'description' => $message,
+            'name' => $name,
+            'description' => $description,
             'image' => $image,
         ];
     }
@@ -2862,13 +2898,15 @@ class OrderController extends Controller
                     ? 'قامت المغسلة بمراجعة الطلب، وكانت النتيجة كالتالي:'
                     : 'The laundry has reviewed the order. Here is the result:')
                 : ($actionDescription ?? ($lang === 'ar' ? 'يجب إتمام الدفع' : 'You need to complete the payment'));
-            $cardPayload = $this->getOnTheWayCardPayload($order, $cardTitle, $cardDescription);
+            $cardPayload = $this->getOnTheWayCardPayload($order, $lang);
 
             return array_merge([
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->status,
                 'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+                'title' => $cardTitle,
+                'message' => $cardDescription,
                 ...$cardPayload,
                 'required_action' => $requiredAction,
                 'action_description' => $actionDescription,
@@ -3578,7 +3616,7 @@ class OrderController extends Controller
                 $message = $lang === 'ar'
                     ? 'قامت المغسلة بمراجعة الطلب، وكانت النتيجة كالتالي:'
                     : 'The laundry has reviewed the order. Here is the result:';
-                $cardPayload = $this->getOnTheWayCardPayload($order, $title, $message);
+                $cardPayload = $this->getOnTheWayCardPayload($order, $lang);
 
                 return [
                     'id' => $order->id,
@@ -3745,7 +3783,7 @@ class OrderController extends Controller
                 'requires_vendor_action' => false,
                 'waiting_for' => $waitingForVendor ? 'vendor' : null,
             ]);
-            $cardPayload = $this->getOnTheWayCardPayload($order, $title, $message);
+            $cardPayload = $this->getOnTheWayCardPayload($order, $lang);
 
             $response = [
                 'id' => $order->id,
