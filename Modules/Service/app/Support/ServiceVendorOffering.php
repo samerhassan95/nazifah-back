@@ -53,7 +53,29 @@ class ServiceVendorOffering
             ->where('service_id', $serviceId)
             ->update(['is_active' => $isActive, 'updated_at' => now()]);
 
+        // Laundry-level off cascades to every branch offering for this vendor.
+        // Re-enabling laundry does not auto-enable branches (explicit per-branch toggle).
+        if (! $isActive) {
+            self::deactivateOnVendorBranches($vendorId, $serviceId);
+        }
+
         return $isActive;
+    }
+
+    /**
+     * Set branch_service.is_active=false for this service on all vendor branches.
+     */
+    public static function deactivateOnVendorBranches(int $vendorId, int $serviceId): int
+    {
+        $branchIds = DB::table('branches')->where('vendor_id', $vendorId)->pluck('id');
+        if ($branchIds->isEmpty()) {
+            return 0;
+        }
+
+        return DB::table('branch_service')
+            ->where('service_id', $serviceId)
+            ->whereIn('branch_id', $branchIds)
+            ->update(['is_active' => false, 'updated_at' => now()]);
     }
 
     public static function find(int $vendorId, int $serviceId): ?object

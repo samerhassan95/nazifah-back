@@ -38,6 +38,7 @@ return [
     'service_not_in_vendor_catalog' => 'Add this service to your laundry catalog first from the services page.',
     'service_removed_from_vendor_catalog' => 'Service removed from your catalog (system service unchanged)',
     'service_status_updated' => 'Service status updated successfully',
+    'service_inactive_at_vendor' => 'Cannot enable this service on the branch while it is inactive at laundry level.',
     'branch_service_status_updated' => 'Branch service status updated successfully',
     'service_addition_status_updated' => 'Additional service status updated successfully',
     'branch_service_addition_status_updated' => 'Branch additional service status updated successfully',

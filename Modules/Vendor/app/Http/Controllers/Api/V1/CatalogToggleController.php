@@ -53,6 +53,8 @@ class CatalogToggleController extends Controller
         return successResponse([
             'service_id' => $serviceId,
             'is_active' => $isActive,
+            // When laundry is turned off, all branch offerings are forced inactive too.
+            'branch_is_active' => $isActive ? null : false,
         ], __('service.service_status_updated'));
     }
 
@@ -77,6 +79,15 @@ class CatalogToggleController extends Controller
         }
 
         $isActive = ! ((bool) ($pivot->is_active ?? true));
+
+        // Cannot enable a branch service while it is inactive at laundry level.
+        if ($isActive) {
+            $vendorOffering = ServiceVendorOffering::find((int) $branch->vendor_id, $serviceId);
+            if ($vendorOffering && ! ((bool) ($vendorOffering->is_active ?? true))) {
+                return errorResponse(__('service.service_inactive_at_vendor'), 400);
+            }
+        }
+
         DB::table('branch_service')
             ->where('branch_id', $branchId)
             ->where('service_id', $serviceId)

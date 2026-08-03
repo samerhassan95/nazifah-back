@@ -38,6 +38,7 @@ return [
     'service_not_in_vendor_catalog' => 'أضف الخدمة إلى كتالوج المغسلة أولاً من صفحة الخدمات.',
     'service_removed_from_vendor_catalog' => 'تمت إزالة الخدمة من كتالوجك (خدمة النظام لم تُحذف)',
     'service_status_updated' => 'تم تحديث حالة الخدمة بنجاح',
+    'service_inactive_at_vendor' => 'لا يمكن تفعيل الخدمة على الفرع لأنها معطّلة على مستوى المغسلة.',
     'branch_service_status_updated' => 'تم تحديث حالة الخدمة في الفرع بنجاح',
     'service_addition_status_updated' => 'تم تحديث حالة الخدمة الإضافية بنجاح',
     'branch_service_addition_status_updated' => 'تم تحديث حالة الخدمة الإضافية في الفرع بنجاح',
