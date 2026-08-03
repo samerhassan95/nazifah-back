@@ -75,12 +75,16 @@ class PaymentMethod extends Model
         $locale = $locale ?? app()->getLocale();
         $activeGateway = $activeGateway ?? ActiveGatewayResolver::name();
 
-        return self::active()
+        $methods = self::active()
             ->get()
             ->map(fn (self $method) => self::formatForApi($method, $locale, $activeGateway))
             ->filter()
             ->values()
             ->all();
+
+        return $activeGateway === 'moyasar'
+            ? self::collapseGatewayMethodsForMoyasar($methods, $locale)
+            : $methods;
     }
 
     /**
@@ -133,6 +137,49 @@ class PaymentMethod extends Model
         }
 
         return $payload;
+    }
+
+    /**
+     * Under Moyasar, present all enabled external methods as one "credit card" option.
+     *
+     * @param  array<int, array<string, mixed>>  $methods
+     * @return array<int, array<string, mixed>>
+     */
+    private static function collapseGatewayMethodsForMoyasar(array $methods, string $locale): array
+    {
+        $internalValues = ['cash_on_delivery', 'nazefah_wallet'];
+        $gatewayMethods = array_values(array_filter(
+            $methods,
+            fn (array $method) => ! in_array((string) ($method['value'] ?? ''), $internalValues, true)
+        ));
+
+        $remaining = array_values(array_filter(
+            $methods,
+            fn (array $method) => in_array((string) ($method['value'] ?? ''), $internalValues, true)
+        ));
+
+        if ($gatewayMethods === []) {
+            return $remaining;
+        }
+
+        $remaining[] = [
+            'id' => 'moyasar-credit-card',
+            'type' => 'moyasar',
+            'value' => 'credit_card',
+            'label' => __('payment.credit_card', [], $locale),
+            'is_active' => true,
+            'sort_order' => min(array_map(fn (array $m) => (int) ($m['sort_order'] ?? 9999), $gatewayMethods)),
+            'payfort_option' => null,
+            'moyasar_source' => 'creditcard',
+            'grouped_method_values' => array_values(array_map(
+                fn (array $m) => (string) ($m['value'] ?? ''),
+                $gatewayMethods
+            )),
+        ];
+
+        usort($remaining, fn (array $a, array $b) => ((int) ($a['sort_order'] ?? 9999)) <=> ((int) ($b['sort_order'] ?? 9999)));
+
+        return array_values($remaining);
     }
 
     /**

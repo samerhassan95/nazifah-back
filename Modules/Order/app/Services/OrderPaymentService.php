@@ -26,6 +26,8 @@ use Modules\Payment\Services\PaymentService;
  */
 class OrderPaymentService
 {
+    public const CREDIT_CARD_ALIAS = 'credit_card';
+
     public function __construct(private PaymentService $paymentService) {}
 
     /**
@@ -116,12 +118,12 @@ class OrderPaymentService
         if (is_string($value)) {
             $value = trim($value);
 
-            return $value !== '' ? [$value] : null;
+            return $value !== '' ? [$this->normalizePaymentMethodAlias($value)] : null;
         }
 
         if (is_array($value)) {
             $methods = array_values(array_unique(array_filter(
-                array_map(static fn ($m) => trim((string) $m), $value),
+                array_map(fn ($m) => $this->normalizePaymentMethodAlias(trim((string) $m)), $value),
                 static fn ($m) => $m !== ''
             )));
 
@@ -129,6 +131,13 @@ class OrderPaymentService
         }
 
         return null;
+    }
+
+    private function normalizePaymentMethodAlias(string $method): string
+    {
+        return $method === self::CREDIT_CARD_ALIAS
+            ? PaymentMethod::VISA->value
+            : $method;
     }
 
     /**

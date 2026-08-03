@@ -13,6 +13,7 @@ return [
     'visa' => 'فيزا',
     'mastercard' => 'ماستركارد',
     'mada' => 'مدى',
+    'credit_card' => 'بطاقة ائتمانية',
     'nazefah_wallet' => 'محفظة نتيفة',
     'stc_pay' => 'STC Pay',
     'samsung_pay' => 'سامسونج باي',

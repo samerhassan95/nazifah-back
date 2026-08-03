@@ -13,6 +13,7 @@ return [
     'visa' => 'Visa',
     'mastercard' => 'MasterCard',
     'mada' => 'MADA',
+    'credit_card' => 'Credit Card',
     'nazefah_wallet' => 'Nathefah Wallet',
     'stc_pay' => 'STC Pay',
     'samsung_pay' => 'Samsung Pay',
