@@ -82,9 +82,15 @@ class PaymentMethod extends Model
             ->values()
             ->all();
 
-        return $activeGateway === 'moyasar'
-            ? self::collapseGatewayMethodsForMoyasar($methods, $locale)
-            : $methods;
+        if ($activeGateway === 'moyasar') {
+            return self::collapseGatewayMethodsForMoyasar($methods, $locale);
+        }
+
+        // Amazon Pay keeps per-method options; hide the Moyasar-only aggregate row.
+        return array_values(array_filter(
+            $methods,
+            fn (array $method) => ($method['value'] ?? '') !== 'credit_card'
+        ));
     }
 
     /**
@@ -148,9 +154,23 @@ class PaymentMethod extends Model
     private static function collapseGatewayMethodsForMoyasar(array $methods, string $locale): array
     {
         $internalValues = ['cash_on_delivery', 'nazefah_wallet'];
+        $creditCardValue = 'credit_card';
+
+        $creditCard = null;
+        foreach ($methods as $method) {
+            if (($method['value'] ?? '') === $creditCardValue) {
+                $creditCard = $method;
+                break;
+            }
+        }
+
         $gatewayMethods = array_values(array_filter(
             $methods,
-            fn (array $method) => ! in_array((string) ($method['value'] ?? ''), $internalValues, true)
+            fn (array $method) => ! in_array(
+                (string) ($method['value'] ?? ''),
+                [...$internalValues, $creditCardValue],
+                true
+            )
         ));
 
         $remaining = array_values(array_filter(
@@ -158,17 +178,19 @@ class PaymentMethod extends Model
             fn (array $method) => in_array((string) ($method['value'] ?? ''), $internalValues, true)
         ));
 
-        if ($gatewayMethods === []) {
+        if ($gatewayMethods === [] || $creditCard === null) {
             return $remaining;
         }
 
+        usort($gatewayMethods, fn (array $a, array $b) => ((int) ($a['sort_order'] ?? 9999)) <=> ((int) ($b['sort_order'] ?? 9999)));
+
         $remaining[] = [
-            'id' => 'moyasar-credit-card',
+            'id' => (int) $creditCard['id'],
             'type' => 'moyasar',
-            'value' => 'credit_card',
+            'value' => $creditCardValue,
             'label' => __('payment.credit_card', [], $locale),
             'is_active' => true,
-            'sort_order' => min(array_map(fn (array $m) => (int) ($m['sort_order'] ?? 9999), $gatewayMethods)),
+            'sort_order' => (int) ($creditCard['sort_order'] ?? 1),
             'payfort_option' => null,
             'moyasar_source' => 'creditcard',
             'grouped_method_values' => array_values(array_map(

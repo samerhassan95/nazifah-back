@@ -13,6 +13,7 @@ enum PaymentMethod: string
     case APPLE_PAY = 'apple_pay';               // Apple Pay via Payfort
     case GOOGLE_PAY = 'google_pay';             // Google Pay via Payfort
     case SAMSUNG_PAY = 'samsung_pay';           // Samsung Pay via Payfort
+    case CREDIT_CARD = 'credit_card';           // Moyasar UI aggregate (all card/wallet gateway methods)
 
     /**
      * Get all payment method values
@@ -122,7 +123,7 @@ enum PaymentMethod: string
     public function getMoyasarSource(): ?string
     {
         return match ($this) {
-            self::VISA, self::MASTERCARD, self::MADA => 'creditcard',
+            self::VISA, self::MASTERCARD, self::MADA, self::CREDIT_CARD => 'creditcard',
             self::STC_PAY => 'stcpay',
             self::APPLE_PAY => 'applepay',
             self::SAMSUNG_PAY => 'samsungpay',
