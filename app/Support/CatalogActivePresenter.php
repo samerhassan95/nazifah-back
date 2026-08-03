@@ -10,9 +10,9 @@ use Modules\Service\Models\ServiceAddition;
 /**
  * Consistent is_active fields for catalog API responses.
  *
- * - Vendor catalog context ($vendorId): is_active = vendor_service.is_active
- * - Branch context: branch_is_active = branch_service.is_active (plus vendor is_active above when $vendorId set)
- * - System/client context (no $vendorId): is_active = services.is_active (admin catalog; inactive rows are filtered out)
+ * - Vendor catalog only: is_active = vendor_service.is_active
+ * - Branch context: vendor_is_active + branch_is_active, and is_active = both (effective)
+ * - System/client without vendor: is_active starts as services.is_active; with branch also ANDs branch (+ vendor when resolvable)
  */
 class CatalogActivePresenter
 {
@@ -27,26 +27,54 @@ class CatalogActivePresenter
             return ['is_active' => false];
         }
 
+        $systemActive = (bool) ($service->is_active ?? true);
+
+        if ($vendorId === null && $branchId !== null) {
+            $vendorId = self::vendorIdForBranch($branchId);
+        }
+
+        $vendorActive = null;
         if ($vendorId !== null) {
             $pivot = $vendorPivot ?? DB::table('vendor_service')
                 ->where('vendor_id', $vendorId)
                 ->where('service_id', $service->id)
                 ->first();
 
-            $flags = ['is_active' => $pivot ? (bool) ($pivot->is_active ?? true) : true];
-        } else {
-            $flags = ['is_active' => (bool) ($service->is_active ?? true)];
+            $vendorActive = $pivot ? (bool) ($pivot->is_active ?? true) : true;
         }
 
+        $branchActive = null;
         if ($branchId !== null) {
             $pivot = $branchPivot ?? DB::table('branch_service')
                 ->where('branch_id', $branchId)
                 ->where('service_id', $service->id)
                 ->first();
 
-            $flags['branch_is_active'] = $pivot
+            $branchActive = $pivot
                 ? (bool) ($pivot->is_active ?? true)
                 : true;
+        }
+
+        $flags = [];
+
+        if ($vendorActive !== null) {
+            $flags['vendor_is_active'] = $vendorActive;
+        }
+
+        if ($branchActive !== null) {
+            $flags['branch_is_active'] = $branchActive;
+        }
+
+        // Single flag for UI switches / "is this usable?":
+        // laundry-only → vendor; branch → vendor ∧ branch; else system.
+        if ($branchActive !== null && $vendorActive !== null) {
+            $flags['is_active'] = $systemActive && $vendorActive && $branchActive;
+        } elseif ($vendorActive !== null) {
+            $flags['is_active'] = $systemActive && $vendorActive;
+        } elseif ($branchActive !== null) {
+            $flags['is_active'] = $systemActive && $branchActive;
+        } else {
+            $flags['is_active'] = $systemActive;
         }
 
         return $flags;
@@ -69,6 +97,8 @@ class CatalogActivePresenter
             $flags['branch_is_active'] = $pivot
                 ? (bool) ($pivot->is_active ?? true)
                 : true;
+
+            $flags['is_active'] = $flags['is_active'] && $flags['branch_is_active'];
         }
 
         return $flags;
@@ -98,6 +128,8 @@ class CatalogActivePresenter
             } else {
                 $flags['branch_is_active'] = (bool) ($pivot->is_active ?? true);
             }
+
+            $flags['is_active'] = $flags['is_active'] && $flags['branch_is_active'];
         }
 
         return $flags;
@@ -115,8 +147,13 @@ class CatalogActivePresenter
      */
     public static function isEffectivelyActive(array $flags): bool
     {
-        $catalog = (bool) ($flags['is_active'] ?? true);
+        return (bool) ($flags['is_active'] ?? true);
+    }
 
-        return $catalog && (bool) ($flags['branch_is_active'] ?? true);
+    private static function vendorIdForBranch(int $branchId): ?int
+    {
+        $vendorId = DB::table('branches')->where('id', $branchId)->value('vendor_id');
+
+        return $vendorId !== null ? (int) $vendorId : null;
     }
 }

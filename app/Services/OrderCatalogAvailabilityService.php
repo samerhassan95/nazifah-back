@@ -14,9 +14,15 @@ class OrderCatalogAvailabilityService
     {
         return DB::table('branch_service')
             ->join('services', 'services.id', '=', 'branch_service.service_id')
+            ->join('branches', 'branches.id', '=', 'branch_service.branch_id')
+            ->join('vendor_service', function ($join) {
+                $join->on('vendor_service.vendor_id', '=', 'branches.vendor_id')
+                    ->on('vendor_service.service_id', '=', 'branch_service.service_id');
+            })
             ->where('branch_service.branch_id', $branchId)
             ->where('branch_service.service_id', $serviceId)
             ->where('branch_service.is_active', true)
+            ->where('vendor_service.is_active', true)
             ->where('services.is_active', true)
             ->exists();
     }

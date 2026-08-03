@@ -53,6 +53,7 @@ class CatalogToggleController extends Controller
         return successResponse([
             'service_id' => $serviceId,
             'is_active' => $isActive,
+            'vendor_is_active' => $isActive,
             // When laundry is turned off, all branch offerings are forced inactive too.
             'branch_is_active' => $isActive ? null : false,
         ], __('service.service_status_updated'));
@@ -95,10 +96,19 @@ class CatalogToggleController extends Controller
 
         $this->clearCatalogCache($serviceId, $branchId);
 
+        $vendorActive = true;
+        $vendorOffering = ServiceVendorOffering::find((int) $branch->vendor_id, $serviceId);
+        if ($vendorOffering) {
+            $vendorActive = (bool) ($vendorOffering->is_active ?? true);
+        }
+
         return successResponse([
             'branch_id' => $branchId,
             'service_id' => $serviceId,
-            'is_active' => $isActive,
+            'vendor_is_active' => $vendorActive,
+            'branch_is_active' => $isActive,
+            // Effective: usable only when laundry and branch are both on.
+            'is_active' => $vendorActive && $isActive,
         ], __('service.branch_service_status_updated'));
     }
 

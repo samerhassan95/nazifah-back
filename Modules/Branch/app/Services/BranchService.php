@@ -349,7 +349,14 @@ class BranchService
             $query->whereHas('services', function ($q) use ($serviceIds) {
                 $q->whereIn('services.id', $serviceIds)
                     ->where('services.is_active', true)
-                    ->where('branch_service.is_active', true);
+                    ->where('branch_service.is_active', true)
+                    ->whereExists(function ($sub) {
+                        $sub->selectRaw('1')
+                            ->from('vendor_service')
+                            ->whereColumn('vendor_service.vendor_id', 'branches.vendor_id')
+                            ->whereColumn('vendor_service.service_id', 'services.id')
+                            ->where('vendor_service.is_active', true);
+                    });
             });
         }
 
