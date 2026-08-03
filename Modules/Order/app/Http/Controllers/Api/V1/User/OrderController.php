@@ -1204,10 +1204,16 @@ class OrderController extends Controller
                 }
             }
 
-            // Upload item images before branching
+            // Upload item images before branching.
+            // Multipart files live on $request->file('items.N.image'), not in input('items').
             foreach ($itemsData as $index => &$itemData) {
-                if (isset($itemData['image']) && $itemData['image'] instanceof \Illuminate\Http\UploadedFile) {
-                    $itemData['uploaded_image'] = $this->uploadFilesService->uploadImage($itemData['image'], 'orders/items');
+                $imageFile = $itemData['image'] ?? null;
+                if (! ($imageFile instanceof \Illuminate\Http\UploadedFile)) {
+                    $imageFile = $request->file("items.{$index}.image");
+                }
+
+                if ($imageFile instanceof \Illuminate\Http\UploadedFile) {
+                    $itemData['uploaded_image'] = $this->uploadFilesService->uploadImage($imageFile, 'orders/items');
                 } else {
                     $itemData['uploaded_image'] = null;
                 }
@@ -2782,7 +2788,8 @@ class OrderController extends Controller
     }
 
     /**
-     * Card fields for on-the-way / pending-approval: piece name, description, and image.
+     * Card fields for on-the-way / pending-approval from the order piece line:
+     * name = piece name, description = item note, image = uploaded item image.
      *
      * @return array{name: ?string, description: ?string, image: ?string}
      */
@@ -2799,12 +2806,28 @@ class OrderController extends Controller
             ];
         }
 
-        $groupItems = OrderItemGrouper::buckets($items)[0] ?? collect([$items->first()]);
-        $primary = $groupItems->first();
+        // Prefer the piece line the client actually annotated (image / note).
+        $featured = $items->first(fn ($item) => ! empty($item->images))
+            ?? $items->first(fn ($item) => ! empty($item->notes))
+            ?? $items->first();
+
+        $groupItems = collect([$featured]);
+        foreach (OrderItemGrouper::buckets($items) as $bucket) {
+            if ($bucket->contains(fn ($item) => (int) $item->id === (int) $featured->id)) {
+                $groupItems = $bucket;
+                break;
+            }
+        }
+
+        $primary = $groupItems->first() ?? $featured;
 
         $name = $primary?->piece
             ? \App\Support\OrderItemDisplayNames::pieceName($primary->piece, $branchId, $lang)
             : null;
+
+        $note = $groupItems
+            ->map(fn ($item) => $item->notes)
+            ->first(fn ($value) => filled($value));
 
         $serviceNames = $groupItems
             ->map(function ($item) use ($branchId, $lang) {
@@ -2819,7 +2842,7 @@ class OrderController extends Controller
             ->values()
             ->all();
 
-        $description = $primary?->notes
+        $description = $note
             ?: ($serviceNames !== [] ? implode($lang === 'ar' ? '، ' : ', ', $serviceNames) : null);
 
         $itemWithImage = $groupItems->first(fn ($item) => ! empty($item->images))
