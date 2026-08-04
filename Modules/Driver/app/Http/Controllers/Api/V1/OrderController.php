@@ -54,7 +54,7 @@ class OrderController extends Controller
             ->whereNull('delivery_driver_id')
             ->where('branch_id', $driver->branch_id)
             ->with(['vendor', 'client'])
-            ->orderBy('created_at', 'desc')
+            ->orderBy('updated_at', 'desc')
             ->paginate($request->query('limit', 15));
 
         return successResponse($orders, 'Available orders retrieved successfully');
@@ -71,7 +71,7 @@ class OrderController extends Controller
 
         $query = Order::forDriverAtBranch($driver->id, $driver->branch_id)
             ->with(['vendor', 'client', 'items.piece', 'branch', 'pickupAddress', 'deliveryAddress'])
-            ->orderBy('created_at', 'desc');
+            ->orderBy('updated_at', 'desc');
 
         // Filter by status parameter
         // "current" = driver accepted (pickup or delivery) through in-progress handoffs.

@@ -379,7 +379,7 @@ class HomeController extends Controller
             'pickupAddress',
             'branch',
         ])
-            ->orderBy('created_at', 'desc')
+            ->orderBy('updated_at', 'desc')
             ->get()
             ->map(function ($order) {
                 $locale = app()->getLocale();

@@ -680,7 +680,7 @@ class OrderController extends Controller
             }
         }
 
-        $orders = $query->orderBy('created_at', 'desc')
+        $orders = $query->orderBy('updated_at', 'desc')
             ->paginate($request->per_page ?? 15);
 
         // Get language from current locale (set by middleware)
@@ -2892,7 +2892,7 @@ class OrderController extends Controller
             'branch.vendor',
             'vendor',
         ])
-            ->orderBy('created_at', 'desc')
+            ->orderBy('updated_at', 'desc')
             ->get();
 
         if ($orderId && $orders->isEmpty()) {
@@ -3554,7 +3554,7 @@ class OrderController extends Controller
             $query->where('id', $orderId);
         }
 
-        $orders = $query->orderBy('created_at', 'desc')->get();
+        $orders = $query->orderBy('updated_at', 'desc')->get();
         if ($orderId && $orders->isEmpty()) {
             $order = Order::with([
                 'driver',

@@ -251,7 +251,7 @@ class HomeController extends Controller
             ->forDriverAtBranch($driver->id, $driver->branch_id)
             ->driverNew($driver->id)
             ->with(['vendor', 'branch', 'client', 'pickupAddress', 'deliveryAddress', 'items.piece', 'items.service'])
-            ->orderBy('created_at', 'desc')
+            ->orderBy('updated_at', 'desc')
             ->get()
             ->map(function ($order) use ($lang, $driver) {
                 $serviceName = null;

@@ -66,7 +66,7 @@ class OrderRepository implements OrderRepositoryInterface
             callback: function () use ($branchIds, $filters) {
                 $query = Order::whereIn('branch_id', $branchIds)
                     ->with($filters['with'] ?? [])
-                    ->orderBy('created_at', 'desc');
+                    ->orderBy('updated_at', 'desc');
 
                 if (! empty($filters['vendor_tab'])) {
                     match ($filters['vendor_tab']) {
