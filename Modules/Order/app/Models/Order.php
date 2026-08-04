@@ -256,6 +256,11 @@ class Order extends Model
         return $this->hasMany(\Modules\Payment\Models\PaymentTransaction::class);
     }
 
+    public function invoice(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\Modules\Invoice\Models\Invoice::class);
+    }
+
     /**
      * Latest CHECKOUT payment transaction. Scoped to exclude additional-charge
      * (surcharge / split) legs so a pending surcharge never flips a paid order's

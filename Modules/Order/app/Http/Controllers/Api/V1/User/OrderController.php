@@ -1477,6 +1477,9 @@ class OrderController extends Controller
             if (empty($checkoutGatewayPayments)) {
                 app(\App\Services\OrderNotificationService::class)
                     ->sendOrderCreatedNotificationsIfNeeded($order);
+
+                app(\Modules\Invoice\Services\InvoiceService::class)
+                    ->issueForOrder($order->fresh(['client', 'branch.vendor', 'items.piece', 'items.service']), null, 'order_create_paid');
             }
 
             $responseData = [

@@ -52,6 +52,11 @@ class PaymentTransaction extends Model
         return $this->belongsTo(\Modules\Order\Models\Order::class);
     }
 
+    public function invoice()
+    {
+        return $this->hasOne(\Modules\Invoice\Models\Invoice::class);
+    }
+
     /**
      * Get payment refunds
      */

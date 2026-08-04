@@ -22,5 +22,6 @@
     "Payment": true,
     "Chat": true,
     "Subscription": true,
-    "Whatsapp": true
+    "Whatsapp": true,
+    "Invoice": true
 }

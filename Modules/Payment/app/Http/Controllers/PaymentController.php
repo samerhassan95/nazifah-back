@@ -1094,6 +1094,11 @@ class PaymentController extends Controller
         if ($order && $paymentService->shouldSendOrderCreatedNotifications($order)) {
             app(OrderNotificationService::class)->sendOrderCreatedNotificationsIfNeeded($order);
         }
+
+        if ($order) {
+            app(\Modules\Invoice\Services\InvoiceService::class)
+                ->issueForOrder($order->fresh(['client', 'branch.vendor', 'items.piece', 'items.service']), $transaction->fresh(), 'primary_gateway_leg');
+        }
     }
 
     /**
@@ -1209,6 +1214,12 @@ class PaymentController extends Controller
                         'status' => $current->status,
                     ],
                 ], 200);
+            }
+
+            $current = $transaction->fresh();
+            if ($current && $current->status === 'completed') {
+                app(\Modules\Invoice\Services\InvoiceService::class)
+                    ->issueForOrder($order->fresh(['client', 'branch.vendor', 'items.piece', 'items.service']), $current, 'manual_capture');
             }
 
             return response()->json([
