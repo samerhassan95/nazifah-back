@@ -1709,6 +1709,7 @@ class OrderController extends Controller
 
         // Build items: group multi-service piece lines; totals include accepted additions
         $branchId = (int) ($order->branch_id ?? 0);
+        $categorizedItems = $this->categorizePendingApprovalItems($order, $lang);
         $mappedItems = collect(OrderItemGrouper::toApiLines(
             $order->items,
             $branchId,
@@ -1745,6 +1746,10 @@ class OrderController extends Controller
                 'driver' => $driverData,
                 'client_address' => $clientDefaultAddress?->toApiClientAddressArray(),
                 'items' => $mappedItems,
+                'rejected_items' => $categorizedItems['rejected'],
+                'rejected_count' => count($categorizedItems['rejected']),
+                'modified_items' => $categorizedItems['modified'],
+                'modified_count' => count($categorizedItems['modified']),
                 'distance' => $order->distance !== null ? (float) $order->distance : 0,
                 'total_distance_km' => $order->distance !== null ? (float) $order->distance : 0,
                 'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
