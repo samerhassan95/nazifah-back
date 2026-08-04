@@ -316,9 +316,11 @@ class OrderController extends Controller
 
     protected function mapOrderToDriverListItem($order, $driver, string $lang): array
     {
+        $deliverableItems = \Modules\Order\Support\OrderItemGrouper::withoutRejected($order->items ?? collect());
+
         $orderTitle = null;
-        if ($order->items && $order->items->count() > 0) {
-            $firstItem = $order->items->first();
+        if ($deliverableItems->count() > 0) {
+            $firstItem = $deliverableItems->first();
             if ($firstItem && $firstItem->piece) {
                 $orderTitle = \App\Support\OrderItemDisplayNames::pieceName(
                     $firstItem->piece,
@@ -335,7 +337,7 @@ class OrderController extends Controller
                 : $order->vendor->name;
         }
 
-        $piecesCount = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($order->items);
+        $piecesCount = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($deliverableItems);
         $distance = null;
         if ($driver->latitude && $driver->longitude) {
             $targetLat = null;
@@ -368,11 +370,11 @@ class OrderController extends Controller
             }
         }
 
-        // First item image
+        // First item image (prefer non-rejected lines)
         $uploadService = app(\App\Services\UploadFilesService::class);
         $firstItemImage = null;
-        if ($order->items && $order->items->count() > 0) {
-            $itemWithImage = $order->items->first(fn ($item) => ! empty($item->images));
+        if ($deliverableItems->count() > 0) {
+            $itemWithImage = $deliverableItems->first(fn ($item) => ! empty($item->images));
             if ($itemWithImage) {
                 $firstItemImage = $uploadService->getFullUrl($itemWithImage->images);
             }
@@ -646,10 +648,11 @@ class OrderController extends Controller
             $subTitleProgress = $lang == 'ar' ? 'تم تسليم الطلب بنجاح' : 'Order delivered successfully';
         }
 
-        // Get order title from first item
+        // Get order title from first non-rejected item
         $orderTitle = null;
-        if ($order->items && $order->items->count() > 0) {
-            $firstItem = $order->items->first();
+        $titleItems = \Modules\Order\Support\OrderItemGrouper::withoutRejected($order->items ?? collect());
+        if ($titleItems->count() > 0) {
+            $firstItem = $titleItems->first();
             if ($firstItem && $firstItem->piece) {
                 $orderTitle = \App\Support\OrderItemDisplayNames::pieceName(
                     $firstItem->piece,
@@ -796,11 +799,12 @@ class OrderController extends Controller
             $response['order_info']['payment_status_label'] = \App\Support\PaymentStatusPresenter::label($order->payment_status ?? 'pending');
         }
 
-        // Items info — group multi-service piece lines into one entry
+        // Items info — exclude laundry-rejected pieces/services from driver delivery view
         $branchId = (int) ($order->branch_id ?? 0);
         $uploadService = app(\App\Services\UploadFilesService::class);
+        $deliverableItems = \Modules\Order\Support\OrderItemGrouper::withoutRejected($order->items ?? collect());
         $response['items_info'] = collect(\Modules\Order\Support\OrderItemGrouper::toApiLines(
-            $order->items,
+            $deliverableItems,
             $branchId,
             $lang,
             fn ($item) => $item->images ? $uploadService->getFullUrl($item->images) : null,
@@ -808,6 +812,10 @@ class OrderController extends Controller
         ))->map(function (array $g) {
             $services = $g['services'] ?? [];
             $serviceNames = collect($services)->pluck('name')->filter()->values()->all();
+            $additionalServices = collect($g['additional_services'] ?? [])
+                ->filter(fn ($a) => ($a['vendor_status'] ?? $a['status'] ?? 'accepted') !== 'rejected')
+                ->values()
+                ->all();
 
             return [
                 'item_id' => $g['id'],
@@ -825,11 +833,11 @@ class OrderController extends Controller
                 'status' => $g['status'] ?? null,
                 'note' => $g['note'] ?? null,
                 'image' => $g['image'] ?? null,
-                'additional_services' => $g['additional_services'] ?? [],
+                'additional_services' => $additionalServices,
             ];
         })->values()->toArray();
 
-        $response['pieces_count'] = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($order->items);
+        $response['pieces_count'] = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($deliverableItems);
 
         $response['delivery_fee'] = (float) $order->getDeliveryFeeForDriver($driver->id);
 

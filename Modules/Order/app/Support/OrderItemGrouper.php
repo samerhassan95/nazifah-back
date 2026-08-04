@@ -12,6 +12,19 @@ use Illuminate\Support\Collection;
 class OrderItemGrouper
 {
     /**
+     * Items the laundry did not reject (deliverable / billable lines).
+     *
+     * @param  Collection<int, mixed>  $items
+     * @return Collection<int, mixed>
+     */
+    public static function withoutRejected(Collection $items): Collection
+    {
+        return $items
+            ->filter(fn ($item) => ($item->vendor_status ?? 'accepted') !== 'rejected')
+            ->values();
+    }
+
+    /**
      * @param  Collection<int, mixed>  $items
      * @param  callable(mixed): (?string)|null  $imageResolver
      * @return list<array<string, mixed>>

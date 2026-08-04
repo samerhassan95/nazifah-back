@@ -257,15 +257,16 @@ class HomeController extends Controller
                 $serviceName = null;
                 $subTitle = null;
                 $piecesCount = 0;
+                $deliverableItems = \Modules\Order\Support\OrderItemGrouper::withoutRejected($order->items ?? collect());
 
-                if ($order->items && $order->items->count() > 0) {
-                    $firstItem = $order->items->first();
+                if ($deliverableItems->count() > 0) {
+                    $firstItem = $deliverableItems->first();
                     if ($firstItem && $firstItem->piece) {
                         $serviceName = method_exists($firstItem->piece, 'getTranslation')
                             ? $firstItem->piece->getTranslation('name', $lang)
                             : $firstItem->piece->name;
                     }
-                    $piecesCount = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($order->items);
+                    $piecesCount = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($deliverableItems);
                     if ($firstItem && $firstItem->service) {
                         $subTitle = method_exists($firstItem->service, 'getTranslation')
                             ? $firstItem->service->getTranslation('service_name', $lang)
@@ -308,8 +309,8 @@ class HomeController extends Controller
                 $taskType = $this->resolveDriverTaskType($order, $driver, $lang);
 
                 $firstItemImage = null;
-                if ($order->items && $order->items->count() > 0) {
-                    $itemWithImage = $order->items->first(fn ($item) => ! empty($item->images));
+                if ($deliverableItems->count() > 0) {
+                    $itemWithImage = $deliverableItems->first(fn ($item) => ! empty($item->images));
                     if ($itemWithImage) {
                         $firstItemImage = $this->uploadFilesService->getFullUrl($itemWithImage->images);
                     }
@@ -421,9 +422,10 @@ class HomeController extends Controller
 
         $taskType = $this->resolveDriverTaskType($order, $driver, $lang);
 
-        // Get pieces details — one row per piece line (multi-service stays together)
+        // Get pieces details — one row per piece line; hide laundry-rejected items from driver
         $branchId = (int) ($order->branch_id ?? 0);
-        $piecesDetails = collect(\Modules\Order\Support\OrderItemGrouper::buckets($order->items))
+        $deliverableItems = \Modules\Order\Support\OrderItemGrouper::withoutRejected($order->items ?? collect());
+        $piecesDetails = collect(\Modules\Order\Support\OrderItemGrouper::buckets($deliverableItems))
             ->map(function ($group) use ($lang, $branchId) {
                 $item = $group->first();
                 $services = $group->map(function ($row) use ($lang, $branchId) {
