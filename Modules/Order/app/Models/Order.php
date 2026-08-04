@@ -66,6 +66,7 @@ class Order extends Model
         'client_delivery_handoff_at',
         'can_confirm_pickup_from_driver',
         'can_confirm_handover_to_delivery',
+        'vendor_handed_to_delivery_at',
         'vendor_pickup_received_at',
         'vendor_delivery_ready_at',
         'vendor_client_delivery_handoff_at',
@@ -106,6 +107,7 @@ class Order extends Model
         'client_delivery_handoff_at' => 'datetime',
         'can_confirm_pickup_from_driver' => 'boolean',
         'can_confirm_handover_to_delivery' => 'boolean',
+        'vendor_handed_to_delivery_at' => 'datetime',
         'vendor_pickup_received_at' => 'datetime',
         'vendor_delivery_ready_at' => 'datetime',
         'vendor_client_delivery_handoff_at' => 'datetime',
@@ -485,6 +487,7 @@ class Order extends Model
         return array_merge($this->clientVisitResponseFields(), [
             'vendor_pickup_received_at' => $this->vendor_pickup_received_at?->toISOString(),
             'vendor_delivery_ready_at' => $this->vendor_delivery_ready_at?->toISOString(),
+            'vendor_handed_to_delivery_at' => $this->vendor_handed_to_delivery_at?->toISOString(),
             'vendor_client_delivery_handoff_at' => $this->vendor_client_delivery_handoff_at?->toISOString(),
         ]);
     }

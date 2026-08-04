@@ -382,6 +382,7 @@ class OrderController extends Controller
         $branchLocation = $order->branch ? $order->branch->getApiLocation($lang) : null;
 
         $taskType = $this->resolveDriverTaskType($order, $driver, $lang);
+        $handoffService = app(\App\Services\VendorOrderHandoffService::class);
 
         return array_merge([
             'order_id' => $order->id,
@@ -398,7 +399,7 @@ class OrderController extends Controller
             'branch_location' => $branchLocation,
             'rating' => $order->rating !== null ? (int) $order->rating : null,
             'review' => $order->review,
-        ], $taskType, $order->clientVisitResponseFields());
+        ], $taskType, $order->clientVisitResponseFields(), $handoffService->vendorConfirmFlags($order), $handoffService->driverDeliveryActionFlags($order, (int) $driver->id));
     }
 
     /**
@@ -469,6 +470,8 @@ class OrderController extends Controller
             ]);
         } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
             return errorResponse($e->userMessage(), null, 400);
+        } catch (\LogicException $e) {
+            return errorResponse($e->getMessage(), null, 400);
         }
 
         if ($newStatus === OrderStatus::DELIVERED) {
@@ -892,7 +895,8 @@ class OrderController extends Controller
         $response = array_merge(
             $response,
             $order->clientVisitResponseFields(),
-            app(\App\Services\VendorOrderHandoffService::class)->vendorConfirmFlags($order)
+            app(\App\Services\VendorOrderHandoffService::class)->vendorConfirmFlags($order),
+            app(\App\Services\VendorOrderHandoffService::class)->driverDeliveryActionFlags($order, (int) $driver->id)
         );
 
         return successResponse($response, 'Order details retrieved successfully');
@@ -1064,7 +1068,7 @@ class OrderController extends Controller
             'status' => $order->fresh()->status,
             'status_label' => OrderStatus::tryFrom($order->fresh()->status)?->localizedLabel($order->payment_method) ?? $order->fresh()->status,
             'message' => 'Order rejected successfully',
-        ]), 'Order rejected successfully');
+        ], (int) $driver->id), 'Order rejected successfully');
     }
 
     /**
@@ -1097,7 +1101,7 @@ class OrderController extends Controller
     /**
      * Mark pickup as complete — transitions based on order and stage:
      * - Pickup driver (on_way_to_pickup) → picked_up
-     * - Delivery driver (driver_delivery_accepted) → on_way_to_delivery
+     * - Delivery driver (driver_delivery_accepted after laundry handoff) → on_way_to_delivery
      */
     public function pickupComplete(Request $request, $orderId): JsonResponse
     {
@@ -1134,7 +1138,7 @@ class OrderController extends Controller
                 'status_label' => OrderStatus::WAITING_CLIENT_RECEIPT->localizedLabel(),
                 'payment_status' => $order->fresh()->payment_status ?? 'pending',
                 'payment_status_label' => \App\Support\PaymentStatusPresenter::label($order->fresh()->payment_status ?? 'pending'),
-            ]), app()->getLocale() === 'ar'
+            ], (int) $driver->id), app()->getLocale() === 'ar'
                 ? 'تم الوصول لموقع التسليم — في انتظار تأكيد العميل للاستلام'
                 : 'At delivery location — waiting for client to confirm receipt');
         }
@@ -1153,18 +1157,24 @@ class OrderController extends Controller
                 'order_number' => $order->order_number,
                 'status' => $order->status,
                 'status_label' => $currentStatus?->localizedLabel($order->payment_method) ?? $order->status,
-            ]), 'Pickup already completed');
+            ], (int) $driver->id), 'Pickup already completed');
         }
 
-        // Delivery driver: received from laundry → on_way_to_delivery (based on stage)
+        // Delivery driver: after laundry handoff → on_way_to_delivery (driver-owned step)
         if ($isDeliveryDriver && $currentStatus === OrderStatus::DRIVER_DELIVERY_ACCEPTED) {
+            if ($order->vendor_handed_to_delivery_at === null) {
+                return errorResponse(__('order.driver_on_way_requires_laundry_handoff'), null, 400);
+            }
+
             try {
                 $statusService->transitionTo($order, OrderStatus::ON_WAY_TO_DELIVERY, [
-                    'notes' => 'Driver picked up from vendor, on way to client',
+                    'notes' => 'Driver started delivery trip to client',
                     'changed_by' => $driver->id,
                 ]);
             } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
                 return errorResponse($e->userMessage(), null, 400);
+            } catch (\LogicException $e) {
+                return errorResponse($e->getMessage(), null, 400);
             }
 
             return successResponse($this->orderApiPayload($order->fresh(), [
@@ -1172,7 +1182,7 @@ class OrderController extends Controller
                 'order_number' => $order->order_number,
                 'status' => $order->fresh()->status,
                 'status_label' => OrderStatus::tryFrom($order->fresh()->status)?->localizedLabel($order->payment_method) ?? $order->fresh()->status,
-            ]), app()->getLocale() === 'ar' ? 'تم استلام الطلب من المغسلة وأنت في الطريق للعميل' : 'Pickup from laundry complete, on way to client');
+            ], (int) $driver->id), app()->getLocale() === 'ar' ? 'أنت في الطريق لتوصيل الطلب للعميل' : 'You are on the way to deliver the order to the client');
         }
 
         // Pickup driver: on_way_to_pickup → picked_up
@@ -1190,7 +1200,7 @@ class OrderController extends Controller
             'order_number' => $order->order_number,
             'status' => $order->fresh()->status,
             'status_label' => OrderStatus::tryFrom($order->fresh()->status)?->localizedLabel($order->payment_method) ?? $order->fresh()->status,
-        ]), app()->getLocale() === 'ar' ? 'تم استلام الطلب من العميل' : 'Order picked up from client');
+        ], (int) $driver->id), app()->getLocale() === 'ar' ? 'تم استلام الطلب من العميل' : 'Order picked up from client');
     }
 
     /**
@@ -1238,10 +1248,22 @@ class OrderController extends Controller
                 'status' => $order->status,
                 'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
                 'driver_role' => 'pickup',
-            ]), __('order.vendor_handoff_driver_qr_enabled_pickup'));
+            ], (int) $driver->id), __('order.vendor_handoff_driver_qr_enabled_pickup'));
         }
 
         if ($isDeliveryDriver && $order->status === OrderStatus::DRIVER_DELIVERY_ACCEPTED->value) {
+            if ($order->vendor_handed_to_delivery_at !== null) {
+                return successResponse($this->orderApiPayload($order, [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'status' => $order->status,
+                    'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+                    'driver_role' => 'delivery',
+                ], (int) $driver->id), app()->getLocale() === 'ar'
+                    ? 'تم استلام الطلب من المغسلة مسبقًا — يمكنك وضع نفسك في الطريق لهذا الطلب'
+                    : 'Order already handed over by laundry — you can mark this order as on the way');
+            }
+
             $order = $handoffService->enableHandoverToDeliveryConfirm($order);
 
             return successResponse($this->orderApiPayload($order, [
@@ -1250,7 +1272,7 @@ class OrderController extends Controller
                 'status' => $order->status,
                 'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
                 'driver_role' => 'delivery',
-            ]), __('order.vendor_handoff_driver_qr_enabled_delivery'));
+            ], (int) $driver->id), __('order.vendor_handoff_driver_qr_enabled_delivery'));
         }
 
         // Delivery driver never transitions to delivered via confirm-qr — only client confirm-delivery does
@@ -1310,13 +1332,16 @@ class OrderController extends Controller
         return successResponse(['status_log' => $statusLog], __('order.status_log_retrieved'));
     }
 
-    private function orderApiPayload(Order $order, array $payload): array
+    private function orderApiPayload(Order $order, array $payload, ?int $viewerDriverId = null): array
     {
+        $handoffService = app(\App\Services\VendorOrderHandoffService::class);
+
         return array_merge(
             $payload,
             $order->couponResponseFields(),
             $order->clientVisitResponseFields(),
-            app(\App\Services\VendorOrderHandoffService::class)->vendorConfirmFlags($order)
+            $handoffService->vendorConfirmFlags($order),
+            $handoffService->driverDeliveryActionFlags($order, $viewerDriverId)
         );
     }
 }

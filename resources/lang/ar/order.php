@@ -344,6 +344,7 @@ return [
     'vendor_handoff_error_not_awaiting_pickup_receipt' => 'الطلب لا ينتظر تأكيد استلام المغسلة من العميل',
     'vendor_handoff_error_not_awaiting_driver_pickup_handoff' => 'الطلب لا ينتظر تأكيد المغسلة لاستلامه من مندوب الاستلام',
     'vendor_handoff_error_not_awaiting_delivery_driver_handoff' => 'الطلب لا ينتظر تأكيد المغسلة لتسليمه إلى مندوب التوصيل',
+    'driver_on_way_requires_laundry_handoff' => 'يجب أن تؤكد المغسلة تسليم الطلب لك قبل أن تضع نفسك في الطريق',
     'vendor_handoff_error_not_ready_client_delivery' => 'الطلب غير جاهز لتعليمه كمكتمل للاستلام من الفرع',
     'vendor_handoff_error_not_awaiting_client_pickup' => 'الطلب لا ينتظر تأكيد استلام العميل من المغسلة',
     'vendor_handoff_log_pickup_received' => 'أكّدت المغسلة استلام الملابس من العميل في الفرع',

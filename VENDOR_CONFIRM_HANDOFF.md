@@ -2,17 +2,20 @@
 
 ## Overview
 
-The handoff flow is now **two-step**:
+Handoff is multi-step and role-specific:
 
-1. The **driver** confirms QR to enable the appropriate vendor handoff flag.
-2. The **vendor (laundry)** confirms the handoff to perform the actual order status transition.
+1. The **driver** confirms QR to enable the appropriate vendor handoff flag (status unchanged).
+2. The **vendor (laundry)** confirms the handoff:
+   - Pickup leg: status → `delivered_to_branch`
+   - Delivery leg: status stays `driver_delivery_accepted`, sets `vendor_handed_to_delivery_at`
+3. For delivery, the **driver** then marks `on_way_to_delivery` for that specific order.
 
 This means:
 
-- `POST /api/v1/driver/orders/{id}/confirm-qr` no longer changes the order status for the two vendor-owned handoff steps.
-- `POST /api/v1/vendor/orders/{id}/confirm-handoff` is the endpoint that changes the order status.
-- `can_confirm_pickup_from_driver` and `can_confirm_handover_to_delivery` are now **persisted boolean fields on the order**, not just computed from the current status.
-
+- `POST /api/v1/driver/orders/{id}/confirm-qr` does not change status for vendor-owned handoff steps.
+- `POST /api/v1/vendor/orders/{id}/confirm-handoff` on delivery does **not** move to `on_way_to_delivery`.
+- `can_confirm_pickup_from_driver` and `can_confirm_handover_to_delivery` are persisted boolean fields on the order.
+- `can_mark_on_the_way` tells the driver app when laundry handoff is done and they may start the trip.
 ---
 
 ## Vendor Endpoint
@@ -157,9 +160,18 @@ Status: driver_delivery_accepted
   ↓
   Vendor calls: POST /vendor/orders/{id}/confirm-handoff
   ↓
-Status: on_way_to_delivery
+  status remains: driver_delivery_accepted
+  ↓
+  vendor_handed_to_delivery_at = now()
   ↓
   can_confirm_handover_to_delivery = false
+  ↓
+  can_mark_on_the_way = true (for delivery driver)
+  ↓
+  Driver calls: PUT /driver/orders/{id}/status { "status": "on_way_to_delivery" }
+  (or POST /driver/orders/{id}/pickup-complete after handoff)
+  ↓
+Status: on_way_to_delivery
 ```
 
 ---
@@ -178,8 +190,11 @@ driver_delivery_accepted
   → [DRIVER confirms QR]
   → can_confirm_handover_to_delivery = true
   → [VENDOR confirms handoff]
-  → on_way_to_delivery
+  → status stays driver_delivery_accepted
+  → vendor_handed_to_delivery_at set
   → can_confirm_handover_to_delivery = false
+  → [DRIVER marks on the way for this order]
+  → on_way_to_delivery
 ```
 
 ---
@@ -193,26 +208,46 @@ driver_delivery_accepted
 | `driver/orders/{id}/confirm-qr` | `picked_up` | `delivered_to_branch` |
 | `driver/orders/{id}/confirm-qr` | `driver_delivery_accepted` | `on_way_to_delivery` |
 
-### New Behavior
+### Previous two-step (vendor owned on-the-way)
 
 | Endpoint | Status Before | Status After | What Changes |
 |----------|---------------|--------------|--------------|
 | `driver/orders/{id}/confirm-qr` | `picked_up` | `picked_up` | Enables `can_confirm_pickup_from_driver=true` |
 | `driver/orders/{id}/confirm-qr` | `driver_delivery_accepted` | `driver_delivery_accepted` | Enables `can_confirm_handover_to_delivery=true` |
 | `vendor/orders/{id}/confirm-handoff` | `picked_up` | `delivered_to_branch` | Consumes and clears pickup flag |
-| `vendor/orders/{id}/confirm-handoff` | `driver_delivery_accepted` | `on_way_to_delivery` | Consumes and clears delivery flag |
+| `vendor/orders/{id}/confirm-handoff` | `driver_delivery_accepted` | `on_way_to_delivery` | Consumes flag and moved to on the way |
+
+### Current Behavior
+
+| Endpoint | Status Before | Status After | What Changes |
+|----------|---------------|--------------|--------------|
+| `driver/orders/{id}/confirm-qr` | `picked_up` | `picked_up` | Enables `can_confirm_pickup_from_driver=true` |
+| `driver/orders/{id}/confirm-qr` | `driver_delivery_accepted` | `driver_delivery_accepted` | Enables `can_confirm_handover_to_delivery=true` |
+| `vendor/orders/{id}/confirm-handoff` | `picked_up` | `delivered_to_branch` | Consumes and clears pickup flag |
+| `vendor/orders/{id}/confirm-handoff` | `driver_delivery_accepted` | `driver_delivery_accepted` | Sets `vendor_handed_to_delivery_at`, clears delivery flag |
+| `PUT driver/orders/{id}/status` (`on_way_to_delivery`) | `driver_delivery_accepted` | `on_way_to_delivery` | Requires `vendor_handed_to_delivery_at` |
+| `POST driver/orders/{id}/pickup-complete` | `driver_delivery_accepted` | `on_way_to_delivery` | Same handoff requirement |
+
+Receiving from laundry and marking on-the-way are separate. A driver can hold multiple `driver_delivery_accepted` orders (same branch) after laundry handoff, then mark on-the-way per order.
 
 ---
 
 ## Where Flags Appear
 
-| Endpoint | `can_confirm_pickup_from_driver` | `can_confirm_handover_to_delivery` |
-|----------|----------------------------------|------------------------------------|
-| `GET /api/v1/vendor/orders/{id}` | ✓ | ✓ |
-| `GET /api/v1/driver/orders/{id}` | ✓ | ✓ |
-| `POST /api/v1/driver/orders/{id}/confirm-qr` response | ✓ | ✓ |
-| `POST /api/v1/vendor/orders/{id}/confirm-handoff` response | ✓ | ✓ |
-| `PUT /api/v1/vendor/orders/{id}/status` response | ✓ | ✓ |
+| Endpoint | `can_confirm_pickup_from_driver` | `can_confirm_handover_to_delivery` | `can_mark_on_the_way` |
+|----------|----------------------------------|-----------------------------------|----------------------|
+| `GET /api/v1/vendor/orders/{id}` | ✓ | ✓ | |
+| `GET /api/v1/driver/orders/{id}` | ✓ | ✓ | ✓ |
+| `GET /api/v1/driver/orders` list items | ✓ | ✓ | ✓ |
+| `POST /api/v1/driver/orders/{id}/confirm-qr` response | ✓ | ✓ | ✓ |
+| `POST /api/v1/vendor/orders/{id}/confirm-handoff` response | ✓ | ✓ | |
+| `PUT /api/v1/vendor/orders/{id}/status` response | ✓ | ✓ | |
+
+`can_mark_on_the_way` is `true` only when:
+
+- status is `driver_delivery_accepted`
+- `vendor_handed_to_delivery_at` is set
+- viewer is the delivery driver
 
 ---
 
@@ -229,6 +264,10 @@ Vendor confirm succeeds only when:
 
 If the flag is `true` but the status changed, vendor confirm is rejected as a safety check.
 
+### Driver `on_way_to_delivery`
+
+Succeeds only when laundry already set `vendor_handed_to_delivery_at`. Otherwise returns 400 with message that laundry must confirm handoff first.
+
 ---
 
 ## Error Responses
@@ -238,6 +277,7 @@ If the flag is `true` but the status changed, vendor confirm is rejected as a sa
 | Order not found or wrong vendor | 404 | Order not found |
 | No handoff action available for current state | 400 | Handoff action is not available for this order in its current state |
 | Invalid status transition | 400 | Specific transition error message |
+| On the way before laundry handoff | 400 | Laundry must confirm handing the order to you before you can mark it as on the way |
 | Invalid QR | 400 | Invalid QR code |
 
 ---
@@ -245,22 +285,27 @@ If the flag is `true` but the status changed, vendor confirm is rejected as a sa
 ## Quick Test
 
 ```bash
-# 1. Driver QR
+# 1. Driver QR (delivery)
 POST /api/v1/driver/orders/{id}/confirm-qr
-→ Status stays the same, appropriate flag becomes true
+→ Status stays driver_delivery_accepted, can_confirm_handover_to_delivery=true
 
-# 2. Check order from driver or vendor side
+# 2. Check order
 GET /api/v1/driver/orders/{id}
 GET /api/v1/vendor/orders/{id}
-→ Look at: status, can_confirm_pickup_from_driver, can_confirm_handover_to_delivery
+→ Look at: status, can_confirm_handover_to_delivery, can_mark_on_the_way, vendor_handed_to_delivery_at
 
 # 3. Vendor confirms handoff
 POST /api/v1/vendor/orders/{id}/confirm-handoff
 Body: {} or {"notes": "..."}
+→ Status stays driver_delivery_accepted
+→ vendor_handed_to_delivery_at set
+→ can_confirm_handover_to_delivery=false
+→ can_mark_on_the_way=true on driver side
 
-# 4. Check order again
-GET /api/v1/vendor/orders/{id}
-→ Status should have changed, used flag should be false
+# 4. Driver marks on the way for this order only
+PUT /api/v1/driver/orders/{id}/status
+Body: {"status":"on_way_to_delivery"}
+→ Status becomes on_way_to_delivery
 ```
 
 ---
@@ -277,6 +322,7 @@ GET /api/v1/vendor/orders/{id}
   - `can_confirm_handover_to_delivery`: "تأكيد تسليم الطلب للمندوب" / "Confirm order handed to driver"
 - On tap, call `POST /vendor/orders/{id}/confirm-handoff`
 - Refresh order details after success
+- For delivery handoff success: expect status to stay `driver_delivery_accepted` (not on the way)
 
 ### Driver App
 
@@ -284,9 +330,12 @@ GET /api/v1/vendor/orders/{id}
 - After QR success:
   - Do not expect order status to change immediately
   - Expect the correct vendor handoff flag to become `true`
-- Refresh the order after QR if the app wants to show the new flag state
+- After vendor delivery handoff: show "في الطريق" when `can_mark_on_the_way=true`
+- On tap, call `PUT /driver/orders/{id}/status` with `on_way_to_delivery` for **that order only**
+- A driver may hold multiple accepted/handed orders and choose which one to mark on the way
 
 ### UI Meaning
 
 - QR success means: "driver finished their part, vendor can now confirm"
-- Vendor confirm success means: "handoff finalized, order status changed"
+- Vendor delivery confirm success means: "bags handed to driver; status still accepted"
+- Driver on-the-way success means: "driver started the trip for this order"

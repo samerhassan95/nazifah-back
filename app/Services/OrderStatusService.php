@@ -32,6 +32,20 @@ class OrderStatusService
             return $order;
         }
 
+        // Home delivery: laundry must confirm handoff before driver can mark on_way_to_delivery.
+        if (
+            $newStatus === OrderStatus::ON_WAY_TO_DELIVERY
+            && $order->needsDeliveryDriver()
+            && in_array($oldStatus, [
+                OrderStatus::DRIVER_DELIVERY_ASSIGNED,
+                OrderStatus::DRIVER_DELIVERY_ACCEPTED,
+                OrderStatus::CLIENT_POSTPONED_DELIVERY,
+            ], true)
+            && $order->vendor_handed_to_delivery_at === null
+        ) {
+            throw new \LogicException(__('order.driver_on_way_requires_laundry_handoff'));
+        }
+
         $updateData = ['status' => $newStatus->value];
 
         if ($newStatus === OrderStatus::ON_WAY_TO_DELIVERY) {
@@ -268,6 +282,9 @@ class OrderStatusService
         $order->update([
             'driver_id' => $driver->id,
             'delivery_driver_id' => $driver->id,
+            'vendor_handed_to_delivery_at' => null,
+            'can_confirm_handover_to_delivery' => false,
+            'can_confirm_pickup_from_driver' => false,
         ]);
 
         $deliveryNotes = $currentStatus === OrderStatus::CLIENT_POSTPONED_DELIVERY

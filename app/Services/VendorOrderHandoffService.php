@@ -52,6 +52,41 @@ class VendorOrderHandoffService
         ];
     }
 
+    /**
+     * Whether the delivery driver may mark this order as on_way_to_delivery.
+     */
+    public function canMarkOnTheWay(Order $order, ?int $driverId = null): bool
+    {
+        if ($order->status !== OrderStatus::DRIVER_DELIVERY_ACCEPTED->value) {
+            return false;
+        }
+
+        if ($order->vendor_handed_to_delivery_at === null) {
+            return false;
+        }
+
+        if (! $order->needsDeliveryDriver() || ! $order->delivery_driver_id) {
+            return false;
+        }
+
+        if ($driverId !== null && (int) $order->delivery_driver_id !== (int) $driverId) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array{can_mark_on_the_way: bool, vendor_handed_to_delivery_at: string|null}
+     */
+    public function driverDeliveryActionFlags(Order $order, ?int $driverId = null): array
+    {
+        return [
+            'can_mark_on_the_way' => $this->canMarkOnTheWay($order, $driverId),
+            'vendor_handed_to_delivery_at' => $order->vendor_handed_to_delivery_at?->toISOString(),
+        ];
+    }
+
     public function enablePickupFromDriverConfirm(Order $order): Order
     {
         $order->update([
@@ -64,6 +99,10 @@ class VendorOrderHandoffService
 
     public function enableHandoverToDeliveryConfirm(Order $order): Order
     {
+        if ($order->vendor_handed_to_delivery_at !== null) {
+            return $order->fresh();
+        }
+
         $order->update([
             'can_confirm_pickup_from_driver' => false,
             'can_confirm_handover_to_delivery' => true,
@@ -239,22 +278,22 @@ class VendorOrderHandoffService
             throw new \LogicException(__('order.vendor_handoff_error_not_awaiting_delivery_driver_handoff'));
         }
 
-        if (! $this->statusService->canTransition($order, OrderStatus::ON_WAY_TO_DELIVERY)) {
-            throw new InvalidStatusTransitionException(
-                OrderStatus::from($order->status),
-                OrderStatus::ON_WAY_TO_DELIVERY,
-                $order
-            );
-        }
+        // Laundry confirms bags handed to delivery driver — status stays driver_delivery_accepted.
+        // Driver later marks on_way_to_delivery for this specific order.
+        $order->update([
+            'vendor_handed_to_delivery_at' => now(),
+            'can_confirm_pickup_from_driver' => false,
+            'can_confirm_handover_to_delivery' => false,
+        ]);
 
-        $this->statusService->transitionTo($order, OrderStatus::ON_WAY_TO_DELIVERY, [
+        \Modules\Order\Models\OrderStatusLog::create([
+            'order_id' => $order->id,
+            'status' => $order->status,
             'notes' => $notes ?? __('order.vendor_handoff_log_handover_to_delivery_confirmed'),
             'changed_by' => $changedBy,
         ]);
 
-        $order->refresh();
-
-        return $this->clearVendorConfirmFlags($order);
+        return $order->fresh();
     }
 
     /**
@@ -407,13 +446,14 @@ class VendorOrderHandoffService
             return null;
         }
 
-        if (! $this->statusService->canTransition($order, OrderStatus::ON_WAY_TO_DELIVERY)) {
+        // Already handed to driver — nothing for vendor to confirm.
+        if ($order->vendor_handed_to_delivery_at !== null) {
             return null;
         }
 
         return [
             'handoff_type' => 'confirm_handover_to_delivery',
-            'target_status' => OrderStatus::ON_WAY_TO_DELIVERY->value,
+            'target_status' => OrderStatus::DRIVER_DELIVERY_ACCEPTED->value,
             'confirm_label' => __('order.vendor_handoff_confirm_handover_to_delivery'),
             'endpoint' => '/api/v1/vendor/orders/'.$order->id.'/confirm-handoff',
         ];
