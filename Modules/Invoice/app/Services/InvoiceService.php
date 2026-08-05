@@ -180,7 +180,7 @@ class InvoiceService
     public function shareUrl(Invoice $invoice): string
     {
         return URL::temporarySignedRoute(
-            'api.invoice.share',
+            'invoice.share',
             now()->addDays((int) config('invoice.public_link_ttl_days', 30)),
             ['invoice' => $invoice->id]
         );
