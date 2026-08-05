@@ -79,13 +79,15 @@ class FirebaseAdminService
                 $message['data'] = $this->stringifyData($data);
             }
 
-            if (isset($notification['sound']) || isset($notification['badge'])) {
+            if (isset($notification['sound']) || isset($notification['badge']) || isset($notification['channel_id'])) {
+                $androidNotification = [
+                    'sound' => (string) ($notification['sound'] ?? 'default'),
+                    'channel_id' => (string) ($notification['channel_id'] ?? 'default'),
+                ];
+
                 $message['android'] = [
                     'priority' => 'HIGH',
-                    'notification' => [
-                        'sound' => (string) ($notification['sound'] ?? 'default'),
-                        'channel_id' => 'default',
-                    ],
+                    'notification' => $androidNotification,
                 ];
             }
 

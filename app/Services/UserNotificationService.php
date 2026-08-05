@@ -9,6 +9,19 @@ use Modules\Notification\Models\Notification;
 
 class UserNotificationService
 {
+    /**
+     * FCM payloads that should use the mobile app's custom new-order sound/channel.
+     */
+    private const NEW_ORDER_NOTIFICATION_TYPES = [
+        'new_order',
+        'driver_pickup_assigned',
+        'driver_delivery_assigned',
+    ];
+
+    private const NEW_ORDER_SOUND = 'new_order.wav';
+
+    private const NEW_ORDER_ANDROID_CHANNEL = 'new_order_channel';
+
     public function __construct(protected FirebaseService $firebaseService) {}
 
     /**
@@ -126,13 +139,25 @@ class UserNotificationService
             return;
         }
 
+        $notificationType = (string) ($data['notification_type'] ?? $data['type'] ?? '');
+        $useNewOrderSound = $this->usesNewOrderSound($notificationType);
+
         $payload = [
             'title' => NotificationLocale::pick($titleAr, $titleEn, $lang),
             'body' => NotificationLocale::pick($bodyAr, $bodyEn, $lang),
-            'sound' => 'default',
+            'sound' => $useNewOrderSound ? self::NEW_ORDER_SOUND : 'default',
         ];
 
+        if ($useNewOrderSound) {
+            $payload['channel_id'] = self::NEW_ORDER_ANDROID_CHANNEL;
+        }
+
         $this->firebaseService->sendToDevice($token, $this->flattenForFcm($data), $payload);
+    }
+
+    private function usesNewOrderSound(string $notificationType): bool
+    {
+        return in_array($notificationType, self::NEW_ORDER_NOTIFICATION_TYPES, true);
     }
 
     /**
