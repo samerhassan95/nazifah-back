@@ -127,6 +127,12 @@ class DiscountService
             ];
         }
 
+        // Check service-based usage conditions (if configured)
+        $usageCheck = $this->validateUsageConditions($discount, $itemsValidation['data']['items_breakdown'], $lang);
+        if (! $usageCheck['success']) {
+            return $usageCheck;
+        }
+
         // Check minimum order amount
         if ($discount->min_order_amount && $orderAmount < $discount->min_order_amount) {
             $minMsg = $msg['min_order'][$lang].' '.number_format($discount->min_order_amount, 2).' SAR';
@@ -156,7 +162,8 @@ class DiscountService
         }
 
         // Calculate discount amount
-        $discountAmount = $this->calculateDiscountAmount($discount, $orderAmount);
+        $discountBaseAmount = $this->resolveDiscountBaseAmount($discount, $orderAmount, $itemsValidation['data']['items_breakdown']);
+        $discountAmount = $this->calculateDiscountAmount($discount, $discountBaseAmount);
 
         $successMessage = $this->appliedSuccessMessage($discount, $lang);
 
@@ -167,6 +174,7 @@ class DiscountService
             'data' => [
                 'discount' => $discount,
                 'discount_amount' => $discountAmount,
+                'discount_base_amount' => round($discountBaseAmount, 2),
                 'order_amount' => $orderAmount,
                 'items_subtotal_after_discount' => round($orderAmount - $discountAmount, 2),
                 'final_amount' => round($orderAmount - $discountAmount, 2),
@@ -474,6 +482,64 @@ class DiscountService
         }
 
         return ['success' => true];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $itemsBreakdown
+     * @return array{success: bool, message?: string, code?: int}
+     */
+    private function validateUsageConditions(Discount $discount, array $itemsBreakdown, string $lang): array
+    {
+        $usageCondition = (string) ($discount->usage_condition ?? Discount::USAGE_CONDITION_ALL);
+        if ($usageCondition !== Discount::USAGE_CONDITION_SERVICES) {
+            return ['success' => true];
+        }
+
+        $requiredServiceIds = array_values(array_unique(array_map('intval', (array) ($discount->usage_service_ids ?? []))));
+        if ($requiredServiceIds === []) {
+            return ['success' => true];
+        }
+
+        foreach ($itemsBreakdown as $line) {
+            $lineServiceIds = array_map('intval', (array) ($line['service_ids'] ?? []));
+            if (array_intersect($requiredServiceIds, $lineServiceIds) !== []) {
+                return ['success' => true];
+            }
+        }
+
+        return [
+            'success' => false,
+            'message' => $lang === 'ar'
+                ? 'هذا الكوبون يتطلب وجود خدمات محددة في الطلب.'
+                : 'This coupon requires specific services in the order.',
+            'code' => 400,
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $itemsBreakdown
+     */
+    private function resolveDiscountBaseAmount(Discount $discount, float $orderAmount, array $itemsBreakdown): float
+    {
+        $scope = (string) ($discount->application_scope ?? Discount::APPLICATION_SCOPE_ORDER_TOTAL);
+        if ($scope !== Discount::APPLICATION_SCOPE_SERVICES) {
+            return $orderAmount;
+        }
+
+        $serviceIds = array_values(array_unique(array_map('intval', (array) ($discount->discount_service_ids ?? []))));
+        if ($serviceIds === []) {
+            return $orderAmount;
+        }
+
+        $servicesSubtotal = 0.0;
+        foreach ($itemsBreakdown as $line) {
+            $lineServiceIds = array_map('intval', (array) ($line['service_ids'] ?? []));
+            if (array_intersect($serviceIds, $lineServiceIds) !== []) {
+                $servicesSubtotal += (float) ($line['total_price'] ?? 0.0);
+            }
+        }
+
+        return round(max(0.0, min($servicesSubtotal, $orderAmount)), 2);
     }
 
     /**

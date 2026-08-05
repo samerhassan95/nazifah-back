@@ -34,6 +34,10 @@ class Discount extends Model
         'description',
         'type',
         'discount_type',
+        'usage_condition',
+        'usage_service_ids',
+        'application_scope',
+        'discount_service_ids',
         'value',
         'min_order_amount',
         'max_discount_amount',
@@ -60,6 +64,8 @@ class Discount extends Model
         'is_active' => 'boolean',
         'user_ids' => 'array',
         'group_ids' => 'array',
+        'usage_service_ids' => 'array',
+        'discount_service_ids' => 'array',
     ];
 
     const TYPE_PERCENTAGE = 'percentage';
@@ -75,6 +81,14 @@ class Discount extends Model
     const DISCOUNT_TYPE_CLIENT = 'client';
 
     const DISCOUNT_TYPE_GLOBAL = 'global';
+
+    const USAGE_CONDITION_ALL = 'all';
+
+    const USAGE_CONDITION_SERVICES = 'services';
+
+    const APPLICATION_SCOPE_ORDER_TOTAL = 'order_total';
+
+    const APPLICATION_SCOPE_SERVICES = 'services';
 
     /**
      * Vendors this discount applies to
