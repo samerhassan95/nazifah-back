@@ -446,7 +446,7 @@ class OrderController extends Controller
         $driver = $request->user();
 
         $validator = Validator::make($request->all(), [
-            'status' => ['required', 'in:on_way_to_pickup,delivered_to_branch,on_way_to_delivery,waiting_client_receipt'],
+            'status' => ['required', 'in:on_way_to_pickup,picked_up,delivered_to_branch,on_way_to_delivery,waiting_client_receipt'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -1108,7 +1108,7 @@ class OrderController extends Controller
 
     /**
      * Mark pickup as complete — transitions based on order and stage:
-     * - Pickup leg: driver cannot close pickup; client must confirm handoff first.
+     * - Pickup driver (on_way_to_pickup) → picked_up, then client confirms handoff.
      * - Delivery driver (driver_delivery_accepted after laundry handoff) → on_way_to_delivery
      */
     public function pickupComplete(Request $request, $orderId): JsonResponse
@@ -1193,18 +1193,27 @@ class OrderController extends Controller
             ], (int) $driver->id), app()->getLocale() === 'ar' ? 'أنت في الطريق لتوصيل الطلب للعميل' : 'You are on the way to deliver the order to the client');
         }
 
-        // Pickup leg: never auto-pickup by driver. Client must confirm handoff from app actions.
-        return errorResponse(
-            app()->getLocale() === 'ar'
-                ? 'لا يمكن تحويل الطلب إلى "تم الاستلام" من المندوب. يجب أن يؤكد العميل تسليم الطلب أولاً.'
-                : 'Pickup cannot be completed by driver. Client must confirm handoff first.',
-            [
-                'order_status' => $order->status,
-                'requires_handoff_confirmation' => true,
-                'confirm_endpoint' => '/api/v1/user/orders/'.$order->id.'/confirm-handoff',
-            ],
-            400
-        );
+        // Pickup driver: on_way_to_pickup → picked_up (client confirms handoff afterwards).
+        try {
+            $statusService->transitionTo($order, OrderStatus::PICKED_UP, [
+                'notes' => 'Order picked up from client by driver',
+                'changed_by' => $driver->id,
+            ]);
+        } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
+            return errorResponse($e->userMessage(), null, 400);
+        }
+
+        $order = $order->fresh();
+
+        return successResponse($this->orderApiPayload($order, [
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'status' => $order->status,
+            'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+            'requires_client_handoff_confirmation' => ! (bool) $order->pickup_at_vendor && $order->client_pickup_handoff_at === null,
+        ], (int) $driver->id), app()->getLocale() === 'ar'
+            ? 'تم استلام الطلب من العميل — في انتظار تأكيد العميل'
+            : 'Order picked up from client — waiting for client handoff confirmation');
     }
 
     /**

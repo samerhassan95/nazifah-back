@@ -530,6 +530,7 @@ enum OrderStatus: string
             self::DRIVER_PICKUP_ASSIGNED->value,
             self::DRIVER_PICKUP_ACCEPTED->value,
             self::ON_WAY_TO_PICKUP->value,
+            self::PICKED_UP->value,
             self::ON_WAY_TO_DELIVERY->value,
             self::WAITING_CLIENT_RECEIPT->value,
             self::DELIVERED->value,

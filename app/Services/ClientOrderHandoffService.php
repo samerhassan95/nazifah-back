@@ -98,10 +98,11 @@ class ClientOrderHandoffService
         $pickupAtVendor = (bool) $order->pickup_at_vendor;
         $deliveryAtVendor = (bool) $order->delivery_at_vendor;
 
+        // Home pickup: driver marks picked_up first, then client confirms they handed clothes over.
         if (
             ! $pickupAtVendor
             && ! $order->client_pickup_handoff_at
-            && $status === OrderStatus::ON_WAY_TO_PICKUP->value
+            && $status === OrderStatus::PICKED_UP->value
         ) {
             return [
                 'handoff_type' => 'give_to_driver',
@@ -157,13 +158,11 @@ class ClientOrderHandoffService
 
     protected function confirmGiveToDriver(Order $order, int $clientId): Order
     {
-        if ($this->statusService->canTransition($order, OrderStatus::PICKED_UP)) {
-            $this->statusService->transitionTo($order, OrderStatus::PICKED_UP, [
-                'notes' => __('order.handoff_log_give_to_driver'),
-                'changed_by' => $clientId,
-            ]);
+        if ($order->status !== OrderStatus::PICKED_UP->value) {
+            throw new \LogicException(__('order.handoff_error_not_awaiting_confirmation'));
         }
 
+        // Driver already moved the order to picked_up; client only confirms the handoff.
         $order->update(['client_pickup_handoff_at' => now()]);
 
         return $order->fresh();

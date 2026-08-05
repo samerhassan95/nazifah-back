@@ -44,7 +44,7 @@ POST /api/v1/user/orders/{orderId}/confirm-handoff
 
 | نوع Handoff | السيناريو | الشروط | بعد التأكيد |
 |-------------|-----------|--------|-------------|
-| `give_to_driver` | استلام من البيت — العميل يسلّم لسائق الاستلام | `pickup_at_vendor = false` · `status = on_way_to_pickup` · `client_pickup_handoff_at` فارغ | الحالة → `picked_up` · يُحدَّث `client_pickup_handoff_at` |
+| `give_to_driver` | استلام من البيت — العميل يؤكد أنه سلّم للمندوب **بعد** ما السائق يعمل pickup | `pickup_at_vendor = false` · `status = picked_up` · `client_pickup_handoff_at` فارغ | يُحدَّث `client_pickup_handoff_at` فقط (الحالة أصلًا `picked_up`) |
 | `give_to_laundry` | تسليم في الفرع — العميل يسلّم في المغسلة | `pickup_at_vendor = true` · `status = confirmed` أو `payment_confirmed` · `client_pickup_handoff_at` فارغ | يُحدَّث `client_pickup_handoff_at` فقط (بدون تغيير الحالة) |
 | `receive_from_driver` | توصيل للبيت — العميل يستلم من سائق التوصيل | `delivery_at_vendor = false` · `status = waiting_client_receipt` أو `delivered` · `client_delivery_handoff_at` فارغ | الحالة → `delivered` · يُحدَّث `client_delivery_handoff_at` · COD يُسجَّل مدفوع إن وُجد |
 | `receive_from_laundry` | استلام من الفرع — العميل يستلم من المغسلة | `delivery_at_vendor = true` · `status = completed` · `client_delivery_handoff_at` فارغ | الحالة → `delivered` · يُحدَّث `client_delivery_handoff_at` · COD إن وُجد |
@@ -54,10 +54,11 @@ POST /api/v1/user/orders/{orderId}/confirm-handoff
 #### سائق الاستلام يستلم من العميل (من البيت)
 
 1. تعيين السائق → في الطريق → `on_way_to_pickup`
-2. العميل يرى **تأكيد التسليم** — «سلّم للسائق» (`give_to_driver`)
-3. العميل يؤكد → `picked_up` + `client_pickup_handoff_at`
+2. السائق يعمل pickup complete → الحالة تصبح `picked_up`
+3. العميل يرى **تأكيد التسليم** — «سلّمت الملابس للمندوب» (`give_to_driver`)
+4. العميل يؤكد → يُحدَّث `client_pickup_handoff_at` (الحالة تبقى `picked_up`)
 
-قد يكتمل الاستلام أيضًا من API السائق (`pickupComplete` من `on_way_to_pickup`); مسار العميل هو **تأكيد يخص العميل**.
+**مهم:** سائق الاستلام هو من ينقل الحالة إلى `picked_up`. تأكيد العميل بعد ذلك إقرار بالتسليم، وليس هو من ينشئ حالة الاستلام.
 
 #### سائق التوصيل يسلّم للعميل (توصيل للبيت)
 
@@ -219,9 +220,10 @@ sequenceDiagram
 
     D->>API: on_way_to_pickup
     Note over C: اختياري: visit-response (جاهز للاستلام)
+    D->>API: pickupComplete
+    API-->>API: الحالة → picked_up
     Note over C: requires_handoff_confirmation (give_to_driver)
     C->>API: POST confirm-handoff
-    API-->>API: الحالة → picked_up
     API-->>API: client_pickup_handoff_at مُحدَّث
 ```
 
@@ -246,7 +248,7 @@ sequenceDiagram
 
 | إجراء السائق | تغيير الحالة | الخطوة التالية للعميل |
 |--------------|--------------|------------------------|
-| سائق استلام · `pickupComplete` من `on_way_to_pickup` | → `picked_up` | قد يكون handoff تم مسبقًا من العميل أو مسار السائق |
+| سائق استلام · `pickupComplete` من `on_way_to_pickup` | → `picked_up` | بعدها العميل يؤكد handoff (`give_to_driver`) |
 | سائق توصيل · `pickupComplete` من `on_way_to_delivery` | → `waiting_client_receipt` | العميل يجب أن يعمل `confirm-handoff` (`receive_from_driver`) |
 | سائق توصيل · `confirm-qr` عند التسليم | **لا** يُنهي التسليم للعميل | العميل ما زال يؤكد الاستلام |
 
@@ -262,7 +264,8 @@ sequenceDiagram
 2. **النوع** — `pickup_at_vendor` / `delivery_at_vendor` صحيح للسيناريو؟
 3. **تأكيد سابق** — `client_pickup_handoff_at` أو `client_delivery_handoff_at` مُحدَّد مسبقًا؟
 4. **مسار خاطئ** — تتوقع visit-response بينما المطلوب handoff (أو العكس)؟
-5. **التوصيل** — الحالة ما زالت `on_way_to_delivery`؟ تأكيد استلام العميل عادة يحتاج `waiting_client_receipt` (بعد أن السائق يضغط «وصلت»).
+5. **الاستلام** — الحالة ما زالت `on_way_to_pickup`؟ تأكيد العميل لـ give-to-driver يحتاج `picked_up` أولًا (بعد ما السائق يعمل pickup).
+6. **التوصيل** — الحالة ما زالت `on_way_to_delivery`؟ تأكيد استلام العميل عادة يحتاج `waiting_client_receipt` (بعد أن السائق يضغط «وصلت»).
 
 ### فحص سريع على السيرفر (tinker)
 

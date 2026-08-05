@@ -44,7 +44,7 @@ Logic depends on **order status**, **pickup/delivery mode** (`pickup_at_vendor`,
 
 | Handoff type | Scenario | Conditions | After confirm |
 |--------------|----------|------------|---------------|
-| `give_to_driver` | Home pickup — client gives clothes to pickup driver | `pickup_at_vendor = false` · `status = on_way_to_pickup` · `client_pickup_handoff_at` empty | Status → `picked_up` · sets `client_pickup_handoff_at` |
+| `give_to_driver` | Home pickup — client confirms they handed clothes to driver **after** driver marked pickup | `pickup_at_vendor = false` · `status = picked_up` · `client_pickup_handoff_at` empty | Sets `client_pickup_handoff_at` only (status already `picked_up`) |
 | `give_to_laundry` | Branch drop-off — client gives clothes at laundry | `pickup_at_vendor = true` · `status = confirmed` or `payment_confirmed` · `client_pickup_handoff_at` empty | Sets `client_pickup_handoff_at` only (no status change) |
 | `receive_from_driver` | Home delivery — client receives from delivery driver | `delivery_at_vendor = false` · `status = waiting_client_receipt` or `delivered` · `client_delivery_handoff_at` empty | Status → `delivered` · sets `client_delivery_handoff_at` · COD marked paid if applicable |
 | `receive_from_laundry` | Branch pickup — client collects from laundry | `delivery_at_vendor = true` · `status = completed` · `client_delivery_handoff_at` empty | Status → `delivered` · sets `client_delivery_handoff_at` · COD if applicable |
@@ -54,10 +54,11 @@ Logic depends on **order status**, **pickup/delivery mode** (`pickup_at_vendor`,
 #### Pickup driver collects from client (home)
 
 1. Driver assigned → en route → `on_way_to_pickup`
-2. Client sees **confirm handoff** — “give to driver” (`give_to_driver`)
-3. Client confirms → `picked_up` + `client_pickup_handoff_at`
+2. Driver marks pickup complete (`pickupComplete` / status → `picked_up`)
+3. Client sees **confirm handoff** — “I handed clothes to the driver” (`give_to_driver`)
+4. Client confirms → sets `client_pickup_handoff_at` (status stays `picked_up`)
 
-Driver may also complete pickup via driver API (`pickupComplete` from `on_way_to_pickup`); client handoff is the **client-owned** confirmation path.
+**Important:** the pickup driver owns the `picked_up` transition. Client confirmation is an acknowledgment afterwards, not the action that creates `picked_up`.
 
 #### Delivery driver delivers to client (home)
 
@@ -219,9 +220,10 @@ sequenceDiagram
 
     D->>API: on_way_to_pickup
     Note over C: Optional visit-response (ready for pickup)
+    D->>API: pickupComplete
+    API-->>API: status → picked_up
     Note over C: requires_handoff_confirmation (give_to_driver)
     C->>API: POST confirm-handoff
-    API-->>API: status → picked_up
     API-->>API: client_pickup_handoff_at set
 ```
 
@@ -246,7 +248,7 @@ sequenceDiagram
 
 | Driver action | Status change | Client next step |
 |---------------|---------------|------------------|
-| Pickup driver · `pickupComplete` from `on_way_to_pickup` | → `picked_up` | Handoff may already be done by client or driver path |
+| Pickup driver · `pickupComplete` from `on_way_to_pickup` | → `picked_up` | Client then confirms handoff (`give_to_driver`) |
 | Delivery driver · `pickupComplete` from `on_way_to_delivery` | → `waiting_client_receipt` | Client must `confirm-handoff` (`receive_from_driver`) |
 | Delivery driver · `confirm-qr` at delivery | Does **not** complete delivery to client | Client still confirms receipt |
 
@@ -262,7 +264,8 @@ Check on the order record:
 2. **Mode** — `pickup_at_vendor` / `delivery_at_vendor` correct for the scenario?
 3. **Already confirmed** — `client_pickup_handoff_at` or `client_delivery_handoff_at` already set?
 4. **Wrong flow** — expecting visit-response while handoff is required (or vice versa)?
-5. **Delivery** — is status still `on_way_to_delivery`? Client handoff for receipt usually needs `waiting_client_receipt` (after driver marks arrival).
+5. **Pickup** — is status still `on_way_to_pickup`? Client handoff for give-to-driver needs `picked_up` first (after driver marks pickup).
+6. **Delivery** — is status still `on_way_to_delivery`? Client handoff for receipt usually needs `waiting_client_receipt` (after driver marks arrival).
 
 ### Quick server check (tinker)
 
