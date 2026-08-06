@@ -1047,6 +1047,7 @@ class OrderController extends Controller
     /**
      * Mobile calculate body often keeps only accepted lines (no status field).
      * Any stored order line not represented in the request becomes a preview rejected line.
+     * If the same piece/services stay but additions were dropped, those additions become rejected.
      *
      * @param  list<array<string,mixed>>  $requestItems
      * @return list<array<string,mixed>>
@@ -1058,20 +1059,19 @@ class OrderController extends Controller
             return $requestItems;
         }
 
-        $requestKeys = [];
+        $matchedStoredIndexes = [];
+
         foreach ($requestItems as $index => $requestItem) {
             if (! is_array($requestItem)) {
                 continue;
             }
-            $requestKeys[$this->calculatePreviewLineKey($requestItem)][] = $index;
 
-            // Additions present on the stored twin but removed from the request → rejected additions.
-            foreach ($storedLines as $storedLine) {
-                if ($this->calculatePreviewLineKey($storedLine, ignoreAdditions: true)
-                    !== $this->calculatePreviewLineKey($requestItem, ignoreAdditions: true)
-                ) {
+            foreach ($storedLines as $storedIndex => $storedLine) {
+                if (! $this->requestMatchesStoredCalculateLine($requestItem, $storedLine)) {
                     continue;
                 }
+
+                $matchedStoredIndexes[$storedIndex] = true;
 
                 $requestAdditionIds = collect($requestItem['additional_service_ids'] ?? [])
                     ->map(fn ($id) => (int) $id)
@@ -1085,11 +1085,11 @@ class OrderController extends Controller
                 }
 
                 $requestItems[$index]['rejected_additional_service_ids'] = array_values(array_unique(array_merge(
-                    collect($requestItem['rejected_additional_service_ids'] ?? [])->map(fn ($id) => (int) $id)->all(),
+                    collect($requestItems[$index]['rejected_additional_service_ids'] ?? [])->map(fn ($id) => (int) $id)->all(),
                     $omittedAdditions
                 )));
 
-                $additionRows = collect($requestItem['additional_services'] ?? [])->keyBy(
+                $additionRows = collect($requestItems[$index]['additional_services'] ?? [])->keyBy(
                     fn ($row) => (int) ($row['service_addition_id'] ?? $row['id'] ?? 0)
                 );
                 foreach ($storedLine['additional_services'] ?? [] as $storedAddition) {
@@ -1108,25 +1108,8 @@ class OrderController extends Controller
             }
         }
 
-        foreach ($storedLines as $storedLine) {
-            $key = $this->calculatePreviewLineKey($storedLine);
-            $keyWithoutAdds = $this->calculatePreviewLineKey($storedLine, ignoreAdditions: true);
-
-            $matched = isset($requestKeys[$key]) || isset($requestKeys[$keyWithoutAdds]);
-            if (! $matched) {
-                // Also match when request keeps same piece+services but different addition set.
-                foreach ($requestItems as $requestItem) {
-                    if (! is_array($requestItem)) {
-                        continue;
-                    }
-                    if ($this->calculatePreviewLineKey($requestItem, ignoreAdditions: true) === $keyWithoutAdds) {
-                        $matched = true;
-                        break;
-                    }
-                }
-            }
-
-            if ($matched) {
+        foreach ($storedLines as $storedIndex => $storedLine) {
+            if (isset($matchedStoredIndexes[$storedIndex])) {
                 continue;
             }
 
@@ -1135,6 +1118,58 @@ class OrderController extends Controller
         }
 
         return array_values($requestItems);
+    }
+
+    /**
+     * Match request ↔ stored calculate lines even when mobile merges sibling services on one piece.
+     *
+     * @param  array<string,mixed>  $requestItem
+     * @param  array<string,mixed>  $storedLine
+     */
+    private function requestMatchesStoredCalculateLine(array $requestItem, array $storedLine): bool
+    {
+        if ((int) ($requestItem['piece_id'] ?? 0) !== (int) ($storedLine['piece_id'] ?? 0)) {
+            return false;
+        }
+
+        $requestNote = trim((string) ($requestItem['note'] ?? ''));
+        $storedNote = trim((string) ($storedLine['note'] ?? ''));
+        if ($requestNote !== '' && $storedNote !== '' && $requestNote !== $storedNote) {
+            return false;
+        }
+
+        $requestServices = collect(OrderItemsNormalizer::mainServiceIds($requestItem))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->sort()
+            ->values();
+        $storedServices = collect($storedLine['service_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->sort()
+            ->values();
+
+        if ($requestServices->isEmpty() || $storedServices->isEmpty()) {
+            return false;
+        }
+
+        if ($requestServices->values()->all() === $storedServices->values()->all()) {
+            return true;
+        }
+
+        // Mobile merged several stored service-rows for the same piece into one request line.
+        if ($storedServices->diff($requestServices)->isEmpty()) {
+            return true;
+        }
+
+        // Mobile sent one of the stored service combinations for this piece.
+        if ($requestServices->diff($storedServices)->isEmpty()) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
