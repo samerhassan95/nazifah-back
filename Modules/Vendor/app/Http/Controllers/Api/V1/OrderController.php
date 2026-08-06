@@ -250,11 +250,28 @@ class OrderController extends Controller
                     }
                 }
 
-                if (! empty($item['additional_service_ids'])) {
+                if (! empty($item['additional_service_ids'])
+                    || ! empty($item['rejected_additional_service_ids'])
+                    || ! empty($item['additional_services'])
+                ) {
                     $storedAdditionalServices = collect($item['additional_services'] ?? [])->keyBy(function ($row) {
                         return (int) ($row['service_addition_id'] ?? $row['id'] ?? 0);
                     });
-                    foreach (array_unique($item['additional_service_ids']) as $additionalServiceId) {
+                    $acceptedAdditionIds = collect($item['additional_service_ids'] ?? [])
+                        ->map(fn ($id) => (int) $id)
+                        ->filter(fn ($id) => $id > 0)
+                        ->values()
+                        ->all();
+                    $allAdditionIds = collect($acceptedAdditionIds)
+                        ->merge($rejectedAdditionIds)
+                        ->merge($storedAdditionalServices->keys())
+                        ->map(fn ($id) => (int) $id)
+                        ->filter(fn ($id) => $id > 0)
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    foreach ($allAdditionIds as $additionalServiceId) {
                         $additionModel = \Modules\Service\Models\ServiceAddition::find($additionalServiceId);
                         $storedAddition = $storedAdditionalServices->get((int) $additionalServiceId);
                         if (! $additionModel && ! $storedAddition) {
@@ -263,8 +280,19 @@ class OrderController extends Controller
                         $additionalPrice = $additionModel
                             ? (float) $additionModel->getPriceForPieceAtBranch($piece->id, $branchId)
                             : (float) ($storedAddition['price'] ?? 0);
-                        $additionStatus = $additionStatusById[(int) $additionalServiceId]
-                            ?? (in_array((int) $additionalServiceId, $rejectedAdditionIds, true) ? 'rejected' : 'accepted');
+
+                        $explicitAdditionStatus = $additionStatusById[(int) $additionalServiceId] ?? null;
+                        $storedAdditionStatus = strtolower((string) ($storedAddition['status'] ?? $storedAddition['vendor_status'] ?? ''));
+                        if ($explicitAdditionStatus) {
+                            $additionStatus = $explicitAdditionStatus;
+                        } elseif (in_array((int) $additionalServiceId, $rejectedAdditionIds, true) || $storedAdditionStatus === 'rejected') {
+                            $additionStatus = 'rejected';
+                        } elseif (in_array((int) $additionalServiceId, $acceptedAdditionIds, true)) {
+                            $additionStatus = 'accepted';
+                        } else {
+                            // Present only via stored twin / omitted from request list.
+                            $additionStatus = 'rejected';
+                        }
                         if ($lineStatus === 'rejected') {
                             $additionStatus = 'rejected';
                         }
