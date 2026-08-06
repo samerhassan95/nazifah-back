@@ -129,15 +129,17 @@ class OrderController extends Controller
                 $primaryServicePrice = 0.0;
 
                 foreach ($mainServiceIds as $mainServiceId) {
-                    $availabilityError = $this->catalogAvailabilityService->validateOrderLineForNewOrder(
-                        $branchId,
-                        (int) $item['piece_id'],
-                        (int) $mainServiceId,
-                        $item['additional_service_ids'] ?? [],
-                        $lang
-                    );
-                    if ($availabilityError !== null) {
-                        return errorResponse($availabilityError, 400);
+                    if (! $usingStoredOrderItems) {
+                        $availabilityError = $this->catalogAvailabilityService->validateOrderLineForNewOrder(
+                            $branchId,
+                            (int) $item['piece_id'],
+                            (int) $mainServiceId,
+                            $item['additional_service_ids'] ?? [],
+                            $lang
+                        );
+                        if ($availabilityError !== null) {
+                            return errorResponse($availabilityError, 400);
+                        }
                     }
 
                     $service = $piece->services->firstWhere('id', $mainServiceId);
