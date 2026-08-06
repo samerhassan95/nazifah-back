@@ -982,21 +982,16 @@ class OrderController extends Controller
     {
         $order->loadMissing(['items.additionalServicesPivot.serviceAddition', 'items.service', 'items.piece']);
 
-        // Physical piece lines for calculate preview:
-        // - rows that share line_group = one multi-service piece
-        // - otherwise each order_item row is its own piece (do NOT legacy-merge
-        //   different services on the same piece_id — e.g. 3 pants stay 3 lines)
-        $buckets = [];
+        // Each order_item row is one physical piece line for calculate preview.
+        // Do not merge by line_group here — duplicate pants / different services on the
+        // same piece_id must stay separate so omitted rows become rejected_items.
+        $normalizedBuckets = [];
         foreach ($order->items as $item) {
-            $key = ! empty($item->line_group)
-                ? 'g:'.$item->line_group
-                : 'i:'.$item->id;
-            $buckets[$key][] = $item;
+            $normalizedBuckets[] = collect([$item]);
         }
 
         $result = [];
-        foreach ($buckets as $groupItems) {
-            $group = collect($groupItems)->values();
+        foreach ($normalizedBuckets as $group) {
             foreach ($group->groupBy(fn ($item) => $item->vendor_status ?? 'accepted') as $status => $statusItems) {
                 if ($status === 'rejected' && ! $includeRejectedGroups) {
                     continue;
