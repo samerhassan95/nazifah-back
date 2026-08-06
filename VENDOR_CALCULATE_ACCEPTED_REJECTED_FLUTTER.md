@@ -10,6 +10,30 @@
 
 ---
 
+## Important: each physical piece is its own line
+
+Same `piece_id` can appear **multiple times** on an order (e.g. 3 pants).  
+Do **not** merge them into one `items[]` row with all services combined.
+
+**Wrong (merges 3 pants into one row):**
+```json
+{ "piece_id": 43, "service_ids": [66, 67], "additional_service_ids": [78] }
+```
+
+**Right (one physical piece only):**
+```json
+{
+  "order_id": 437,
+  "items": [
+    { "piece_id": 43, "quantity": 1, "service_ids": [66], "additional_service_ids": [78], "note": "" }
+  ]
+}
+```
+
+→ that one pants is accepted; the **other** pants lines on the order go to `rejected_items`.
+
+---
+
 ## Contract (what Flutter must implement)
 
 | Request | Meaning | Response |

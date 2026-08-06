@@ -1067,9 +1067,9 @@ class OrderController extends Controller
 
     /**
      * Mobile calculate body often keeps only accepted lines (no status field).
-     * Any stored order line not represented in the request becomes a preview rejected line.
-     * If the same piece stays but main services or additions were dropped from the request,
-     * those dropped services/additions become preview rejected lines.
+     * Each stored piece-line is independent (same piece_id can appear many times).
+     * Sent request lines match stored lines one-to-one; unmatched stored lines are rejected (display only).
+     * Dropped services/additions on a matched line also become rejected preview rows.
      *
      * @param  list<array<string,mixed>>  $requestItems
      * @return list<array<string,mixed>>
@@ -1088,80 +1088,98 @@ class OrderController extends Controller
                 continue;
             }
 
+            $bestStoredIndex = null;
+            $bestScore = -1;
+
             foreach ($storedLines as $storedIndex => $storedLine) {
-                if (! $this->requestMatchesStoredCalculateLine($requestItem, $storedLine)) {
+                if (isset($matchedStoredIndexes[$storedIndex])) {
                     continue;
                 }
 
-                $matchedStoredIndexes[$storedIndex] = true;
-
-                $requestServiceIds = collect(OrderItemsNormalizer::mainServiceIds($requestItem))
-                    ->map(fn ($id) => (int) $id)
-                    ->filter(fn ($id) => $id > 0)
-                    ->unique()
-                    ->values()
-                    ->all();
-                $storedServiceIds = collect($storedLine['service_ids'] ?? [])
-                    ->map(fn ($id) => (int) $id)
-                    ->filter(fn ($id) => $id > 0)
-                    ->unique()
-                    ->values()
-                    ->all();
-                $omittedServices = array_values(array_diff($storedServiceIds, $requestServiceIds));
-
-                // Main services dropped from service_ids → preview rejected line (same piece).
-                if ($omittedServices !== []) {
-                    $rejectedServiceLine = $storedLine;
-                    $rejectedServiceLine['status'] = 'rejected';
-                    $rejectedServiceLine['service_id'] = $omittedServices[0];
-                    $rejectedServiceLine['service_ids'] = $omittedServices;
-                    $rejectedServiceLine['service_prices'] = array_intersect_key(
-                        $storedLine['service_prices'] ?? [],
-                        array_flip($omittedServices)
-                    );
-                    $rejectedServiceLine['service_names'] = array_intersect_key(
-                        $storedLine['service_names'] ?? [],
-                        array_flip($omittedServices)
-                    );
-                    $rejectedServiceLine['additional_service_ids'] = [];
-                    $rejectedServiceLine['additional_services'] = [];
-                    $rejectedServiceLine['rejected_additional_service_ids'] = [];
-                    $requestItems[] = $rejectedServiceLine;
-                }
-
-                $requestAdditionIds = collect($requestItem['additional_service_ids'] ?? [])
-                    ->map(fn ($id) => (int) $id)
-                    ->all();
-                $storedAdditionIds = collect($storedLine['additional_service_ids'] ?? [])
-                    ->map(fn ($id) => (int) $id)
-                    ->all();
-                $omittedAdditions = array_values(array_diff($storedAdditionIds, $requestAdditionIds));
-                if ($omittedAdditions === []) {
+                $score = $this->scoreCalculateLineMatch($requestItem, $storedLine);
+                if ($score < 0) {
                     continue;
                 }
 
-                $requestItems[$index]['rejected_additional_service_ids'] = array_values(array_unique(array_merge(
-                    collect($requestItems[$index]['rejected_additional_service_ids'] ?? [])->map(fn ($id) => (int) $id)->all(),
-                    $omittedAdditions
-                )));
-
-                $additionRows = collect($requestItems[$index]['additional_services'] ?? [])->keyBy(
-                    fn ($row) => (int) ($row['service_addition_id'] ?? $row['id'] ?? 0)
-                );
-                foreach ($storedLine['additional_services'] ?? [] as $storedAddition) {
-                    $additionId = (int) ($storedAddition['service_addition_id'] ?? $storedAddition['id'] ?? 0);
-                    if (! in_array($additionId, $omittedAdditions, true)) {
-                        continue;
-                    }
-                    $row = $additionRows->get($additionId, $storedAddition);
-                    $row['id'] = $additionId;
-                    $row['service_addition_id'] = $additionId;
-                    $row['status'] = 'rejected';
-                    $row['vendor_status'] = 'rejected';
-                    $additionRows[$additionId] = $row;
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $bestStoredIndex = $storedIndex;
                 }
-                $requestItems[$index]['additional_services'] = $additionRows->values()->all();
             }
+
+            if ($bestStoredIndex === null) {
+                continue;
+            }
+
+            $matchedStoredIndexes[$bestStoredIndex] = true;
+            $storedLine = $storedLines[$bestStoredIndex];
+
+            $requestServiceIds = collect(OrderItemsNormalizer::mainServiceIds($requestItem))
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+            $storedServiceIds = collect($storedLine['service_ids'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+            $omittedServices = array_values(array_diff($storedServiceIds, $requestServiceIds));
+
+            // Main services dropped from service_ids → preview rejected line (same piece instance).
+            if ($omittedServices !== []) {
+                $rejectedServiceLine = $storedLine;
+                $rejectedServiceLine['status'] = 'rejected';
+                $rejectedServiceLine['service_id'] = $omittedServices[0];
+                $rejectedServiceLine['service_ids'] = $omittedServices;
+                $rejectedServiceLine['service_prices'] = array_intersect_key(
+                    $storedLine['service_prices'] ?? [],
+                    array_flip($omittedServices)
+                );
+                $rejectedServiceLine['service_names'] = array_intersect_key(
+                    $storedLine['service_names'] ?? [],
+                    array_flip($omittedServices)
+                );
+                $rejectedServiceLine['additional_service_ids'] = [];
+                $rejectedServiceLine['additional_services'] = [];
+                $rejectedServiceLine['rejected_additional_service_ids'] = [];
+                $requestItems[] = $rejectedServiceLine;
+            }
+
+            $requestAdditionIds = collect($requestItem['additional_service_ids'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $storedAdditionIds = collect($storedLine['additional_service_ids'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $omittedAdditions = array_values(array_diff($storedAdditionIds, $requestAdditionIds));
+            if ($omittedAdditions === []) {
+                continue;
+            }
+
+            $requestItems[$index]['rejected_additional_service_ids'] = array_values(array_unique(array_merge(
+                collect($requestItems[$index]['rejected_additional_service_ids'] ?? [])->map(fn ($id) => (int) $id)->all(),
+                $omittedAdditions
+            )));
+
+            $additionRows = collect($requestItems[$index]['additional_services'] ?? [])->keyBy(
+                fn ($row) => (int) ($row['service_addition_id'] ?? $row['id'] ?? 0)
+            );
+            foreach ($storedLine['additional_services'] ?? [] as $storedAddition) {
+                $additionId = (int) ($storedAddition['service_addition_id'] ?? $storedAddition['id'] ?? 0);
+                if (! in_array($additionId, $omittedAdditions, true)) {
+                    continue;
+                }
+                $row = $additionRows->get($additionId, $storedAddition);
+                $row['id'] = $additionId;
+                $row['service_addition_id'] = $additionId;
+                $row['status'] = 'rejected';
+                $row['vendor_status'] = 'rejected';
+                $additionRows[$additionId] = $row;
+            }
+            $requestItems[$index]['additional_services'] = $additionRows->values()->all();
         }
 
         foreach ($storedLines as $storedIndex => $storedLine) {
@@ -1177,21 +1195,22 @@ class OrderController extends Controller
     }
 
     /**
-     * Match request ↔ stored calculate lines even when mobile merges sibling services on one piece.
+     * Score a request↔stored match. Higher is better. -1 = no match.
+     * Same piece_id alone is not enough — each physical line keeps its own services.
      *
      * @param  array<string,mixed>  $requestItem
      * @param  array<string,mixed>  $storedLine
      */
-    private function requestMatchesStoredCalculateLine(array $requestItem, array $storedLine): bool
+    private function scoreCalculateLineMatch(array $requestItem, array $storedLine): int
     {
         if ((int) ($requestItem['piece_id'] ?? 0) !== (int) ($storedLine['piece_id'] ?? 0)) {
-            return false;
+            return -1;
         }
 
         $requestNote = trim((string) ($requestItem['note'] ?? ''));
         $storedNote = trim((string) ($storedLine['note'] ?? ''));
         if ($requestNote !== '' && $storedNote !== '' && $requestNote !== $storedNote) {
-            return false;
+            return -1;
         }
 
         $requestServices = collect(OrderItemsNormalizer::mainServiceIds($requestItem))
@@ -1199,33 +1218,51 @@ class OrderController extends Controller
             ->filter(fn ($id) => $id > 0)
             ->unique()
             ->sort()
-            ->values();
+            ->values()
+            ->all();
         $storedServices = collect($storedLine['service_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
             ->filter(fn ($id) => $id > 0)
             ->unique()
             ->sort()
-            ->values();
+            ->values()
+            ->all();
 
-        if ($requestServices->isEmpty() || $storedServices->isEmpty()) {
-            return false;
+        if ($requestServices === [] || $storedServices === []) {
+            return -1;
         }
 
-        if ($requestServices->values()->all() === $storedServices->values()->all()) {
-            return true;
+        // Exact service set — this is one physical piece line.
+        if ($requestServices !== $storedServices) {
+            return -1;
         }
 
-        // Mobile merged several stored service-rows for the same piece into one request line.
-        if ($storedServices->diff($requestServices)->isEmpty()) {
-            return true;
+        $requestAdds = collect($requestItem['additional_service_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+        $storedAdds = collect($storedLine['additional_service_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        // Prefer exact additions match; still allow match when mobile dropped some additions.
+        if ($requestAdds === $storedAdds) {
+            return 100;
         }
 
-        // Mobile sent one of the stored service combinations for this piece.
-        if ($requestServices->diff($storedServices)->isEmpty()) {
-            return true;
+        if (array_diff($requestAdds, $storedAdds) === []) {
+            // Request additions are a subset of stored (some rejected by omission).
+            return 50;
         }
 
-        return false;
+        return -1;
     }
 
     /**
