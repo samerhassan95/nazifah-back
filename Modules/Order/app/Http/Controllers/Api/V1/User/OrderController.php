@@ -2415,17 +2415,30 @@ class OrderController extends Controller
 
                 if ($status === 'rejected') {
                     $allAdditionsTotal = collect($additionalServices)->sum('total');
+                    $servicesWithAdditions = $services;
+                    foreach ($additionalServices as $addition) {
+                        $servicesWithAdditions[] = [
+                            'id' => $addition['id'] ?? null,
+                            'name' => $addition['name'] ?? '',
+                            'price' => (float) ($addition['price'] ?? 0),
+                        ];
+                    }
+                    $serviceNameWithAdditions = collect($servicesWithAdditions)
+                        ->pluck('name')
+                        ->filter()
+                        ->implode(' + ');
+
                     $rejectedItems[] = [
                         'id' => $ids[0],
                         'ids' => $ids,
                         'piece_name' => $pieceName,
-                        'service_name' => $serviceName,
-                        'services' => $services,
+                        'service_name' => $serviceNameWithAdditions !== '' ? $serviceNameWithAdditions : $serviceName,
+                        'services' => $servicesWithAdditions,
                         'quantity' => $quantity,
                         'unit_price' => round($servicesTotal, 2),
                         'total_price' => round(($servicesTotal * $quantity) + $allAdditionsTotal, 2),
                         'vendor_notes' => $notes,
-                        'additional_services' => $additionalServices,
+                        'additional_services' => [],
                     ];
 
                     continue;

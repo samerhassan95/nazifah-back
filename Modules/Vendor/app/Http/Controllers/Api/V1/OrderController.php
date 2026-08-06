@@ -281,21 +281,20 @@ class OrderController extends Controller
             $pickupAtVendor = (bool) $existingOrder->pickup_at_vendor;
             $deliveryAtVendor = (bool) $existingOrder->delivery_at_vendor;
 
-            if ($usingStoredOrderItems) {
-                $deliveryFees = [
-                    'delivery_fee' => (float) $existingOrder->delivery_fee,
-                    'pickup_fee' => $pickupAtVendor ? 0.0 : (float) $existingOrder->delivery_fee / (($pickupAtVendor || $deliveryAtVendor) ? 1 : 2),
-                    'delivery_fee_amount' => $deliveryAtVendor ? 0.0 : (float) $existingOrder->delivery_fee / (($pickupAtVendor || $deliveryAtVendor) ? 1 : 2),
-                    'total_distance_km' => (float) ($existingOrder->distance ?? 0),
-                    'distance' => (float) ($existingOrder->distance ?? 0),
-                ];
-            } else {
-                $deliveryFees = $this->computeDeliveryFeesFromOrder($existingOrder, $branch);
-
-                if ($deliveryFees instanceof JsonResponse) {
-                    return $deliveryFees;
-                }
-            }
+            // Vendor calculate for an existing order must keep the stored delivery fee.
+            // Recomputing from distance creates half-leg floats (e.g. 18.56097...) that
+            // diverge from tracking/order-details which use orders.delivery_fee.
+            $storedDeliveryFee = round((float) $existingOrder->delivery_fee, 2);
+            $splitFee = ($pickupAtVendor || $deliveryAtVendor)
+                ? $storedDeliveryFee
+                : round($storedDeliveryFee / 2, 2);
+            $deliveryFees = [
+                'delivery_fee' => $storedDeliveryFee,
+                'pickup_fee' => $pickupAtVendor ? 0.0 : $splitFee,
+                'delivery_fee_amount' => $deliveryAtVendor ? 0.0 : $splitFee,
+                'total_distance_km' => round((float) ($existingOrder->distance ?? 0), 2),
+                'distance' => round((float) ($existingOrder->distance ?? 0), 2),
+            ];
 
             $pricing = Order::calculatePricingTotals(
                 (float) $totalAmount,
@@ -428,9 +427,9 @@ class OrderController extends Controller
         $deliveryFee = $pickupFee + $deliveryFeeAmount;
 
         return [
-            'delivery_fee' => (float) $deliveryFee,
-            'pickup_fee' => (float) $pickupFee,
-            'delivery_fee_amount' => (float) $deliveryFeeAmount,
+            'delivery_fee' => round((float) $deliveryFee, 2),
+            'pickup_fee' => round((float) $pickupFee, 2),
+            'delivery_fee_amount' => round((float) $deliveryFeeAmount, 2),
             'total_distance_km' => (float) round($totalDistance, 2),
             'distance' => (float) round($totalDistance, 2),
         ];
@@ -571,6 +570,8 @@ class OrderController extends Controller
 
         $acceptedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') !== 'rejected')->values();
         $rejectedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') === 'rejected')->values();
+        // Fully rejected pieces: fold additions into services so mobile shows them on one line.
+        $rejectedItems = $rejectedItems->map(fn (array $item) => $this->foldAdditionsIntoServicesForDisplay($item))->values();
 
         $rejectedAdditionItems = $acceptedItems
             ->map(function (array $item) {
@@ -646,6 +647,39 @@ class OrderController extends Controller
     }
 
     /**
+     * Mobile renders services as the parenthetical label; fold additions into services
+     * for fully rejected pieces so the line is not missing extra services.
+     *
+     * @param  array<string,mixed>  $item
+     * @return array<string,mixed>
+     */
+    private function foldAdditionsIntoServicesForDisplay(array $item): array
+    {
+        $additions = collect($item['service_additions'] ?? [])->values();
+        if ($additions->isEmpty()) {
+            return $item;
+        }
+
+        $additionServices = $additions
+            ->map(fn (array $addition) => [
+                'id' => $addition['id'],
+                'name' => $addition['name'],
+                'price' => (float) ($addition['price'] ?? 0),
+                'icon' => $addition['icon'] ?? null,
+            ])
+            ->all();
+
+        $item['services'] = array_values(array_merge($item['services'] ?? [], $additionServices));
+        if (($item['service'] ?? null) === null && $item['services'] !== []) {
+            $item['service'] = $item['services'][0];
+        }
+        // Avoid double rendering: mobile expands service_additions as separate sub-rows.
+        $item['service_additions'] = [];
+
+        return $item;
+    }
+
+    /**
      * Flatten calculate summary items so mobile can render accepted and rejected rows consistently.
      *
      * @param  list<array<string,mixed>>  $acceptedItems
@@ -672,6 +706,8 @@ class OrderController extends Controller
         });
 
         $rejected = collect($rejectedItems)->map(function (array $item) {
+            $item = $this->foldAdditionsIntoServicesForDisplay($item);
+
             return [
                 'piece' => $item['piece'] ?? null,
                 'service' => $item['service'] ?? null,
@@ -1026,6 +1062,8 @@ class OrderController extends Controller
 
         $acceptedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') !== 'rejected')->values();
         $rejectedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') === 'rejected')->values();
+        // Fully rejected pieces: fold additions into services so mobile shows them on one line.
+        $rejectedItems = $rejectedItems->map(fn (array $item) => $this->foldAdditionsIntoServicesForDisplay($item))->values();
         // Group rejected additions under one rejected line per piece (not one line per addition).
         // Skip fully-rejected pieces — their additions already appear on that rejected item.
         $rejectedAdditionItems = $acceptedItems

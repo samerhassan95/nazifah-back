@@ -605,6 +605,30 @@ class HomeController extends Controller
 
         $acceptedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') !== 'rejected')->values();
         $rejectedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') === 'rejected')->values();
+        // Fully rejected pieces: fold additions into services so mobile shows them on one line.
+        $rejectedItems = $rejectedItems->map(function (array $item) {
+            $additions = collect($item['service_additions'] ?? [])->values();
+            if ($additions->isEmpty()) {
+                return $item;
+            }
+
+            $additionServices = $additions
+                ->map(fn (array $addition) => [
+                    'id' => $addition['id'],
+                    'name' => $addition['name'],
+                    'price' => (float) ($addition['price'] ?? 0),
+                    'icon' => $addition['icon'] ?? null,
+                ])
+                ->all();
+
+            $item['services'] = array_values(array_merge($item['services'] ?? [], $additionServices));
+            if (($item['service'] ?? null) === null && $item['services'] !== []) {
+                $item['service'] = $item['services'][0];
+            }
+            $item['service_additions'] = [];
+
+            return $item;
+        })->values();
         // Group rejected additions under one rejected line per piece (not one line per addition).
         // Skip fully-rejected pieces — their additions already appear on that rejected item.
         $rejectedAdditionItems = $acceptedItems
