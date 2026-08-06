@@ -6,29 +6,38 @@ use GuzzleHttp\Client;
 use Modules\Invoice\Contracts\InvoiceComplianceGatewayInterface;
 use Modules\Invoice\DTOs\InvoiceComplianceResult;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\InvoiceSettingsService;
 
 class HttpZatcaGateway implements InvoiceComplianceGatewayInterface
 {
+    public function __construct(
+        private ?InvoiceSettingsService $settings = null
+    ) {
+        $this->settings ??= app(InvoiceSettingsService::class);
+    }
+
     public function submitSimplifiedInvoice(Invoice $invoice, array $payload): InvoiceComplianceResult
     {
-        $baseUrl = rtrim((string) config('invoice.zatca.base_url'), '/');
-        $path = '/'.ltrim((string) config('invoice.zatca.submit_path', '/invoices'), '/');
+        $baseUrl = rtrim((string) $this->settings->get('invoice_zatca_base_url', ''), '/');
+        $path = '/'.ltrim((string) $this->settings->get('invoice_zatca_submit_path', '/invoices'), '/');
 
         $requestPayload = [
-            'environment' => config('invoice.zatca.environment', 'sandbox'),
+            'environment' => $this->settings->get('invoice_zatca_environment', 'sandbox'),
             'invoice' => $payload,
         ];
 
         try {
             $client = new Client([
                 'base_uri' => $baseUrl,
-                'timeout' => (int) config('invoice.zatca.timeout', 20),
+                'timeout' => (int) $this->settings->get('invoice_zatca_timeout', 20),
             ]);
 
             $response = $client->post($path, [
                 'headers' => array_filter([
                     'Accept' => 'application/json',
-                    'Authorization' => config('invoice.zatca.api_key') ? 'Bearer '.config('invoice.zatca.api_key') : null,
+                    'Authorization' => $this->settings->get('invoice_zatca_api_key')
+                        ? 'Bearer '.$this->settings->get('invoice_zatca_api_key')
+                        : null,
                 ]),
                 'json' => $requestPayload,
             ]);

@@ -15,6 +15,7 @@ use Modules\Admin\Http\Controllers\AdminDashboardController;
 use Modules\Admin\Http\Controllers\AdminDriverController;
 use Modules\Admin\Http\Controllers\AdminGeneralSettingController;
 use Modules\Admin\Http\Controllers\AdminIconController;
+use Modules\Admin\Http\Controllers\AdminInvoiceSettingController;
 use Modules\Admin\Http\Controllers\AdminLaundryAdditionalServiceController;
 use Modules\Admin\Http\Controllers\AdminLaundryBankAccountController;
 use Modules\Admin\Http\Controllers\AdminLaundryBranchController;
@@ -359,6 +360,12 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
     Route::prefix('general-settings')->group(function () {
         Route::get('/', [AdminGeneralSettingController::class, 'index']);
         Route::post('/', [AdminGeneralSettingController::class, 'update']);
+    });
+
+    // Invoice Settings Management
+    Route::prefix('invoice-settings')->group(function () {
+        Route::get('/', [AdminInvoiceSettingController::class, 'index']);
+        Route::put('/', [AdminInvoiceSettingController::class, 'update']);
     });
 
     // Timezones

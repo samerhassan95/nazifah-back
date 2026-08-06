@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>متطلبات واتساب والزكاة والفواتير - مشروع نظيفة</title>
+  <style>
+    body { font-family: Tahoma, Arial, sans-serif; line-height: 1.8; margin: 32px; color: #222; }
+    h1, h2, h3 { color: #0f4c81; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; }
+    th, td { border: 1px solid #999; padding: 10px; vertical-align: top; text-align: right; }
+    th { background: #eaf2fb; }
+    code { background: #f4f4f4; padding: 1px 4px; }
+    .note { background: #fff8e1; padding: 12px; border-right: 4px solid #d4a017; margin: 16px 0; }
+    .ok { background: #eefaf1; padding: 12px; border-right: 4px solid #2e7d32; margin: 16px 0; }
+  </style>
+</head>
+<body>
+  <h1>متطلبات واتساب والزكاة والفواتير بناءً على مشروع نظيفة</h1>
+
+  <p>
+    هذه الورقة مبنية على الكود الحالي داخل مشروع <strong>Nazefah</strong>، وبالتحديد موديول الفواتير.
+    الهدف منها تحديد ما هو جاهز حاليًا في المشروع، وما هي الإعدادات والبيانات التي ما زالت مطلوبة
+    لتشغيل الفاتورة الضريبية المبسطة، الإرسال إلى مزود الزكاة، وإرسال رابط الفاتورة إلى العميل على واتساب.
+  </p>
+
+  <div class="ok">
+    <strong>ما هو واضح من المشروع:</strong><br>
+    1. النظام يصدر <strong>فاتورة ضريبية مبسطة</strong>.<br>
+    2. النظام يدعم تكاملين منفصلين: تكامل زكاة، وتكامل واتساب.<br>
+    3. النظام يولد رابط مشاركة للفاتورة ويرسله داخل رسالة واتساب.<br>
+    4. المشروع مجهز للعمل عبر مزود HTTP لكل من الزكاة وواتساب.
+  </div>
+
+  <h2>أولًا: ما الذي يفعله المشروع الآن</h2>
+  <ul>
+    <li>نوع الفاتورة الافتراضي هو <code>simplified_tax_invoice</code>.</li>
+    <li>بيانات البائع في الفاتورة تأتي من بيانات الفرع/المغسلة، وإذا لم تكن موجودة يرجع إلى إعدادات البيئة.</li>
+    <li>بعد إعداد الفاتورة يمكن إرسالها إلى مزود الزكاة، وبعد نجاح ذلك يمكن إرسال رابط الفاتورة إلى واتساب.</li>
+    <li>النظام يتيح API للعميل لإحضار الفاتورة، كما يولد رابط مشاركة موقّع للعرض العام.</li>
+  </ul>
+
+  <h2>ثانيًا: الإعدادات الموجودة في الكود</h2>
+  <p>المشروع ينتظر إعدادات البيئة التالية داخل ملف <code>.env</code>:</p>
+
+  <table>
+    <tr>
+      <th>الفئة</th>
+      <th>المتغير</th>
+      <th>وظيفته</th>
+      <th>حالته</th>
+    </tr>
+    <tr>
+      <td>الفاتورة</td>
+      <td><code>INVOICE_AUTO_ISSUE</code></td>
+      <td>إصدار الفاتورة تلقائيًا</td>
+      <td>موجود في المشروع</td>
+    </tr>
+    <tr>
+      <td>الفاتورة</td>
+      <td><code>INVOICE_ISSUE_COD</code></td>
+      <td>تحديد هل تصدر فواتير طلبات الدفع عند الاستلام</td>
+      <td>موجود في المشروع</td>
+    </tr>
+    <tr>
+      <td>الفاتورة</td>
+      <td><code>INVOICE_PUBLIC_LINK_TTL_DAYS</code></td>
+      <td>مدة صلاحية رابط الفاتورة العام</td>
+      <td>موجود في المشروع</td>
+    </tr>
+    <tr>
+      <td>الفاتورة</td>
+      <td><code>INVOICE_CURRENCY</code></td>
+      <td>عملة الفاتورة</td>
+      <td>موجود في المشروع</td>
+    </tr>
+    <tr>
+      <td>بيانات الشركة</td>
+      <td><code>INVOICE_COMPANY_NAME_AR</code> / <code>INVOICE_COMPANY_NAME_EN</code></td>
+      <td>اسم الشركة العربي والإنجليزي</td>
+      <td>موجود في المشروع</td>
+    </tr>
+    <tr>
+      <td>بيانات الشركة</td>
+      <td><code>INVOICE_COMPANY_VAT_NUMBER</code></td>
+      <td>الرقم الضريبي</td>
+      <td>مطلوب تعبئته فعليًا</td>
+    </tr>
+    <tr>
+      <td>بيانات الشركة</td>
+      <td><code>INVOICE_COMPANY_REGISTRATION_NUMBER</code></td>
+      <td>رقم السجل التجاري أو الرقم الرسمي</td>
+      <td>مطلوب تعبئته فعليًا</td>
+    </tr>
+    <tr>
+      <td>بيانات الشركة</td>
+      <td><code>INVOICE_COMPANY_ADDRESS</code></td>
+      <td>العنوان الرسمي الذي يظهر في الفاتورة عند غياب عنوان الفرع</td>
+      <td>مطلوب تعبئته فعليًا</td>
+    </tr>
+    <tr>
+      <td>الزكاة</td>
+      <td><code>INVOICE_ZATCA_ENABLED</code></td>
+      <td>تفعيل أو إيقاف التكامل</td>
+      <td>مدعوم في المشروع</td>
+    </tr>
+    <tr>
+      <td>الزكاة</td>
+      <td><code>INVOICE_ZATCA_DRIVER</code></td>
+      <td>نوع المزود، والمشروع يدعم <code>http</code></td>
+      <td>مدعوم في المشروع</td>
+    </tr>
+    <tr>
+      <td>الزكاة</td>
+      <td><code>INVOICE_ZATCA_ENVIRONMENT</code></td>
+      <td>بيئة التشغيل: <code>sandbox</code> أو <code>production</code></td>
+      <td>مطلوب تأكيدها</td>
+    </tr>
+    <tr>
+      <td>الزكاة</td>
+      <td><code>INVOICE_ZATCA_BASE_URL</code></td>
+      <td>الرابط الأساسي لمزود الربط مع الزكاة</td>
+      <td>مطلوب تعبئته فعليًا</td>
+    </tr>
+    <tr>
+      <td>الزكاة</td>
+      <td><code>INVOICE_ZATCA_SUBMIT_PATH</code></td>
+      <td>المسار الذي يستقبل إرسال الفاتورة، والافتراضي <code>/invoices</code></td>
+      <td>مطلوب تأكيده مع المزود</td>
+    </tr>
+    <tr>
+      <td>الزكاة</td>
+      <td><code>INVOICE_ZATCA_API_KEY</code></td>
+      <td>مفتاح الربط مع مزود الزكاة</td>
+      <td>مطلوب تعبئته فعليًا</td>
+    </tr>
+    <tr>
+      <td>الزكاة</td>
+      <td><code>INVOICE_ZATCA_TIMEOUT</code></td>
+      <td>مهلة الاتصال</td>
+      <td>مدعوم في المشروع</td>
+    </tr>
+    <tr>
+      <td>واتساب</td>
+      <td><code>INVOICE_WHATSAPP_ENABLED</code></td>
+      <td>تفعيل أو إيقاف التكامل</td>
+      <td>مدعوم في المشروع</td>
+    </tr>
+    <tr>
+      <td>واتساب</td>
+      <td><code>INVOICE_WHATSAPP_DRIVER</code></td>
+      <td>نوع المزود، والمشروع يدعم <code>http</code></td>
+      <td>مدعوم في المشروع</td>
+    </tr>
+    <tr>
+      <td>واتساب</td>
+      <td><code>INVOICE_WHATSAPP_BASE_URL</code></td>
+      <td>الرابط الأساسي لمزود واتساب</td>
+      <td>مطلوب تعبئته فعليًا</td>
+    </tr>
+    <tr>
+      <td>واتساب</td>
+      <td><code>INVOICE_WHATSAPP_SEND_PATH</code></td>
+      <td>المسار الذي يستقبل الإرسال، والافتراضي <code>/messages</code></td>
+      <td>مطلوب تأكيده مع المزود</td>
+    </tr>
+    <tr>
+      <td>واتساب</td>
+      <td><code>INVOICE_WHATSAPP_API_KEY</code></td>
+      <td>مفتاح API الخاص بمزود واتساب</td>
+      <td>مطلوب تعبئته فعليًا</td>
+    </tr>
+    <tr>
+      <td>واتساب</td>
+      <td><code>INVOICE_WHATSAPP_TEMPLATE</code></td>
+      <td>اسم القالب المعتمد، والافتراضي <code>invoice_link</code></td>
+      <td>مطلوب تأكيده مع المزود</td>
+    </tr>
+    <tr>
+      <td>واتساب</td>
+      <td><code>INVOICE_WHATSAPP_SENDER</code></td>
+      <td>اسم أو رقم المرسل المعتمد على واتساب</td>
+      <td>مطلوب تعبئته فعليًا</td>
+    </tr>
+    <tr>
+      <td>واتساب</td>
+      <td><code>INVOICE_WHATSAPP_TIMEOUT</code></td>
+      <td>مهلة الاتصال</td>
+      <td>مدعوم في المشروع</td>
+    </tr>
+  </table>
+
+  <h2>ثالثًا: المطلوب فعليًا لتشغيل النظام في مشروعنا</h2>
+
+  <h3>أ) بيانات لازم تأتي من الإدارة أو المحاسب</h3>
+  <ol>
+    <li>الرقم الضريبي للشركة أو الكيان الذي ستصدر عليه الفواتير.</li>
+    <li>رقم السجل التجاري أو الرقم الرسمي المستخدم في الفاتورة.</li>
+    <li>العنوان الرسمي الكامل.</li>
+    <li>تأكيد اسم الكيان الذي يجب أن يظهر في الفاتورة: هل هو اسم المنصة أم اسم المغسلة/الفرع.</li>
+  </ol>
+
+  <p>
+    مهم: الكود الحالي يستطيع أخذ بيانات البائع من الفرع/المغسلة إذا كانت موجودة، وإلا سيستخدم القيم العامة من
+    <code>INVOICE_COMPANY_VAT_NUMBER</code> و<code>INVOICE_COMPANY_REGISTRATION_NUMBER</code> و<code>INVOICE_COMPANY_ADDRESS</code>.
+    لذلك يجب حسم القرار تجاريًا: هل الفاتورة تصدر باسم المنصة، أم باسم كل مزود خدمة.
+  </p>
+
+  <h3>ب) بيانات لازم تأتي من مزود الزكاة أو الجهة المنفذة للتكامل</h3>
+  <ol>
+    <li>الرابط الأساسي الحقيقي للـ API الخاص بالإرسال.</li>
+    <li>مفتاح API أو Bearer Token.</li>
+    <li>اسم البيئة: <code>sandbox</code> أو <code>production</code>.</li>
+    <li>المسار الصحيح للإرسال إذا لم يكن <code>/invoices</code>.</li>
+    <li>صيغة الاستجابة المتوقعة، خصوصًا حقول: المرجع، UUID، الهاش، وQR.</li>
+  </ol>
+
+  <h3>ج) بيانات لازم تأتي من مزود واتساب</h3>
+  <ol>
+    <li>الرابط الأساسي للـ API.</li>
+    <li>مفتاح API أو Bearer Token.</li>
+    <li>اسم القالب المعتمد لإرسال رابط الفاتورة.</li>
+    <li>اسم أو رقم المرسل المعتمد.</li>
+    <li>تأكيد أسماء المتغيرات التي يقبلها القالب.</li>
+  </ol>
+
+  <h2>رابعًا: ما الذي يرسله مشروعنا لكل تكامل</h2>
+
+  <h3>1) إلى مزود الزكاة</h3>
+  <p>المشروع يرسل طلب HTTP يحتوي على:</p>
+  <ul>
+    <li><code>environment</code></li>
+    <li><code>invoice</code> ويحتوي على بيانات الفاتورة الكاملة</li>
+  </ul>
+
+  <p>وبداخل بيانات الفاتورة نفسها توجد معلومات أساسية مثل:</p>
+  <ul>
+    <li>رقم الفاتورة</li>
+    <li>نوع الفاتورة</li>
+    <li>تاريخ الإصدار</li>
+    <li>العملة</li>
+    <li>بيانات الطلب</li>
+    <li>بيانات البائع</li>
+    <li>بيانات العميل</li>
+    <li>الإجمالي والضريبة والخصم</li>
+  </ul>
+
+  <h3>2) إلى مزود واتساب</h3>
+  <p>المشروع يرسل طلب HTTP يحتوي على:</p>
+  <ul>
+    <li><code>to</code> رقم العميل</li>
+    <li><code>template_name</code></li>
+    <li><code>sender</code></li>
+    <li><code>variables.customer_name</code></li>
+    <li><code>variables.order_number</code></li>
+    <li><code>variables.invoice_number</code></li>
+    <li><code>variables.amount</code></li>
+    <li><code>variables.invoice_url</code></li>
+  </ul>
+
+  <div class="note">
+    معنى هذا أن قالب واتساب عند المزود يجب أن يكون مهيأ ليستقبل نفس المتغيرات السابقة، أو سنحتاج تعديل الكود ليلائم أسماء المتغيرات الفعلية لدى المزود.
+  </div>
+
+  <h2>خامسًا: متطلبات تشغيل مهمة غير الإعدادات</h2>
+  <ol>
+    <li>
+      <strong>رابط عام صحيح للسيرفر:</strong>
+      لأن المشروع يولد رابط فاتورة موقّع، لازم تكون قيمة <code>APP_URL</code> في بيئة السيرفر
+      هي الدومين العام الحقيقي HTTPS، وليست <code>http://localhost</code>.
+    </li>
+    <li>
+      <strong>الـ Queue:</strong>
+      المشروع يعتمد على Jobs للإرسال إلى الزكاة وواتساب. إذا كانت بيئة التشغيل تستخدم
+      <code>ShouldQueue</code> مع اتصال غير فوري، فلازم العامل (queue worker) يكون شغال باستمرار.
+    </li>
+    <li>
+      <strong>اعتماد قالب واتساب:</strong>
+      لا يكفي وجود API فقط، بل يجب أن يكون القالب نفسه approved من مزود واتساب.
+    </li>
+    <li>
+      <strong>تحديد الجهة المحاسبية:</strong>
+      يجب حسم هل الفواتير ستكون باسم المنصة أو باسم كل مغسلة/فرع، لأن ذلك يؤثر على VAT والسجل والعنوان.
+    </li>
+    <li>
+      <strong>بيانات العميل:</strong>
+      المشروع يستخدم رقم العميل في الإرسال على واتساب، لذلك يجب أن تكون أرقام العملاء مخزنة بصيغة صحيحة وقابلة للإرسال.
+    </li>
+  </ol>
+
+  <h2>سادسًا: ما الذي يبدو ناقصًا الآن في مشروعنا</h2>
+  <ol>
+    <li><code>INVOICE_COMPANY_VAT_NUMBER</code></li>
+    <li><code>INVOICE_COMPANY_REGISTRATION_NUMBER</code></li>
+    <li><code>INVOICE_COMPANY_ADDRESS</code></li>
+    <li><code>INVOICE_ZATCA_BASE_URL</code></li>
+    <li><code>INVOICE_ZATCA_API_KEY</code></li>
+    <li><code>INVOICE_WHATSAPP_BASE_URL</code></li>
+    <li><code>INVOICE_WHATSAPP_API_KEY</code></li>
+    <li><code>INVOICE_WHATSAPP_SENDER</code></li>
+    <li>تأكيد <code>INVOICE_ZATCA_ENVIRONMENT</code></li>
+    <li>تأكيد <code>INVOICE_ZATCA_SUBMIT_PATH</code></li>
+    <li>تأكيد <code>INVOICE_WHATSAPP_SEND_PATH</code></li>
+    <li>تأكيد <code>INVOICE_WHATSAPP_TEMPLATE</code></li>
+    <li>تأكيد من يصدر الفاتورة باسمه تجاريًا ومحاسبيًا</li>
+  </ol>
+
+  <h2>سابعًا: كيف تجيب كل مطلوب</h2>
+
+  <table>
+    <tr>
+      <th>المطلوب</th>
+      <th>تجيبه من مين</th>
+      <th>كيف تطلبه</th>
+    </tr>
+    <tr>
+      <td>الرقم الضريبي</td>
+      <td>المحاسب أو مالك النشاط</td>
+      <td>اطلب الرقم الضريبي الرسمي للكيان الذي ستصدر عليه الفواتير</td>
+    </tr>
+    <tr>
+      <td>رقم السجل التجاري</td>
+      <td>المحاسب أو الإدارة</td>
+      <td>اطلب السجل التجاري أو الرقم الرسمي المعتمد داخل الفواتير</td>
+    </tr>
+    <tr>
+      <td>العنوان الرسمي</td>
+      <td>الإدارة</td>
+      <td>اطلب العنوان الوطني أو العنوان التجاري الكامل المعتمد للفاتورة</td>
+    </tr>
+    <tr>
+      <td>ZATCA Base URL</td>
+      <td>شركة التكامل أو المزود التقني</td>
+      <td>اطلب رابط API الخاص بالـ sandbox ورابط الـ production إن وجد</td>
+    </tr>
+    <tr>
+      <td>ZATCA API Key</td>
+      <td>شركة التكامل أو المزود التقني</td>
+      <td>اطلب Bearer Token أو API Key مع طريقة التوثيق</td>
+    </tr>
+    <tr>
+      <td>ZATCA Path</td>
+      <td>شركة التكامل أو المزود التقني</td>
+      <td>اسألهم عن endpoint الدقيق المستخدم لإرسال simplified invoices</td>
+    </tr>
+    <tr>
+      <td>WhatsApp Base URL</td>
+      <td>مزود واتساب</td>
+      <td>اطلب الرابط الأساسي للإرسال البرمجي</td>
+    </tr>
+    <tr>
+      <td>WhatsApp API Key</td>
+      <td>مزود واتساب</td>
+      <td>اطلب بيانات التوثيق المستخدمة في الهيدر Authorization</td>
+    </tr>
+    <tr>
+      <td>WhatsApp Template</td>
+      <td>مزود واتساب</td>
+      <td>اطلب اسم القالب approved الذي يرسل رابط الفاتورة</td>
+    </tr>
+    <tr>
+      <td>WhatsApp Sender</td>
+      <td>مزود واتساب</td>
+      <td>اطلب اسم أو رقم المرسل الذي تم اعتماده على الحساب</td>
+    </tr>
+  </table>
+
+  <h2>ثامنًا: رسالة جاهزة ترسلها للمزودين</h2>
+
+  <h3>رسالة لمزود الزكاة</h3>
+  <p>
+    نحتاج بيانات التكامل الخاصة بإرسال simplified tax invoices من نظامنا. برجاء تزويدنا بـ:
+    رابط الـ API الأساسي، مسار الإرسال، بيئة التشغيل (sandbox / production)، طريقة التوثيق،
+    وAPI key أو Bearer token، مع مثال request/response يحتوي على reference وUUID وinvoice hash وQR code.
+  </p>
+
+  <h3>رسالة لمزود واتساب</h3>
+  <p>
+    نحتاج بيانات التكامل الخاصة بإرسال رابط الفاتورة إلى العميل عبر واتساب. برجاء تزويدنا بـ:
+    Base URL، endpoint الإرسال، طريقة التوثيق، API key أو Bearer token، اسم القالب المعتمد،
+    واسم/رقم المرسل المعتمد، مع أسماء المتغيرات المطلوبة داخل القالب.
+  </p>
+
+  <h2>تاسعًا: الخلاصة التنفيذية</h2>
+  <p>
+    من ناحية الكود، مشروعنا جاهز لفكرة الفاتورة الضريبية المبسطة، وإرسالها لمزود الزكاة، ثم إرسال رابطها على واتساب.
+    لكن التشغيل الحقيقي يحتاج أولًا استكمال بيانات الشركة، ثم بيانات مزود الزكاة، ثم بيانات مزود واتساب،
+    مع التأكد من أن <code>APP_URL</code> في السيرفر هو الدومين العام الصحيح، وأن بيئة الـ queue مضبوطة حسب طريقة التشغيل على السيرفر.
+  </p>
+</body>
+</html>

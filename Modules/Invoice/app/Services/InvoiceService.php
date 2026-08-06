@@ -21,17 +21,18 @@ class InvoiceService
         private InvoiceComplianceGatewayInterface $zatcaGateway,
         private WhatsappInvoiceGatewayInterface $whatsappGateway,
         private OrderPaymentService $orderPaymentService,
+        private InvoiceSettingsService $invoiceSettings,
     ) {}
 
     public function issueForOrder(Order $order, ?PaymentTransaction $transaction = null, string $reason = 'payment_completed'): ?Invoice
     {
-        if (! config('invoice.auto_issue', true)) {
+        if (! $this->invoiceSettings->get('invoice_auto_issue', true)) {
             return null;
         }
 
         $order->loadMissing(['client', 'branch.vendor', 'items.piece', 'items.service']);
 
-        if ($order->isCashOnDelivery() && ! config('invoice.issue_cod_invoices', false)) {
+        if ($order->isCashOnDelivery() && ! $this->invoiceSettings->get('invoice_issue_cod', false)) {
             return null;
         }
 
@@ -51,7 +52,7 @@ class InvoiceService
             'branch_id' => $order->branch_id,
             'invoice_number' => $invoice->invoice_number ?: $this->generateInvoiceNumber($order),
             'invoice_type' => 'simplified_tax_invoice',
-            'currency' => config('invoice.currency', 'SAR'),
+            'currency' => (string) $this->invoiceSettings->get('invoice_currency', 'SAR'),
             'status' => $invoice->status ?: Invoice::STATUS_DRAFT,
             'subtotal_amount' => round((float) $order->total_amount, 2),
             'discount_amount' => round((float) $order->discount_amount, 2),
@@ -62,9 +63,9 @@ class InvoiceService
             'customer_phone' => $order->client?->phone,
             'customer_email' => $order->client?->email,
             'seller_name' => $this->resolveSellerName($order),
-            'seller_vat_number' => $order->branch?->vendor?->vat_number ?: config('invoice.company.vat_number'),
-            'seller_registration_number' => $order->branch?->vendor?->official_number ?: config('invoice.company.registration_number'),
-            'seller_address' => $order->branch?->getLocalizedAddress() ?: config('invoice.company.address'),
+            'seller_vat_number' => $order->branch?->vendor?->vat_number ?: $this->invoiceSettings->get('invoice_company_vat_number'),
+            'seller_registration_number' => $order->branch?->vendor?->official_number ?: $this->invoiceSettings->get('invoice_company_registration_number'),
+            'seller_address' => $order->branch?->getLocalizedAddress() ?: $this->invoiceSettings->get('invoice_company_address'),
             'issued_at' => $invoice->issued_at ?: ($transaction?->paid_at ?? now()),
             'last_error' => null,
         ]);
@@ -83,7 +84,7 @@ class InvoiceService
             'reason' => $reason,
         ]);
 
-        if (config('invoice.zatca.enabled', false)) {
+        if ($this->invoiceSettings->get('invoice_zatca_enabled', false)) {
             $invoice->update(['status' => Invoice::STATUS_SUBMITTED, 'zatca_status' => 'queued']);
             SubmitInvoiceToZatcaJob::dispatch($invoice->id);
         } else {
@@ -100,7 +101,7 @@ class InvoiceService
         $payload = $invoice->invoice_payload ?: $this->payloadBuilder->buildForOrder($invoice->order, $invoice);
         $result = $this->zatcaGateway->submitSimplifiedInvoice($invoice, $payload);
 
-        $this->recordAttempt($invoice, 'zatca', config('invoice.zatca.driver', 'mock'), $result->status, $result->requestPayload, $result->responsePayload, $result->errorMessage);
+        $this->recordAttempt($invoice, 'zatca', (string) $this->invoiceSettings->get('invoice_zatca_driver', 'mock'), $result->status, $result->requestPayload, $result->responsePayload, $result->errorMessage);
 
         if (! $result->success) {
             $invoice->update([
@@ -127,7 +128,7 @@ class InvoiceService
             'last_error' => null,
         ]);
 
-        if (config('invoice.whatsapp.enabled', false)) {
+        if ($this->invoiceSettings->get('invoice_whatsapp_enabled', false)) {
             SendInvoiceWhatsappJob::dispatch($invoice->id);
         } else {
             $invoice->update(['whatsapp_status' => 'disabled']);
@@ -143,8 +144,8 @@ class InvoiceService
 
         $payload = [
             'to' => $invoice->customer_phone,
-            'template_name' => config('invoice.whatsapp.template_name'),
-            'sender' => config('invoice.whatsapp.sender'),
+            'template_name' => $this->invoiceSettings->get('invoice_whatsapp_template'),
+            'sender' => $this->invoiceSettings->get('invoice_whatsapp_sender'),
             'variables' => [
                 'customer_name' => $invoice->customer_name,
                 'order_number' => $invoice->order?->order_number,
@@ -156,7 +157,7 @@ class InvoiceService
 
         $result = $this->whatsappGateway->sendInvoiceLink($invoice, $payload);
 
-        $this->recordAttempt($invoice, 'whatsapp', config('invoice.whatsapp.driver', 'mock'), $result->status, $result->requestPayload, $result->responsePayload, $result->errorMessage);
+        $this->recordAttempt($invoice, 'whatsapp', (string) $this->invoiceSettings->get('invoice_whatsapp_driver', 'mock'), $result->status, $result->requestPayload, $result->responsePayload, $result->errorMessage);
 
         if (! $result->success) {
             $invoice->update([
@@ -181,7 +182,7 @@ class InvoiceService
     {
         return URL::temporarySignedRoute(
             'invoice.share',
-            now()->addDays((int) config('invoice.public_link_ttl_days', 30)),
+            now()->addDays((int) $this->invoiceSettings->get('invoice_public_link_ttl_days', 30)),
             ['invoice' => $invoice->id]
         );
     }
@@ -202,9 +203,14 @@ class InvoiceService
 
     private function resolveSellerName(Order $order): ?string
     {
+        $fallbackName = app()->getLocale() === 'ar'
+            ? $this->invoiceSettings->get('invoice_company_name_ar')
+            : $this->invoiceSettings->get('invoice_company_name_en');
+
         return $order->branch?->vendor?->getTranslatedName()
             ?: $order->branch?->getTranslation('name', app()->getLocale())
-            ?: config('invoice.company.name_en');
+            ?: $fallbackName
+            ?: $this->invoiceSettings->get('invoice_company_name_en');
     }
 
     private function recordAttempt(

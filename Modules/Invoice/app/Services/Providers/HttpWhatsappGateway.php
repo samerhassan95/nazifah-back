@@ -6,24 +6,33 @@ use GuzzleHttp\Client;
 use Modules\Invoice\Contracts\WhatsappInvoiceGatewayInterface;
 use Modules\Invoice\DTOs\WhatsappDeliveryResult;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\InvoiceSettingsService;
 
 class HttpWhatsappGateway implements WhatsappInvoiceGatewayInterface
 {
+    public function __construct(
+        private ?InvoiceSettingsService $settings = null
+    ) {
+        $this->settings ??= app(InvoiceSettingsService::class);
+    }
+
     public function sendInvoiceLink(Invoice $invoice, array $payload): WhatsappDeliveryResult
     {
-        $baseUrl = rtrim((string) config('invoice.whatsapp.base_url'), '/');
-        $path = '/'.ltrim((string) config('invoice.whatsapp.send_path', '/messages'), '/');
+        $baseUrl = rtrim((string) $this->settings->get('invoice_whatsapp_base_url', ''), '/');
+        $path = '/'.ltrim((string) $this->settings->get('invoice_whatsapp_send_path', '/messages'), '/');
 
         try {
             $client = new Client([
                 'base_uri' => $baseUrl,
-                'timeout' => (int) config('invoice.whatsapp.timeout', 20),
+                'timeout' => (int) $this->settings->get('invoice_whatsapp_timeout', 20),
             ]);
 
             $response = $client->post($path, [
                 'headers' => array_filter([
                     'Accept' => 'application/json',
-                    'Authorization' => config('invoice.whatsapp.api_key') ? 'Bearer '.config('invoice.whatsapp.api_key') : null,
+                    'Authorization' => $this->settings->get('invoice_whatsapp_api_key')
+                        ? 'Bearer '.$this->settings->get('invoice_whatsapp_api_key')
+                        : null,
                 ]),
                 'json' => $payload,
             ]);

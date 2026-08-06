@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Modules\Invoice\Contracts\InvoiceComplianceGatewayInterface;
 use Modules\Invoice\Contracts\WhatsappInvoiceGatewayInterface;
+use Modules\Invoice\Services\InvoiceSettingsService;
 use Modules\Invoice\Services\Providers\HttpWhatsappGateway;
 use Modules\Invoice\Services\Providers\HttpZatcaGateway;
 use Modules\Invoice\Services\Providers\MockWhatsappGateway;
@@ -35,15 +36,19 @@ class InvoiceServiceProvider extends ServiceProvider
         $this->app->register(RouteServiceProvider::class);
 
         $this->app->bind(InvoiceComplianceGatewayInterface::class, function () {
-            return match (config('invoice.zatca.driver', 'mock')) {
-                'http' => new HttpZatcaGateway,
+            $settings = app(InvoiceSettingsService::class);
+
+            return match ($settings->get('invoice_zatca_driver', 'mock')) {
+                'http' => new HttpZatcaGateway($settings),
                 default => new MockZatcaGateway,
             };
         });
 
         $this->app->bind(WhatsappInvoiceGatewayInterface::class, function () {
-            return match (config('invoice.whatsapp.driver', 'mock')) {
-                'http' => new HttpWhatsappGateway,
+            $settings = app(InvoiceSettingsService::class);
+
+            return match ($settings->get('invoice_whatsapp_driver', 'mock')) {
+                'http' => new HttpWhatsappGateway($settings),
                 default => new MockWhatsappGateway,
             };
         });
