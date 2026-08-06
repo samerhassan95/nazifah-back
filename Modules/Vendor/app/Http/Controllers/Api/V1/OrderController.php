@@ -1047,7 +1047,8 @@ class OrderController extends Controller
     /**
      * Mobile calculate body often keeps only accepted lines (no status field).
      * Any stored order line not represented in the request becomes a preview rejected line.
-     * If the same piece/services stay but additions were dropped, those additions become rejected.
+     * If the same piece stays but main services or additions were dropped from the request,
+     * those dropped services/additions become preview rejected lines.
      *
      * @param  list<array<string,mixed>>  $requestItems
      * @return list<array<string,mixed>>
@@ -1072,6 +1073,40 @@ class OrderController extends Controller
                 }
 
                 $matchedStoredIndexes[$storedIndex] = true;
+
+                $requestServiceIds = collect(OrderItemsNormalizer::mainServiceIds($requestItem))
+                    ->map(fn ($id) => (int) $id)
+                    ->filter(fn ($id) => $id > 0)
+                    ->unique()
+                    ->values()
+                    ->all();
+                $storedServiceIds = collect($storedLine['service_ids'] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->filter(fn ($id) => $id > 0)
+                    ->unique()
+                    ->values()
+                    ->all();
+                $omittedServices = array_values(array_diff($storedServiceIds, $requestServiceIds));
+
+                // Main services dropped from service_ids → preview rejected line (same piece).
+                if ($omittedServices !== []) {
+                    $rejectedServiceLine = $storedLine;
+                    $rejectedServiceLine['status'] = 'rejected';
+                    $rejectedServiceLine['service_id'] = $omittedServices[0];
+                    $rejectedServiceLine['service_ids'] = $omittedServices;
+                    $rejectedServiceLine['service_prices'] = array_intersect_key(
+                        $storedLine['service_prices'] ?? [],
+                        array_flip($omittedServices)
+                    );
+                    $rejectedServiceLine['service_names'] = array_intersect_key(
+                        $storedLine['service_names'] ?? [],
+                        array_flip($omittedServices)
+                    );
+                    $rejectedServiceLine['additional_service_ids'] = [];
+                    $rejectedServiceLine['additional_services'] = [];
+                    $rejectedServiceLine['rejected_additional_service_ids'] = [];
+                    $requestItems[] = $rejectedServiceLine;
+                }
 
                 $requestAdditionIds = collect($requestItem['additional_service_ids'] ?? [])
                     ->map(fn ($id) => (int) $id)
