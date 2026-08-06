@@ -103,10 +103,16 @@ class OrderController extends Controller
         $skipCatalogChecks = $usingStoredOrderItems || $isStatusPreviewOverlay;
 
         if ($usingStoredOrderItems) {
-            $itemsInput = $this->mapOrderItemsForCalculate($existingOrder);
+            // No items body = no vendor action yet → treat every stored line as accepted (display only).
+            $itemsInput = $this->mapOrderItemsForCalculate($existingOrder, includeRejectedGroups: true);
             if ($itemsInput === []) {
                 return errorResponse(__('order.items_not_available'), 400);
             }
+            $itemsInput = array_map(function (array $item) {
+                $item['status'] = 'accepted';
+
+                return $item;
+            }, $itemsInput);
         } elseif ($isStatusPreviewOverlay) {
             $itemsInput = $this->mergeCalculatePreviewStatuses(
                 $this->mapOrderItemsForCalculate($existingOrder),
@@ -457,16 +463,30 @@ class OrderController extends Controller
 
             $acceptedItems = [];
             $rejectedItems = [];
+            // Display-only split for the laundry UI — calculate never persists accept/reject.
             if ($usingStoredOrderItems) {
-                // Includes pending/unconfirmed lines so the app can render before review confirm.
-                ['accepted_items' => $acceptedItems, 'rejected_items' => $rejectedItems] =
-                    $this->buildReviewedItemsForVendorResponse($existingOrder, $lang);
+                // No items sent → no action → everything accepted, nothing rejected.
+                $acceptedItems = collect($itemsSummary)
+                    ->map(function (array $item) {
+                        $mapped = $this->mapSummaryItemToVendorItem($item);
+                        $mapped['status'] = 'accepted';
+
+                        return $mapped;
+                    })
+                    ->values()
+                    ->all();
+                $rejectedItems = [];
                 $itemsSummary = $this->buildCalculateSummaryItems($acceptedItems, $rejectedItems);
             } else {
-                // Preview before review is confirmed (full items body OR item_id+status overlay).
+                // Items sent → included lines are accepted; omitted / status=rejected lines are rejected (preview only).
                 $acceptedItems = collect($itemsSummary)
                     ->filter(fn (array $item) => ($item['status'] ?? 'accepted') !== 'rejected')
-                    ->map(fn (array $item) => $this->mapSummaryItemToVendorItem($item))
+                    ->map(function (array $item) {
+                        $mapped = $this->mapSummaryItemToVendorItem($item);
+                        $mapped['status'] = 'accepted';
+
+                        return $mapped;
+                    })
                     ->values()
                     ->all();
                 $rejectedItems = collect($itemsSummary)
@@ -955,16 +975,17 @@ class OrderController extends Controller
     }
 
     /**
+     * @param  bool  $includeRejectedGroups  When true, include DB-rejected rows (display-only calculate with no items body).
      * @return list<array<string,mixed>>
      */
-    private function mapOrderItemsForCalculate(Order $order): array
+    private function mapOrderItemsForCalculate(Order $order, bool $includeRejectedGroups = false): array
     {
         $order->loadMissing(['items.additionalServicesPivot', 'items.service', 'items.piece']);
 
         $result = [];
         foreach (\Modules\Order\Support\OrderItemGrouper::buckets($order->items) as $group) {
             foreach ($group->groupBy(fn ($item) => $item->vendor_status ?? 'accepted') as $status => $statusItems) {
-                if ($status === 'rejected') {
+                if ($status === 'rejected' && ! $includeRejectedGroups) {
                     continue;
                 }
 
