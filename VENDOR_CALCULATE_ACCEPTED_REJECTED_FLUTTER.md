@@ -4,77 +4,43 @@
 **Auth:** Vendor employee Bearer token  
 **Header:** `Accept-Language: ar` or `en`
 
-> **Important:** `accepted` / `rejected` from this endpoint are **for laundry UI display only**.  
-> They do **not** mean the order was actually accepted or rejected in the database.  
-> This endpoint does **not** replace `review`. No vendor decision is persisted here.
+> **Important**  
+> - `accepted_items` / `rejected_items` here are **for laundry UI display only**.  
+> - They are **not** saved to the database.  
+> - This does **not** replace `POST /vendor/orders/{id}/review` (real accept/reject happens there later).
 
 ---
 
-## Important: each physical piece is its own line
-
-Same `piece_id` can appear **multiple times** on an order (e.g. 3 pants).  
-Do **not** merge them into one `items[]` row with all services combined.
-
-**Wrong (merges 3 pants into one row):**
-```json
-{ "piece_id": 43, "service_ids": [66, 67], "additional_service_ids": [78] }
-```
-
-**Right (one physical piece only):**
-```json
-{
-  "order_id": 437,
-  "items": [
-    { "piece_id": 43, "quantity": 1, "service_ids": [66], "additional_service_ids": [78], "note": "" }
-  ]
-}
-```
-
-→ that one pants is accepted; the **other** pants lines on the order go to `rejected_items`.
-
----
-
-## Contract (what Flutter must implement)
+## Core contract
 
 | Request | Meaning | Response |
 |---------|---------|----------|
-| `{ "order_id": 437, "branch_id": 38 }` only (no `items`) | No action yet | **Everything** in `accepted_items`, `rejected_items` = `[]` |
-| `{ "order_id": 437, "items": [ ... ] }` | Body = what laundry keeps | **Sent lines** → `accepted_items` · **Not sent (vs stored order)** → `rejected_items` |
+| `{ "order_id", "branch_id" }` only — **no `items`** | No action yet | All order lines → `accepted_items` · `rejected_items` = `[]` |
+| `{ "order_id", "items": [ ... ] }` | Body = what laundry **keeps** | Each sent line → `accepted_items` · each stored line **not matched** → `rejected_items` |
 
-In **both** cases the API always returns:
+Always read:
 
 - `data.accepted_items`
 - `data.rejected_items`
-- `data.summary` (totals)
-
-Bind the UI to those lists.
+- `data.summary` (use `summary.delivery_fee` for full delivery fee)
 
 ---
 
-## Case 1 — No action (open screen / no toggle yet)
+## Critical rule: one physical piece = one `items[]` row
 
-```json
-{
-  "order_id": 437,
-  "branch_id": 38
-}
-```
+On the server, **each `order_item` row is one physical piece**, even if `piece_id` is the same.
 
-**Expected:**
+Example order **437** in DB:
 
-- `accepted_items` = all order pieces/services/additions  
-- `rejected_items` = `[]`
+| # | piece_id | service_ids | additional_service_ids |
+|---|----------|-------------|------------------------|
+| 1 | 43 (pants) | `[66]` | `[78]` |
+| 2 | 43 (pants) | `[67]` | `[]` |
+| 3 | 43 (pants) | `[66]` | `[78]` |
 
----
+→ **3 pants**, not 1 pants with 3 services.
 
-## Case 2 — Laundry toggled accept/reject in UI (preview)
-
-Send **only what should appear as accepted**.  
-Anything that exists on the order but is **missing** from `items` is returned in `rejected_items` (display only).
-
-### Reject a whole piece
-
-Do **not** include that piece in `items`.
+### Wrong (merges pants into one row)
 
 ```json
 {
@@ -92,11 +58,10 @@ Do **not** include that piece in `items`.
 }
 ```
 
-→ Other stored pieces (not listed) go to `rejected_items`.
+This does **not** match any single stored row (no row has exactly `[66, 67]`).  
+Result: the body line may show as accepted, and **all 3 real pants** go to `rejected_items`.
 
-### Reject one main service only
-
-Keep the piece, drop the rejected service id from `service_ids`.
+### Right (one pants only)
 
 ```json
 {
@@ -114,14 +79,50 @@ Keep the piece, drop the rejected service id from `service_ids`.
 }
 ```
 
-If the order had services `[66, 67]`:
+**Expected:**
 
-- `accepted_items` → piece + service `66` + addition `78`  
-- `rejected_items` → same piece + service `67`
+- `accepted=1` → pants + service `66` + addition `78`
+- `rejected=2` → the other pants (`67`) + the other pants (`66`+`78`)
 
-### Reject one addition only
+Matching is **one-to-one**: identical services on two pants are still two lines. Sending one accepted row matches **one** stored row; the twin stays rejected.
 
-Keep services, remove the addition from `additional_service_ids` (or send `[]`).
+---
+
+## How matching works
+
+For each `items[]` entry, the server finds **at most one** unused stored row where:
+
+1. Same `piece_id`
+2. Same `service_ids` set (exact)
+3. Prefer exact `additional_service_ids`; allow request additions to be a **subset** (dropped adds = rejected additions)
+
+Then that stored row is **consumed** (cannot match again).
+
+Anything left unmatched in DB → `rejected_items`.
+
+---
+
+## All send cases
+
+### Case A — No action (open screen)
+
+```json
+{
+  "order_id": 437,
+  "branch_id": 38
+}
+```
+
+| Field | Result |
+|-------|--------|
+| `accepted_items` | All order lines |
+| `rejected_items` | `[]` |
+
+---
+
+### Case B — Accept one piece, reject the other pieces
+
+Send **only** the kept piece line(s). Omit the rest.
 
 ```json
 {
@@ -131,7 +132,70 @@ Keep services, remove the addition from `additional_service_ids` (or send `[]`).
     {
       "piece_id": 43,
       "quantity": 1,
-      "service_ids": [66, 67],
+      "service_ids": [66],
+      "additional_service_ids": [78],
+      "note": ""
+    }
+  ]
+}
+```
+
+| Field | Result |
+|-------|--------|
+| `accepted_items` | That one pants |
+| `rejected_items` | Every other stored pants/piece |
+
+---
+
+### Case C — Accept two identical pants, reject the third
+
+Send the accepted line **twice** (same `piece_id` / services / adds):
+
+```json
+{
+  "order_id": 437,
+  "branch_id": 38,
+  "items": [
+    {
+      "piece_id": 43,
+      "quantity": 1,
+      "service_ids": [66],
+      "additional_service_ids": [78],
+      "note": ""
+    },
+    {
+      "piece_id": 43,
+      "quantity": 1,
+      "service_ids": [66],
+      "additional_service_ids": [78],
+      "note": ""
+    }
+  ]
+}
+```
+
+| Field | Result |
+|-------|--------|
+| `accepted_items` | 2 |
+| `rejected_items` | 1 (the remaining pants, e.g. service `67`) |
+
+---
+
+### Case D — Reject one addition on a kept piece
+
+Keep the piece + services; remove the addition from `additional_service_ids` (or send `[]`).
+
+Stored row: `service_ids: [66]`, `additional_service_ids: [78]`
+
+```json
+{
+  "order_id": 437,
+  "branch_id": 38,
+  "items": [
+    {
+      "piece_id": 43,
+      "quantity": 1,
+      "service_ids": [66],
       "additional_service_ids": [],
       "note": ""
     }
@@ -139,33 +203,90 @@ Keep services, remove the addition from `additional_service_ids` (or send `[]`).
 }
 ```
 
-- `accepted_items` → piece + main services  
-- `rejected_items` → piece + rejected addition name(s)
+| Field | Result |
+|-------|--------|
+| `accepted_items` | Pants + service `66` (no addition) |
+| `rejected_items` | Pants + rejected addition name(s), **and** any other unmatched pants |
 
 ---
 
-## Do NOT send this (ambiguous)
+### Case E — Reject one main service on a multi-service **single** stored row
 
-Same piece twice (full + reduced):
+Only if **one** DB row actually has multiple services together (rare with current mapping — usually one service per row).
+
+If a stored line is `service_ids: [66, 67]`:
 
 ```json
-"items": [
-  { "piece_id": 43, "service_ids": [66, 67], "additional_service_ids": [78] },
-  { "piece_id": 43, "service_ids": [66], "additional_service_ids": [78] }
-]
+{
+  "piece_id": 43,
+  "quantity": 1,
+  "service_ids": [66],
+  "additional_service_ids": [78],
+  "note": ""
+}
 ```
 
-Send **one final accepted version** of each piece only.
+| Field | Result |
+|-------|--------|
+| `accepted_items` | Piece + service `66` (+ kept adds) |
+| `rejected_items` | Same piece instance + omitted service `67` |
+
+> On order 437, services `66` and `67` are **different pants rows**. Do not use Case E by merging `[66, 67]` in one request row — use Case B/C instead.
 
 ---
 
-## Response fields to use in UI
+### Case F — Reject everything
+
+You cannot send “empty keep list” as `items: []` — empty `items` is treated like **no items** (Case A = all accepted).
+
+To reject all pieces for display, you would need a different product rule; today: either keep at least one accepted line, or handle “reject all” in the UI without relying on empty `items`.
+
+---
+
+## Optional: `item_id` + `status` overlay
+
+Also supported (same display-only behavior):
+
+```json
+{
+  "order_id": 437,
+  "branch_id": 38,
+  "items": [
+    { "item_id": 1520, "status": "accepted" },
+    { "item_id": 1521, "status": "rejected" }
+  ]
+}
+```
+
+Prefer this if the app already has order `item_id`s.  
+Catalog-shaped omit flow (Cases B–D) does **not** require `status`.
+
+---
+
+## Response shape (UI binding)
 
 ```json
 {
   "data": {
-    "accepted_items": [ /* status: "accepted" */ ],
-    "rejected_items": [ /* status: "rejected" */ ],
+    "accepted_items": [
+      {
+        "piece_id": 43,
+        "item_name": "بنطال",
+        "status": "accepted",
+        "services": [{ "id": 66, "name": "...", "price": 8 }],
+        "service_additions": [{ "id": 78, "name": "...", "price": 3 }],
+        "total_price": 11
+      }
+    ],
+    "rejected_items": [
+      {
+        "piece_id": 43,
+        "item_name": "بنطال",
+        "status": "rejected",
+        "services": [{ "id": 67, "name": "..." }],
+        "original_total_price": 5
+      }
+    ],
     "summary": {
       "subtotal": 11,
       "delivery_fee": 37.12,
@@ -177,24 +298,39 @@ Send **one final accepted version** of each piece only.
 
 - Accepted section ← `data.accepted_items`  
 - Rejected section ← `data.rejected_items`  
-- Totals ← `data.summary` (`delivery_fee` = full fee)
+- For rejected amounts prefer `original_total_price`
 
-For rejected rows, prefer `original_total_price` for the amount shown.
+---
+
+## Do NOT send
+
+1. **Merged pants** — one row with `service_ids: [66, 67]` when DB has separate rows.  
+2. **Full + reduced duplicate** of the same piece in one request:
+   ```json
+   "items": [
+     { "piece_id": 43, "service_ids": [66, 67], "additional_service_ids": [78] },
+     { "piece_id": 43, "service_ids": [66], "additional_service_ids": [78] }
+   ]
+   ```
+3. **`order_id` only** and expect rejects — with no `items`, everything is accepted.  
+4. Treating calculate accept/reject as a saved business decision — use `review` to persist later.
 
 ---
 
 ## Flutter checklist
 
-1. [ ] Initial load: call calculate with `order_id` (+ optional `branch_id`) only → all accepted.  
-2. [ ] On every toggle: rebuild `items` as **current accepted set only**, call calculate again.  
-3. [ ] Render `accepted_items` + `rejected_items` every time.  
-4. [ ] Never treat calculate accept/reject as a saved business decision.  
-5. [ ] Persist real accept/reject later with `POST /vendor/orders/{id}/review` when the vendor confirms (separate step).  
-6. [ ] Do not duplicate the same piece with two different `service_ids` sets in one request.
+1. [ ] Initial open: `calculate` with `order_id` (+ `branch_id`) only → all accepted.  
+2. [ ] Build `items` as **one entry per accepted physical piece** (one DB row’s services/adds).  
+3. [ ] On every toggle: rebuild `items`, call `calculate` again.  
+4. [ ] Bind UI to `accepted_items` + `rejected_items`.  
+5. [ ] Identical services on two pieces → send two identical rows to accept both.  
+6. [ ] Never merge different pants into one `service_ids` array.  
+7. [ ] Persist real decisions later with `POST /vendor/orders/{id}/review`.
 
 ---
 
 ## One sentence
 
-> **Whatever you send in `items` is shown as accepted; whatever exists on the order but you omit is shown as rejected — display only, not saved.**  
-> **If you send no `items`, everything is shown as accepted.**
+> **No `items` → everything accepted for display.  
+> With `items` → each sent row is one accepted physical piece; every unmatched stored row is rejected for display.  
+> Same `piece_id` can mean many pieces — never merge them.**
