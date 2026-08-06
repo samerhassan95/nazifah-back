@@ -125,6 +125,16 @@ class OrderController extends Controller
                     ]);
                 }
             }
+
+            // Mobile often omits rejected lines instead of sending status.
+            // Compare request items to the stored order and treat missing lines as preview rejects.
+            $hasExplicitStatus = collect($itemsInput)->contains(
+                fn ($item) => is_array($item) && isset($item['status']) && (string) $item['status'] !== ''
+            );
+            if (! $hasExplicitStatus) {
+                $itemsInput = $this->appendOmittedStoredItemsAsRejectedPreview($existingOrder, $itemsInput);
+                $skipCatalogChecks = true;
+            }
         }
 
         try {
@@ -1004,6 +1014,126 @@ class OrderController extends Controller
         }
 
         return $result;
+    }
+
+    /**
+     * Mobile calculate body often keeps only accepted lines (no status field).
+     * Any stored order line not represented in the request becomes a preview rejected line.
+     *
+     * @param  list<array<string,mixed>>  $requestItems
+     * @return list<array<string,mixed>>
+     */
+    private function appendOmittedStoredItemsAsRejectedPreview(Order $order, array $requestItems): array
+    {
+        $storedLines = $this->mapOrderItemsForCalculate($order);
+        if ($storedLines === []) {
+            return $requestItems;
+        }
+
+        $requestKeys = [];
+        foreach ($requestItems as $index => $requestItem) {
+            if (! is_array($requestItem)) {
+                continue;
+            }
+            $requestKeys[$this->calculatePreviewLineKey($requestItem)][] = $index;
+
+            // Additions present on the stored twin but removed from the request → rejected additions.
+            foreach ($storedLines as $storedLine) {
+                if ($this->calculatePreviewLineKey($storedLine, ignoreAdditions: true)
+                    !== $this->calculatePreviewLineKey($requestItem, ignoreAdditions: true)
+                ) {
+                    continue;
+                }
+
+                $requestAdditionIds = collect($requestItem['additional_service_ids'] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+                $storedAdditionIds = collect($storedLine['additional_service_ids'] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+                $omittedAdditions = array_values(array_diff($storedAdditionIds, $requestAdditionIds));
+                if ($omittedAdditions === []) {
+                    continue;
+                }
+
+                $requestItems[$index]['rejected_additional_service_ids'] = array_values(array_unique(array_merge(
+                    collect($requestItem['rejected_additional_service_ids'] ?? [])->map(fn ($id) => (int) $id)->all(),
+                    $omittedAdditions
+                )));
+
+                $additionRows = collect($requestItem['additional_services'] ?? [])->keyBy(
+                    fn ($row) => (int) ($row['service_addition_id'] ?? $row['id'] ?? 0)
+                );
+                foreach ($storedLine['additional_services'] ?? [] as $storedAddition) {
+                    $additionId = (int) ($storedAddition['service_addition_id'] ?? $storedAddition['id'] ?? 0);
+                    if (! in_array($additionId, $omittedAdditions, true)) {
+                        continue;
+                    }
+                    $row = $additionRows->get($additionId, $storedAddition);
+                    $row['id'] = $additionId;
+                    $row['service_addition_id'] = $additionId;
+                    $row['status'] = 'rejected';
+                    $row['vendor_status'] = 'rejected';
+                    $additionRows[$additionId] = $row;
+                }
+                $requestItems[$index]['additional_services'] = $additionRows->values()->all();
+            }
+        }
+
+        foreach ($storedLines as $storedLine) {
+            $key = $this->calculatePreviewLineKey($storedLine);
+            $keyWithoutAdds = $this->calculatePreviewLineKey($storedLine, ignoreAdditions: true);
+
+            $matched = isset($requestKeys[$key]) || isset($requestKeys[$keyWithoutAdds]);
+            if (! $matched) {
+                // Also match when request keeps same piece+services but different addition set.
+                foreach ($requestItems as $requestItem) {
+                    if (! is_array($requestItem)) {
+                        continue;
+                    }
+                    if ($this->calculatePreviewLineKey($requestItem, ignoreAdditions: true) === $keyWithoutAdds) {
+                        $matched = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($matched) {
+                continue;
+            }
+
+            $storedLine['status'] = 'rejected';
+            $requestItems[] = $storedLine;
+        }
+
+        return array_values($requestItems);
+    }
+
+    /**
+     * @param  array<string,mixed>  $item
+     */
+    private function calculatePreviewLineKey(array $item, bool $ignoreAdditions = false): string
+    {
+        $serviceIds = OrderItemsNormalizer::mainServiceIds($item);
+        sort($serviceIds);
+
+        $additionIds = [];
+        if (! $ignoreAdditions) {
+            $additionIds = collect($item['additional_service_ids'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        }
+
+        return implode(':', [
+            (string) ((int) ($item['piece_id'] ?? 0)),
+            implode(',', $serviceIds),
+            implode(',', $additionIds),
+            trim((string) ($item['note'] ?? '')),
+        ]);
     }
 
     /**
