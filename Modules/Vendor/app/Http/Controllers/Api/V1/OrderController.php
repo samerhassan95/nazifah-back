@@ -1173,33 +1173,6 @@ class OrderController extends Controller
     }
 
     /**
-     * @param  array<string,mixed>  $item
-     */
-    private function calculatePreviewLineKey(array $item, bool $ignoreAdditions = false): string
-    {
-        $serviceIds = OrderItemsNormalizer::mainServiceIds($item);
-        sort($serviceIds);
-
-        $additionIds = [];
-        if (! $ignoreAdditions) {
-            $additionIds = collect($item['additional_service_ids'] ?? [])
-                ->map(fn ($id) => (int) $id)
-                ->filter(fn ($id) => $id > 0)
-                ->unique()
-                ->sort()
-                ->values()
-                ->all();
-        }
-
-        return implode(':', [
-            (string) ((int) ($item['piece_id'] ?? 0)),
-            implode(',', $serviceIds),
-            implode(',', $additionIds),
-            trim((string) ($item['note'] ?? '')),
-        ]);
-    }
-
-    /**
      * Review-style calculate body: item_id + status (and optional addition statuses) before save.
      *
      * @param  array<int, mixed>  $items
