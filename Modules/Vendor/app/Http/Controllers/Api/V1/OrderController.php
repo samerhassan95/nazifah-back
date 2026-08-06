@@ -84,7 +84,8 @@ class OrderController extends Controller
         $branchId = (int) $branch->id;
 
         $itemsInput = $request->input('items');
-        if (! is_array($itemsInput) || $itemsInput === []) {
+        $usingStoredOrderItems = ! is_array($itemsInput) || $itemsInput === [];
+        if ($usingStoredOrderItems) {
             $itemsInput = $this->mapOrderItemsForCalculate($existingOrder);
             if ($itemsInput === []) {
                 return errorResponse(__('order.items_not_available'), 400);
@@ -245,10 +246,20 @@ class OrderController extends Controller
             $pickupAtVendor = (bool) $existingOrder->pickup_at_vendor;
             $deliveryAtVendor = (bool) $existingOrder->delivery_at_vendor;
 
-            $deliveryFees = $this->computeDeliveryFeesFromOrder($existingOrder, $branch);
+            if ($usingStoredOrderItems) {
+                $deliveryFees = [
+                    'delivery_fee' => (float) $existingOrder->delivery_fee,
+                    'pickup_fee' => $pickupAtVendor ? 0.0 : (float) $existingOrder->delivery_fee / (($pickupAtVendor || $deliveryAtVendor) ? 1 : 2),
+                    'delivery_fee_amount' => $deliveryAtVendor ? 0.0 : (float) $existingOrder->delivery_fee / (($pickupAtVendor || $deliveryAtVendor) ? 1 : 2),
+                    'total_distance_km' => (float) ($existingOrder->distance ?? 0),
+                    'distance' => (float) ($existingOrder->distance ?? 0),
+                ];
+            } else {
+                $deliveryFees = $this->computeDeliveryFeesFromOrder($existingOrder, $branch);
 
-            if ($deliveryFees instanceof JsonResponse) {
-                return $deliveryFees;
+                if ($deliveryFees instanceof JsonResponse) {
+                    return $deliveryFees;
+                }
             }
 
             $pricing = Order::calculatePricingTotals(
@@ -256,6 +267,14 @@ class OrderController extends Controller
                 (float) $discountAmount,
                 (float) $deliveryFees['delivery_fee']
             );
+
+            $acceptedItems = [];
+            $rejectedItems = [];
+            if ($usingStoredOrderItems) {
+                ['accepted_items' => $acceptedItems, 'rejected_items' => $rejectedItems] =
+                    $this->buildReviewedItemsForVendorResponse($existingOrder, $lang);
+                $itemsSummary = $this->buildCalculateSummaryItems($acceptedItems, $rejectedItems);
+            }
 
             return successResponse([
                 'order_id' => $orderId,
@@ -278,6 +297,8 @@ class OrderController extends Controller
                     'pickup_at_vendor' => $pickupAtVendor,
                     'delivery_at_vendor' => $deliveryAtVendor,
                 ],
+                'accepted_items' => $acceptedItems,
+                'rejected_items' => $rejectedItems,
                 'discount' => $appliedDiscount ? [
                     'code' => $appliedDiscount->code,
                     'name' => $appliedDiscount->name,
@@ -378,6 +399,261 @@ class OrderController extends Controller
             'total_distance_km' => (float) round($totalDistance, 2),
             'distance' => (float) round($totalDistance, 2),
         ];
+    }
+
+    /**
+     * Reuse the vendor order-details grouping so calculate matches reviewed orders.
+     *
+     * @return array{accepted_items: list<array<string,mixed>>, rejected_items: list<array<string,mixed>>}
+     */
+    private function buildReviewedItemsForVendorResponse(Order $order, string $locale): array
+    {
+        $order->loadMissing([
+            'items.piece.iconRelation',
+            'items.service.iconRelation',
+            'items.additionalServicesPivot.serviceAddition.iconRelation',
+        ]);
+
+        $uploadService = app(\App\Services\UploadFilesService::class);
+        $branchId = (int) ($order->branch_id ?? 0);
+
+        $items = collect(\Modules\Order\Support\OrderItemGrouper::toApiLines(
+            $order->items,
+            $branchId,
+            $locale,
+            fn ($item) => $item->images ? $uploadService->getFullUrl($item->images) : null
+        ))->map(function (array $g) use ($order, $branchId, $locale) {
+            $primaryItemId = $g['id'];
+            $primaryItem = $order->items->firstWhere('id', $primaryItemId);
+            $pieceName = $g['piece']['name'] ?? 'Item';
+            $groupItemIds = $g['ids'] ?? [$primaryItemId];
+
+            $modifiers = [];
+            if ($primaryItem && $primaryItem->notes) {
+                $notes = json_decode($primaryItem->notes, true);
+                if (is_array($notes)) {
+                    foreach ($notes as $modifier) {
+                        $modifiers[] = [
+                            'modifier_id' => $modifier['id'] ?? null,
+                            'modifier_name' => $modifier['name'] ?? 'Modifier',
+                            'modifier_price' => (float) ($modifier['price'] ?? 0),
+                        ];
+                    }
+                }
+            }
+
+            $serviceAdditions = [];
+            foreach ($groupItemIds as $itemId) {
+                $itemModel = $order->items->firstWhere('id', $itemId);
+                if (! $itemModel || ! $itemModel->relationLoaded('additionalServicesPivot')) {
+                    continue;
+                }
+                foreach ($itemModel->additionalServicesPivot as $pivot) {
+                    $addition = $pivot->serviceAddition;
+                    if (! $addition) {
+                        continue;
+                    }
+                    $qty = (int) ($pivot->quantity ?? 1);
+                    $price = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
+                    $serviceAdditions[] = array_merge([
+                        'id' => $addition->id,
+                        'name' => \App\Support\OrderItemDisplayNames::additionalServiceName($addition, $branchId, $locale) ?: 'Addition',
+                        'price' => $price,
+                        'quantity' => $qty,
+                        'total_price' => $price * $qty,
+                        'icon' => \App\Support\OrderItemDisplayNames::additionalServiceIconUrl($addition, $branchId),
+                        'status' => $pivot->vendor_status ?? 'accepted',
+                        'vendor_status' => $pivot->vendor_status ?? 'accepted',
+                        'vendor_notes' => $pivot->vendor_notes,
+                    ], \App\Support\CatalogActivePresenter::serviceAddition($addition, $branchId));
+                }
+            }
+
+            $servicesData = [];
+            foreach ($g['services'] ?? [] as $svc) {
+                $svcEntry = [
+                    'id' => $svc['id'],
+                    'name' => $svc['name'] ?? '',
+                    'price' => (float) ($svc['price'] ?? 0),
+                    'icon' => $svc['icon'] ?? null,
+                ];
+                $serviceModel = $primaryItem?->piece?->services->firstWhere('id', $svc['id']);
+                if ($serviceModel) {
+                    $svcEntry = array_merge($svcEntry, [
+                        'description' => $serviceModel->getTranslation('description', $locale),
+                        'icon' => \App\Support\OrderItemDisplayNames::serviceIconUrl($serviceModel, $branchId),
+                    ], \App\Support\CatalogActivePresenter::service($serviceModel, $branchId));
+                }
+                $servicesData[] = $svcEntry;
+            }
+
+            $pieceData = null;
+            if ($primaryItem && $primaryItem->piece) {
+                $pieceData = array_merge([
+                    'id' => $primaryItem->piece->id,
+                    'name' => $pieceName,
+                    'icon' => \App\Support\OrderItemDisplayNames::pieceIconUrl($primaryItem->piece),
+                ], \App\Support\CatalogActivePresenter::piece($primaryItem->piece, $branchId));
+            }
+
+            $groupModels = collect($groupItemIds)
+                ->map(fn ($itemId) => $order->items->firstWhere('id', $itemId))
+                ->filter()
+                ->values();
+            $servicesTotalPrice = (float) collect($servicesData)->sum('price');
+            $originalUnitPrice = (float) $groupModels->sum(fn ($item) => (float) ($item->service_price ?? 0));
+            $originalTotalPrice = (float) $groupModels->sum(
+                fn ($item) => (float) ($item->original_total_price ?? $item->total_price ?? 0)
+            );
+
+            return [
+                'item_id' => $primaryItemId,
+                'item_ids' => $groupItemIds,
+                'piece_id' => $primaryItem->piece_id ?? null,
+                'item_name' => $pieceName,
+                'service_price' => $servicesTotalPrice,
+                'additional_services_total' => (float) ($g['additional_services_total'] ?? 0),
+                'quantity' => (int) ($g['quantity'] ?? 1),
+                'unit_price' => (float) ($g['unit_price'] ?? 0),
+                'total_price' => (float) ($g['total_price'] ?? 0),
+                'status' => $g['status'] ?? 'accepted',
+                'original_quantity' => $primaryItem->original_quantity ?? $primaryItem->quantity ?? null,
+                'original_unit_price' => $originalUnitPrice,
+                'original_total_price' => $originalTotalPrice,
+                'modified_quantity' => $primaryItem->modified_quantity ?? null,
+                'modified_unit_price' => $primaryItem->modified_unit_price !== null ? (float) $primaryItem->modified_unit_price : null,
+                'modified_total_price' => $primaryItem->modified_total_price !== null ? (float) $primaryItem->modified_total_price : null,
+                'vendor_notes' => $primaryItem->vendor_notes ?? null,
+                'note' => $g['note'] ?? null,
+                'image' => $g['image'] ?? null,
+                'modifiers' => $modifiers,
+                'service_additions' => $serviceAdditions,
+                'service' => $servicesData[0] ?? null,
+                'services' => $servicesData,
+                'piece' => $pieceData,
+            ];
+        });
+
+        $acceptedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') !== 'rejected')->values();
+        $rejectedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') === 'rejected')->values();
+
+        $rejectedAdditionItems = $acceptedItems
+            ->map(function (array $item) {
+                $rejectedAdditions = collect($item['service_additions'] ?? [])
+                    ->filter(fn ($addition) => (($addition['vendor_status'] ?? $addition['status'] ?? 'accepted') === 'rejected'))
+                    ->values()
+                    ->all();
+
+                if ($rejectedAdditions === []) {
+                    return null;
+                }
+
+                $additionsTotal = (float) collect($rejectedAdditions)->sum(fn ($a) => (float) ($a['total_price'] ?? 0));
+                $servicesFromRejectedAdditions = collect($rejectedAdditions)
+                    ->map(fn (array $addition) => [
+                        'id' => $addition['id'],
+                        'name' => $addition['name'],
+                        'price' => (float) ($addition['price'] ?? 0),
+                        'icon' => $addition['icon'] ?? null,
+                    ])
+                    ->values()
+                    ->all();
+                $pieceQuantity = (int) ($item['quantity'] ?? 1);
+
+                return [
+                    'item_id' => $item['item_id'],
+                    'item_ids' => $item['item_ids'] ?? [$item['item_id']],
+                    'piece_id' => $item['piece_id'] ?? null,
+                    'item_name' => $item['item_name'],
+                    'service_price' => 0.0,
+                    'additional_services_total' => $additionsTotal,
+                    'quantity' => $pieceQuantity,
+                    'unit_price' => $additionsTotal,
+                    'total_price' => $additionsTotal,
+                    'status' => 'rejected',
+                    'original_quantity' => $pieceQuantity,
+                    'original_unit_price' => $additionsTotal,
+                    'original_total_price' => $additionsTotal,
+                    'modified_quantity' => null,
+                    'modified_unit_price' => null,
+                    'modified_total_price' => null,
+                    'vendor_notes' => null,
+                    'note' => $item['note'] ?? null,
+                    'image' => $item['image'] ?? null,
+                    'modifiers' => [],
+                    'service_additions' => [],
+                    'service' => $servicesFromRejectedAdditions[0] ?? null,
+                    'services' => $servicesFromRejectedAdditions,
+                    'piece' => $item['piece'] ?? null,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        $rejectedItems = $rejectedItems->concat($rejectedAdditionItems)->values();
+
+        $acceptedItems = $acceptedItems->map(function (array $item) {
+            $acceptedAdditions = collect($item['service_additions'] ?? [])
+                ->filter(fn ($addition) => (($addition['vendor_status'] ?? $addition['status'] ?? 'accepted') !== 'rejected'))
+                ->values()
+                ->all();
+            $item['service_additions'] = $acceptedAdditions;
+            $item['additional_services_total'] = (float) collect($acceptedAdditions)
+                ->sum(fn ($addition) => (float) ($addition['total_price'] ?? 0));
+
+            return $item;
+        })->values();
+
+        return [
+            'accepted_items' => $acceptedItems->values()->toArray(),
+            'rejected_items' => $rejectedItems->values()->toArray(),
+        ];
+    }
+
+    /**
+     * Flatten calculate summary items so mobile can render accepted and rejected rows consistently.
+     *
+     * @param  list<array<string,mixed>>  $acceptedItems
+     * @param  list<array<string,mixed>>  $rejectedItems
+     * @return list<array<string,mixed>>
+     */
+    private function buildCalculateSummaryItems(array $acceptedItems, array $rejectedItems): array
+    {
+        $accepted = collect($acceptedItems)->map(function (array $item) {
+            return [
+                'piece' => $item['piece'] ?? null,
+                'service' => $item['service'] ?? null,
+                'services' => $item['services'] ?? [],
+                'additional_services' => $item['service_additions'] ?? [],
+                'additional_services_total' => (float) ($item['additional_services_total'] ?? 0),
+                'quantity' => (int) ($item['quantity'] ?? 1),
+                'unit_price' => (float) ($item['unit_price'] ?? 0),
+                'total_price' => (float) ($item['total_price'] ?? 0),
+                'original_unit_price' => (float) ($item['original_unit_price'] ?? $item['unit_price'] ?? 0),
+                'original_total_price' => (float) ($item['original_total_price'] ?? $item['total_price'] ?? 0),
+                'status' => $item['status'] ?? 'accepted',
+                'note' => $item['note'] ?? null,
+            ];
+        });
+
+        $rejected = collect($rejectedItems)->map(function (array $item) {
+            return [
+                'piece' => $item['piece'] ?? null,
+                'service' => $item['service'] ?? null,
+                'services' => $item['services'] ?? [],
+                'additional_services' => $item['service_additions'] ?? [],
+                'additional_services_total' => (float) ($item['additional_services_total'] ?? 0),
+                'quantity' => (int) ($item['quantity'] ?? 1),
+                'unit_price' => 0.0,
+                'total_price' => 0.0,
+                'original_unit_price' => (float) ($item['original_unit_price'] ?? $item['unit_price'] ?? 0),
+                'original_total_price' => (float) ($item['original_total_price'] ?? $item['total_price'] ?? 0),
+                'status' => 'rejected',
+                'note' => $item['note'] ?? null,
+            ];
+        });
+
+        return $accepted->concat($rejected)->values()->all();
     }
 
     private function calculateDistanceKm(float $lat1, float $lon1, float $lat2, float $lon2): float
