@@ -443,7 +443,9 @@ class HomeController extends Controller
                         'quantity' => $g['quantity'],
                         'unit_price' => (float) $g['unit_price'],
                         'total_price' => (float) $g['total_price'],
-                        'status' => $g['status'] ?? 'pending',
+                        'status' => (($g['status'] ?? 'pending') === 'pending')
+                            ? 'accepted'
+                            : ($g['status'] ?? 'accepted'),
                         'service' => $servicesData[0] ?? null,
                         'services' => $servicesData,
                         'service_additions' => $serviceAdditions,
@@ -592,7 +594,9 @@ class HomeController extends Controller
                 'quantity' => (int) ($grouped['quantity'] ?? 1),
                 'unit_price' => (float) ($grouped['unit_price'] ?? 0),
                 'total_price' => (float) ($grouped['total_price'] ?? 0),
-                'status' => $grouped['status'] ?? 'pending',
+                'status' => (($grouped['status'] ?? 'pending') === 'pending')
+                    ? 'accepted'
+                    : ($grouped['status'] ?? 'accepted'),
                 'note' => $grouped['note'] ?? null,
                 'image' => $grouped['image'] ?? null,
                 'modifiers' => $modifiers,
@@ -686,6 +690,9 @@ class HomeController extends Controller
             $item['service_additions'] = $acceptedAdditions;
             $item['additional_services_total'] = (float) collect($acceptedAdditions)
                 ->sum(fn ($addition) => (float) ($addition['total_price'] ?? 0));
+            if (($item['status'] ?? '') === 'pending') {
+                $item['status'] = 'accepted';
+            }
 
             return $item;
         })->values();

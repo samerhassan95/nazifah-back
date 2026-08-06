@@ -299,7 +299,7 @@ class OrderController extends Controller
                         'total_price' => $isRejectedLine ? 0.0 : $acceptedLineTotal,
                         'original_unit_price' => $unitPrice,
                         'original_total_price' => $originalLineTotal,
-                        'status' => $isRejectedLine ? 'rejected' : $lineStatus,
+                        'status' => $isRejectedLine ? 'rejected' : $this->normalizeVendorItemDisplayStatus($lineStatus),
                         'note' => $item['note'] ?? null,
                     ];
 
@@ -659,7 +659,7 @@ class OrderController extends Controller
                 'quantity' => (int) ($g['quantity'] ?? 1),
                 'unit_price' => (float) ($g['unit_price'] ?? 0),
                 'total_price' => (float) ($g['total_price'] ?? 0),
-                'status' => $g['status'] ?? 'accepted',
+                'status' => $this->normalizeVendorItemDisplayStatus($g['status'] ?? 'accepted'),
                 'original_quantity' => $primaryItem->original_quantity ?? $primaryItem->quantity ?? null,
                 'original_unit_price' => $originalUnitPrice,
                 'original_total_price' => $originalTotalPrice,
@@ -745,6 +745,7 @@ class OrderController extends Controller
             $item['service_additions'] = $acceptedAdditions;
             $item['additional_services_total'] = (float) collect($acceptedAdditions)
                 ->sum(fn ($addition) => (float) ($addition['total_price'] ?? 0));
+            $item['status'] = $this->normalizeVendorItemDisplayStatus($item['status'] ?? 'accepted');
 
             return $item;
         })->values();
@@ -753,6 +754,19 @@ class OrderController extends Controller
             'accepted_items' => $acceptedItems->values()->toArray(),
             'rejected_items' => $rejectedItems->values()->toArray(),
         ];
+    }
+
+    /**
+     * Mobile often filters UI lists to accepted/rejected only — treat DB pending as accepted for display.
+     */
+    private function normalizeVendorItemDisplayStatus(?string $status): string
+    {
+        $status = strtolower(trim((string) ($status ?: 'accepted')));
+        if ($status === '' || $status === 'pending') {
+            return 'accepted';
+        }
+
+        return $status;
     }
 
     /**
@@ -809,7 +823,7 @@ class OrderController extends Controller
             'quantity' => (int) ($item['quantity'] ?? 1),
             'unit_price' => (float) ($item['unit_price'] ?? 0),
             'total_price' => (float) ($item['total_price'] ?? 0),
-            'status' => $item['status'] ?? 'accepted',
+            'status' => $this->normalizeVendorItemDisplayStatus($item['status'] ?? 'accepted'),
             'original_quantity' => (int) ($item['quantity'] ?? 1),
             'original_unit_price' => (float) ($item['original_unit_price'] ?? $item['unit_price'] ?? 0),
             'original_total_price' => (float) ($item['original_total_price'] ?? $item['total_price'] ?? 0),
@@ -848,7 +862,7 @@ class OrderController extends Controller
                 'total_price' => (float) ($item['total_price'] ?? 0),
                 'original_unit_price' => (float) ($item['original_unit_price'] ?? $item['unit_price'] ?? 0),
                 'original_total_price' => (float) ($item['original_total_price'] ?? $item['total_price'] ?? 0),
-                'status' => $item['status'] ?? 'accepted',
+                'status' => $this->normalizeVendorItemDisplayStatus($item['status'] ?? 'accepted'),
                 'note' => $item['note'] ?? null,
             ];
         });
@@ -1190,7 +1204,7 @@ class OrderController extends Controller
                 'quantity' => (int) ($g['quantity'] ?? 1),
                 'unit_price' => (float) ($g['unit_price'] ?? 0),
                 'total_price' => (float) ($g['total_price'] ?? 0),
-                'status' => $g['status'] ?? 'accepted',
+                'status' => $this->normalizeVendorItemDisplayStatus($g['status'] ?? 'accepted'),
                 'original_quantity' => $primaryItem->original_quantity ?? $primaryItem->quantity ?? null,
                 'original_unit_price' => $originalUnitPrice,
                 'original_total_price' => $originalTotalPrice,
@@ -1277,6 +1291,7 @@ class OrderController extends Controller
             $item['service_additions'] = $acceptedAdditions;
             $item['additional_services_total'] = (float) collect($acceptedAdditions)
                 ->sum(fn ($addition) => (float) ($addition['total_price'] ?? 0));
+            $item['status'] = $this->normalizeVendorItemDisplayStatus($item['status'] ?? 'accepted');
 
             return $item;
         })->values();
