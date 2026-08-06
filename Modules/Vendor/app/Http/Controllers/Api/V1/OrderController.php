@@ -54,8 +54,11 @@ class OrderController extends Controller
             'order_id' => ['required', 'integer', 'exists:orders,id'],
             'coupon_code' => ['nullable', 'string'],
             'items' => ['nullable', 'array', 'min:1'],
-            'items.*.piece_id' => ['required', 'exists:pieces,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.item_id' => ['nullable', 'integer', 'exists:order_items,id'],
+            'items.*.item_ids' => ['nullable', 'array'],
+            'items.*.item_ids.*' => ['integer', 'exists:order_items,id'],
+            'items.*.piece_id' => ['nullable', 'integer', 'exists:pieces,id'],
+            'items.*.quantity' => ['nullable', 'integer', 'min:1'],
             'items.*.service_id' => ['nullable', 'exists:services,id'],
             'items.*.service_ids' => ['nullable', 'array', 'min:1'],
             'items.*.service_ids.*' => ['integer', 'exists:services,id'],
@@ -91,11 +94,36 @@ class OrderController extends Controller
         $branchId = (int) $branch->id;
 
         $itemsInput = $request->input('items');
-        $usingStoredOrderItems = ! is_array($itemsInput) || $itemsInput === [];
+        $itemsFromRequest = is_array($itemsInput) && $itemsInput !== [];
+        $isStatusPreviewOverlay = $itemsFromRequest && $this->isCalculateStatusPreviewOverlay($itemsInput);
+
+        // Pure DB load (no request items) — accepted/rejected come from stored vendor_status.
+        // Status overlay (item_id + status, not saved yet) — merge onto stored lines then split lists from preview.
+        $usingStoredOrderItems = ! $itemsFromRequest;
+        $skipCatalogChecks = $usingStoredOrderItems || $isStatusPreviewOverlay;
+
         if ($usingStoredOrderItems) {
             $itemsInput = $this->mapOrderItemsForCalculate($existingOrder);
             if ($itemsInput === []) {
                 return errorResponse(__('order.items_not_available'), 400);
+            }
+        } elseif ($isStatusPreviewOverlay) {
+            $itemsInput = $this->mergeCalculatePreviewStatuses(
+                $this->mapOrderItemsForCalculate($existingOrder),
+                $itemsInput,
+                $existingOrder
+            );
+            if ($itemsInput === []) {
+                return errorResponse(__('order.items_not_available'), 400);
+            }
+        } else {
+            foreach ($itemsInput as $index => $item) {
+                if (empty($item['piece_id']) || empty($item['quantity'])) {
+                    return validationErrorResponse([
+                        "items.$index.piece_id" => ['The piece_id field is required when not using item_id preview.'],
+                        "items.$index.quantity" => ['The quantity field is required when not using item_id preview.'],
+                    ]);
+                }
             }
         }
 
@@ -136,7 +164,7 @@ class OrderController extends Controller
                 $primaryServicePrice = 0.0;
 
                 foreach ($mainServiceIds as $mainServiceId) {
-                    if (! $usingStoredOrderItems) {
+                    if (! $skipCatalogChecks) {
                         $availabilityError = $this->catalogAvailabilityService->validateOrderLineForNewOrder(
                             $branchId,
                             (int) $item['piece_id'],
@@ -152,7 +180,7 @@ class OrderController extends Controller
                     $service = $piece->services->firstWhere('id', $mainServiceId);
                     $storedServicePrice = (float) ($item['service_prices'][$mainServiceId] ?? 0);
                     if (! $service) {
-                        if (! $usingStoredOrderItems) {
+                        if (! $skipCatalogChecks) {
                             $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang);
 
                             return errorResponse(__('order.service_not_available', ['piece_name' => $pieceName]), 400);
@@ -397,7 +425,7 @@ class OrderController extends Controller
                     $this->buildReviewedItemsForVendorResponse($existingOrder, $lang);
                 $itemsSummary = $this->buildCalculateSummaryItems($acceptedItems, $rejectedItems);
             } else {
-                // Preview before review is confirmed: split from the request-driven summary.
+                // Preview before review is confirmed (full items body OR item_id+status overlay).
                 $acceptedItems = collect($itemsSummary)
                     ->filter(fn (array $item) => ($item['status'] ?? 'accepted') !== 'rejected')
                     ->map(fn (array $item) => $this->mapSummaryItemToVendorItem($item))
@@ -904,7 +932,6 @@ class OrderController extends Controller
 
                 $primary = collect($statusItems)->first();
                 $additionIds = collect($primary->additionalServicesPivot ?? [])
-                    ->filter(fn ($pivot) => ($pivot->vendor_status ?? 'accepted') !== 'rejected')
                     ->pluck('service_addition_id')
                     ->filter()
                     ->map(fn ($id) => (int) $id)
@@ -930,14 +957,23 @@ class OrderController extends Controller
                     })
                     ->all();
                 $additionDetails = collect($primary->additionalServicesPivot ?? [])
-                    ->filter(fn ($pivot) => ($pivot->vendor_status ?? 'accepted') !== 'rejected')
-                    ->map(fn ($pivot) => [
-                        'id' => (int) $pivot->service_addition_id,
-                        'name' => $pivot->serviceAddition
-                            ? \App\Support\OrderItemDisplayNames::additionalServiceName($pivot->serviceAddition, (int) $primary->branch_id, app()->getLocale())
-                            : 'Addition',
-                        'price' => (float) \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot),
-                    ])
+                    ->map(function ($pivot) use ($primary) {
+                        $additionStatus = strtolower((string) ($pivot->vendor_status ?? 'accepted'));
+                        if ($additionStatus === '' || $additionStatus === 'pending') {
+                            $additionStatus = 'accepted';
+                        }
+
+                        return [
+                            'id' => (int) $pivot->service_addition_id,
+                            'service_addition_id' => (int) $pivot->service_addition_id,
+                            'name' => $pivot->serviceAddition
+                                ? \App\Support\OrderItemDisplayNames::additionalServiceName($pivot->serviceAddition, (int) $primary->branch_id, app()->getLocale())
+                                : 'Addition',
+                            'price' => (float) \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot),
+                            'status' => $additionStatus,
+                            'vendor_status' => $additionStatus,
+                        ];
+                    })
                     ->values()
                     ->all();
 
@@ -945,7 +981,14 @@ class OrderController extends Controller
                     continue;
                 }
 
+                $lineStatus = strtolower((string) ($status ?: 'accepted'));
+                if ($lineStatus === '') {
+                    $lineStatus = 'accepted';
+                }
+
                 $result[] = [
+                    'item_id' => (int) $primary->id,
+                    'item_ids' => collect($statusItems)->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
                     'piece_id' => (int) $primary->piece_id,
                     'service_id' => (int) ($serviceIds[0] ?? $primary->service_id),
                     'service_ids' => $serviceIds,
@@ -954,12 +997,109 @@ class OrderController extends Controller
                     'quantity' => max(1, (int) $primary->quantity),
                     'additional_service_ids' => $additionIds,
                     'additional_services' => $additionDetails,
+                    'status' => $lineStatus,
                     'note' => $primary->notes,
                 ];
             }
         }
 
         return $result;
+    }
+
+    /**
+     * Review-style calculate body: item_id + status (and optional addition statuses) before save.
+     *
+     * @param  array<int, mixed>  $items
+     */
+    private function isCalculateStatusPreviewOverlay(array $items): bool
+    {
+        return collect($items)->contains(function ($item) {
+            if (! is_array($item)) {
+                return false;
+            }
+
+            return ! empty($item['item_id']) || ! empty($item['item_ids']);
+        });
+    }
+
+    /**
+     * Apply unsaved accept/reject decisions onto stored order lines for calculate preview.
+     *
+     * @param  list<array<string,mixed>>  $storedLines
+     * @param  array<int, mixed>  $previewItems
+     * @return list<array<string,mixed>>
+     */
+    private function mergeCalculatePreviewStatuses(array $storedLines, array $previewItems, Order $order): array
+    {
+        $order->loadMissing(['items']);
+        $orderItemIds = $order->items->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        foreach ($previewItems as $preview) {
+            if (! is_array($preview)) {
+                continue;
+            }
+
+            $previewIds = collect($preview['item_ids'] ?? [])
+                ->when(! empty($preview['item_id']), fn ($c) => $c->push($preview['item_id']))
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0 && in_array($id, $orderItemIds, true))
+                ->unique()
+                ->values();
+
+            if ($previewIds->isEmpty()) {
+                continue;
+            }
+
+            $previewStatus = isset($preview['status'])
+                ? strtolower((string) $preview['status'])
+                : null;
+
+            $rejectedAdditionIds = collect($preview['rejected_additional_service_ids'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $additionStatusById = [];
+            foreach ($preview['additional_services'] ?? [] as $additionRow) {
+                if (! is_array($additionRow)) {
+                    continue;
+                }
+                $additionId = (int) ($additionRow['service_addition_id'] ?? $additionRow['id'] ?? 0);
+                if ($additionId > 0 && ! empty($additionRow['status'])) {
+                    $additionStatusById[$additionId] = strtolower((string) $additionRow['status']);
+                }
+            }
+
+            foreach ($storedLines as &$line) {
+                $lineIds = collect($line['item_ids'] ?? [])
+                    ->when(! empty($line['item_id']), fn ($c) => $c->push($line['item_id']))
+                    ->map(fn ($id) => (int) $id);
+
+                if ($lineIds->intersect($previewIds)->isEmpty()) {
+                    continue;
+                }
+
+                if ($previewStatus !== null && $previewStatus !== '') {
+                    $line['status'] = $previewStatus;
+                }
+
+                if ($rejectedAdditionIds !== [] || $additionStatusById !== []) {
+                    $lineRejected = collect($line['rejected_additional_service_ids'] ?? []);
+                    foreach ($line['additional_services'] ?? [] as $idx => $addition) {
+                        $additionId = (int) ($addition['service_addition_id'] ?? $addition['id'] ?? 0);
+                        $additionStatus = $additionStatusById[$additionId]
+                            ?? (in_array($additionId, $rejectedAdditionIds, true) ? 'rejected' : ($addition['status'] ?? 'accepted'));
+                        $line['additional_services'][$idx]['status'] = $additionStatus;
+                        $line['additional_services'][$idx]['vendor_status'] = $additionStatus;
+                        if ($additionStatus === 'rejected') {
+                            $lineRejected->push($additionId);
+                        }
+                    }
+                    $line['rejected_additional_service_ids'] = $lineRejected->unique()->values()->all();
+                }
+            }
+            unset($line);
+        }
+
+        return array_values($storedLines);
     }
 
     /**
