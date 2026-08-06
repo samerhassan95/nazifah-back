@@ -143,10 +143,29 @@ class OrderController extends Controller
                     }
 
                     $service = $piece->services->firstWhere('id', $mainServiceId);
+                    $storedServicePrice = (float) ($item['service_prices'][$mainServiceId] ?? 0);
                     if (! $service) {
-                        $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang);
+                        if (! $usingStoredOrderItems) {
+                            $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang);
 
-                        return errorResponse(__('order.service_not_available', ['piece_name' => $pieceName]), 400);
+                            return errorResponse(__('order.service_not_available', ['piece_name' => $pieceName]), 400);
+                        }
+
+                        $serviceLabel = (string) ($item['service_names'][$mainServiceId] ?? '');
+                        $servicesTotal += $storedServicePrice;
+                        $servicesSummary[] = [
+                            'id' => (int) $mainServiceId,
+                            'service_id' => (int) $mainServiceId,
+                            'name' => $serviceLabel,
+                            'service_name' => $serviceLabel,
+                            'price' => $storedServicePrice,
+                        ];
+
+                        if ($primaryService === null) {
+                            $primaryServicePrice = $storedServicePrice;
+                        }
+
+                        continue;
                     }
 
                     $servicePiecePrice = (float) $service->getPriceForPieceAtBranch($piece->id, $branchId);
@@ -170,19 +189,33 @@ class OrderController extends Controller
                 $additionalServicesTotal = 0.0;
 
                 if (! empty($item['additional_service_ids'])) {
+                    $storedAdditionalServices = collect($item['additional_services'] ?? [])->keyBy('id');
                     foreach (array_unique($item['additional_service_ids']) as $additionalServiceId) {
                         $additionModel = \Modules\Service\Models\ServiceAddition::find($additionalServiceId);
-                        if (! $additionModel) {
+                        $storedAddition = $storedAdditionalServices->get($additionalServiceId);
+                        if (! $additionModel && ! $storedAddition) {
                             continue;
                         }
-                        $additionalPrice = (float) $additionModel->getPriceForPieceAtBranch($piece->id, $branchId);
+                        $additionalPrice = $additionModel
+                            ? (float) $additionModel->getPriceForPieceAtBranch($piece->id, $branchId)
+                            : (float) ($storedAddition['price'] ?? 0);
                         $additionalServicesTotal += $additionalPrice;
-                        $additionalServicesSummary[] = \App\Support\OrderItemDisplayNames::additionalServiceLine(
-                            $additionModel,
-                            $branchId,
-                            $lang,
-                            $additionalPrice
-                        );
+                        if ($additionModel) {
+                            $additionalServicesSummary[] = \App\Support\OrderItemDisplayNames::additionalServiceLine(
+                                $additionModel,
+                                $branchId,
+                                $lang,
+                                $additionalPrice
+                            );
+                        } else {
+                            $additionalServicesSummary[] = [
+                                'id' => (int) $additionalServiceId,
+                                'name' => (string) ($storedAddition['name'] ?? 'Addition'),
+                                'price' => $additionalPrice,
+                                'quantity' => 1,
+                                'total_price' => $additionalPrice,
+                            ];
+                        }
                     }
                 }
 
@@ -672,7 +705,7 @@ class OrderController extends Controller
     }
 
     /**
-     * @return list<array{piece_id: int, service_id: int, service_ids: list<int>, quantity: int, additional_service_ids: list<int>, note: ?string}>
+     * @return list<array<string,mixed>>
      */
     private function mapOrderItemsForCalculate(Order $order): array
     {
@@ -700,6 +733,29 @@ class OrderController extends Controller
                     ->unique()
                     ->values()
                     ->all();
+                $servicePrices = collect($statusItems)
+                    ->mapWithKeys(fn ($item) => [(int) $item->service_id => (float) ($item->service_price ?? 0)])
+                    ->all();
+                $serviceNames = collect($statusItems)
+                    ->mapWithKeys(function ($item) {
+                        $label = $item->service
+                            ? \App\Support\OrderItemDisplayNames::serviceName($item->service, (int) $item->branch_id, app()->getLocale())
+                            : '';
+
+                        return [(int) $item->service_id => $label];
+                    })
+                    ->all();
+                $additionDetails = collect($primary->additionalServicesPivot ?? [])
+                    ->filter(fn ($pivot) => ($pivot->vendor_status ?? 'accepted') !== 'rejected')
+                    ->map(fn ($pivot) => [
+                        'id' => (int) $pivot->service_addition_id,
+                        'name' => $pivot->serviceAddition
+                            ? \App\Support\OrderItemDisplayNames::additionalServiceName($pivot->serviceAddition, (int) $primary->branch_id, app()->getLocale())
+                            : 'Addition',
+                        'price' => (float) \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot),
+                    ])
+                    ->values()
+                    ->all();
 
                 if ($serviceIds === []) {
                     continue;
@@ -709,8 +765,11 @@ class OrderController extends Controller
                     'piece_id' => (int) $primary->piece_id,
                     'service_id' => (int) ($serviceIds[0] ?? $primary->service_id),
                     'service_ids' => $serviceIds,
+                    'service_prices' => $servicePrices,
+                    'service_names' => $serviceNames,
                     'quantity' => max(1, (int) $primary->quantity),
                     'additional_service_ids' => $additionIds,
+                    'additional_services' => $additionDetails,
                     'note' => $primary->notes,
                 ];
             }
