@@ -980,20 +980,34 @@ class OrderController extends Controller
      */
     private function mapOrderItemsForCalculate(Order $order, bool $includeRejectedGroups = false): array
     {
-        $order->loadMissing(['items.additionalServicesPivot', 'items.service', 'items.piece']);
+        $order->loadMissing(['items.additionalServicesPivot.serviceAddition', 'items.service', 'items.piece']);
+
+        // Physical piece lines for calculate preview:
+        // - rows that share line_group = one multi-service piece
+        // - otherwise each order_item row is its own piece (do NOT legacy-merge
+        //   different services on the same piece_id — e.g. 3 pants stay 3 lines)
+        $buckets = [];
+        foreach ($order->items as $item) {
+            $key = ! empty($item->line_group)
+                ? 'g:'.$item->line_group
+                : 'i:'.$item->id;
+            $buckets[$key][] = $item;
+        }
 
         $result = [];
-        foreach (\Modules\Order\Support\OrderItemGrouper::buckets($order->items) as $group) {
+        foreach ($buckets as $groupItems) {
+            $group = collect($groupItems)->values();
             foreach ($group->groupBy(fn ($item) => $item->vendor_status ?? 'accepted') as $status => $statusItems) {
                 if ($status === 'rejected' && ! $includeRejectedGroups) {
                     continue;
                 }
 
                 $primary = collect($statusItems)->first();
-                $additionIds = collect($primary->additionalServicesPivot ?? [])
-                    ->pluck('service_addition_id')
+                $additionIds = collect($statusItems)
+                    ->flatMap(fn ($item) => collect($item->additionalServicesPivot ?? [])->pluck('service_addition_id'))
                     ->filter()
                     ->map(fn ($id) => (int) $id)
+                    ->unique()
                     ->values()
                     ->all();
 
@@ -1015,26 +1029,33 @@ class OrderController extends Controller
                         return [(int) $item->service_id => $label];
                     })
                     ->all();
-                $additionDetails = collect($primary->additionalServicesPivot ?? [])
-                    ->map(function ($pivot) use ($primary) {
+
+                $additionDetails = [];
+                $seenAdditionIds = [];
+                foreach ($statusItems as $itemModel) {
+                    foreach ($itemModel->additionalServicesPivot ?? [] as $pivot) {
+                        $additionId = (int) $pivot->service_addition_id;
+                        if ($additionId <= 0 || isset($seenAdditionIds[$additionId])) {
+                            continue;
+                        }
+                        $seenAdditionIds[$additionId] = true;
                         $additionStatus = strtolower((string) ($pivot->vendor_status ?? 'accepted'));
                         if ($additionStatus === '' || $additionStatus === 'pending') {
                             $additionStatus = 'accepted';
                         }
-
-                        return [
-                            'id' => (int) $pivot->service_addition_id,
-                            'service_addition_id' => (int) $pivot->service_addition_id,
-                            'name' => $pivot->serviceAddition
-                                ? \App\Support\OrderItemDisplayNames::additionalServiceName($pivot->serviceAddition, (int) $primary->branch_id, app()->getLocale())
+                        $addition = $pivot->serviceAddition;
+                        $additionDetails[] = [
+                            'id' => $additionId,
+                            'service_addition_id' => $additionId,
+                            'name' => $addition
+                                ? \App\Support\OrderItemDisplayNames::additionalServiceName($addition, (int) $primary->branch_id, app()->getLocale())
                                 : 'Addition',
                             'price' => (float) \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot),
                             'status' => $additionStatus,
                             'vendor_status' => $additionStatus,
                         ];
-                    })
-                    ->values()
-                    ->all();
+                    }
+                }
 
                 if ($serviceIds === []) {
                     continue;
