@@ -61,6 +61,13 @@ class OrderController extends Controller
             'items.*.service_ids.*' => ['integer', 'exists:services,id'],
             'items.*.additional_service_ids' => ['nullable', 'array'],
             'items.*.additional_service_ids.*' => ['integer', 'exists:service_additions,id'],
+            'items.*.status' => ['nullable', 'string', 'in:accepted,rejected,pending,modified'],
+            'items.*.additional_services' => ['nullable', 'array'],
+            'items.*.additional_services.*.id' => ['nullable', 'integer'],
+            'items.*.additional_services.*.service_addition_id' => ['nullable', 'integer'],
+            'items.*.additional_services.*.status' => ['nullable', 'string', 'in:accepted,rejected'],
+            'items.*.rejected_additional_service_ids' => ['nullable', 'array'],
+            'items.*.rejected_additional_service_ids.*' => ['integer', 'exists:service_additions,id'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -187,66 +194,146 @@ class OrderController extends Controller
 
                 $additionalServicesSummary = [];
                 $additionalServicesTotal = 0.0;
+                $rejectedAdditionsSummary = [];
+                $rejectedAdditionsTotal = 0.0;
+                $lineStatus = strtolower((string) ($item['status'] ?? 'accepted'));
+                if (! in_array($lineStatus, ['accepted', 'rejected', 'pending', 'modified'], true)) {
+                    $lineStatus = 'accepted';
+                }
+
+                $rejectedAdditionIds = collect($item['rejected_additional_service_ids'] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+                $additionStatusById = [];
+                foreach ($item['additional_services'] ?? [] as $additionRow) {
+                    $additionId = (int) ($additionRow['service_addition_id'] ?? $additionRow['id'] ?? 0);
+                    if ($additionId > 0 && ! empty($additionRow['status'])) {
+                        $additionStatusById[$additionId] = strtolower((string) $additionRow['status']);
+                    }
+                }
 
                 if (! empty($item['additional_service_ids'])) {
-                    $storedAdditionalServices = collect($item['additional_services'] ?? [])->keyBy('id');
+                    $storedAdditionalServices = collect($item['additional_services'] ?? [])->keyBy(function ($row) {
+                        return (int) ($row['service_addition_id'] ?? $row['id'] ?? 0);
+                    });
                     foreach (array_unique($item['additional_service_ids']) as $additionalServiceId) {
                         $additionModel = \Modules\Service\Models\ServiceAddition::find($additionalServiceId);
-                        $storedAddition = $storedAdditionalServices->get($additionalServiceId);
+                        $storedAddition = $storedAdditionalServices->get((int) $additionalServiceId);
                         if (! $additionModel && ! $storedAddition) {
                             continue;
                         }
                         $additionalPrice = $additionModel
                             ? (float) $additionModel->getPriceForPieceAtBranch($piece->id, $branchId)
                             : (float) ($storedAddition['price'] ?? 0);
-                        $additionalServicesTotal += $additionalPrice;
-                        if ($additionModel) {
-                            $additionalServicesSummary[] = \App\Support\OrderItemDisplayNames::additionalServiceLine(
+                        $additionStatus = $additionStatusById[(int) $additionalServiceId]
+                            ?? (in_array((int) $additionalServiceId, $rejectedAdditionIds, true) ? 'rejected' : 'accepted');
+                        if ($lineStatus === 'rejected') {
+                            $additionStatus = 'rejected';
+                        }
+
+                        $additionLine = $additionModel
+                            ? \App\Support\OrderItemDisplayNames::additionalServiceLine(
                                 $additionModel,
                                 $branchId,
                                 $lang,
                                 $additionalPrice
-                            );
-                        } else {
-                            $additionalServicesSummary[] = [
+                            )
+                            : [
                                 'id' => (int) $additionalServiceId,
                                 'name' => (string) ($storedAddition['name'] ?? 'Addition'),
                                 'price' => $additionalPrice,
                                 'quantity' => 1,
                                 'total_price' => $additionalPrice,
                             ];
+                        $additionLine['status'] = $additionStatus;
+                        $additionLine['vendor_status'] = $additionStatus;
+
+                        if ($additionStatus === 'rejected') {
+                            $rejectedAdditionsTotal += $additionalPrice;
+                            $rejectedAdditionsSummary[] = $additionLine;
+                        } else {
+                            $additionalServicesTotal += $additionalPrice;
+                            $additionalServicesSummary[] = $additionLine;
                         }
                     }
                 }
 
                 $unitPrice = $servicesTotal;
-                $lineTotalPrice = $unitPrice + $additionalServicesTotal;
-                $itemTotal = $lineTotalPrice * (int) $item['quantity'];
-                $totalAmount += $itemTotal;
+                $acceptedLineTotal = $unitPrice + $additionalServicesTotal;
+                $originalLineTotal = $unitPrice + $additionalServicesTotal + $rejectedAdditionsTotal;
+                $isRejectedLine = $lineStatus === 'rejected';
+                if (! $isRejectedLine) {
+                    $totalAmount += $acceptedLineTotal * (int) $item['quantity'];
+                }
 
                 $quantity = (int) $item['quantity'];
                 for ($i = 0; $i < $quantity; $i++) {
+                    $primaryServicePayload = $servicesSummary[0] ?? (
+                        $primaryService
+                            ? [
+                                'id' => $primaryService->id,
+                                'service_id' => $primaryService->id,
+                                'name' => \App\Support\OrderItemDisplayNames::serviceName($primaryService, $branchId, $lang),
+                                'service_name' => \App\Support\OrderItemDisplayNames::serviceName($primaryService, $branchId, $lang),
+                                'price' => $primaryServicePrice,
+                            ]
+                            : null
+                    );
+
                     $itemsSummary[] = [
                         'piece' => [
                             'id' => $piece->id,
                             'name' => \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang),
                             'icon' => $piece->iconRelation?->full_path,
                         ],
-                        'service' => $servicesSummary[0] ?? [
-                            'id' => $primaryService->id,
-                            'service_id' => $primaryService->id,
-                            'name' => \App\Support\OrderItemDisplayNames::serviceName($primaryService, $branchId, $lang),
-                            'service_name' => \App\Support\OrderItemDisplayNames::serviceName($primaryService, $branchId, $lang),
-                            'price' => $primaryServicePrice,
-                        ],
+                        'service' => $primaryServicePayload,
                         'services' => $servicesSummary,
-                        'additional_services' => $additionalServicesSummary,
-                        'additional_services_total' => $additionalServicesTotal,
+                        'additional_services' => $isRejectedLine
+                            ? array_merge($additionalServicesSummary, $rejectedAdditionsSummary)
+                            : $additionalServicesSummary,
+                        'additional_services_total' => $isRejectedLine
+                            ? $originalLineTotal - $unitPrice
+                            : $additionalServicesTotal,
                         'quantity' => 1,
-                        'unit_price' => $unitPrice,
-                        'total_price' => $lineTotalPrice,
+                        'unit_price' => $isRejectedLine ? 0.0 : $unitPrice,
+                        'total_price' => $isRejectedLine ? 0.0 : $acceptedLineTotal,
+                        'original_unit_price' => $unitPrice,
+                        'original_total_price' => $originalLineTotal,
+                        'status' => $isRejectedLine ? 'rejected' : $lineStatus,
                         'note' => $item['note'] ?? null,
                     ];
+
+                    // Rejected additions on an otherwise accepted/pending piece become their own rejected line.
+                    if (! $isRejectedLine && $rejectedAdditionsSummary !== []) {
+                        $rejectedServices = collect($rejectedAdditionsSummary)
+                            ->map(fn (array $addition) => [
+                                'id' => $addition['id'],
+                                'name' => $addition['name'],
+                                'price' => (float) ($addition['price'] ?? 0),
+                                'icon' => $addition['icon'] ?? null,
+                            ])
+                            ->values()
+                            ->all();
+
+                        $itemsSummary[] = [
+                            'piece' => [
+                                'id' => $piece->id,
+                                'name' => \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang),
+                                'icon' => $piece->iconRelation?->full_path,
+                            ],
+                            'service' => $rejectedServices[0] ?? null,
+                            'services' => $rejectedServices,
+                            'additional_services' => [],
+                            'additional_services_total' => $rejectedAdditionsTotal,
+                            'quantity' => 1,
+                            'unit_price' => 0.0,
+                            'total_price' => 0.0,
+                            'original_unit_price' => $rejectedAdditionsTotal,
+                            'original_total_price' => $rejectedAdditionsTotal,
+                            'status' => 'rejected',
+                            'note' => $item['note'] ?? null,
+                        ];
+                    }
                 }
             }
 
@@ -305,9 +392,31 @@ class OrderController extends Controller
             $acceptedItems = [];
             $rejectedItems = [];
             if ($usingStoredOrderItems) {
+                // Includes pending/unconfirmed lines so the app can render before review confirm.
                 ['accepted_items' => $acceptedItems, 'rejected_items' => $rejectedItems] =
                     $this->buildReviewedItemsForVendorResponse($existingOrder, $lang);
                 $itemsSummary = $this->buildCalculateSummaryItems($acceptedItems, $rejectedItems);
+            } else {
+                // Preview before review is confirmed: split from the request-driven summary.
+                $acceptedItems = collect($itemsSummary)
+                    ->filter(fn (array $item) => ($item['status'] ?? 'accepted') !== 'rejected')
+                    ->map(fn (array $item) => $this->mapSummaryItemToVendorItem($item))
+                    ->values()
+                    ->all();
+                $rejectedItems = collect($itemsSummary)
+                    ->filter(fn (array $item) => ($item['status'] ?? 'accepted') === 'rejected')
+                    ->map(function (array $item) {
+                        $mapped = $this->mapSummaryItemToVendorItem($item);
+                        $mapped['unit_price'] = (float) ($item['original_unit_price'] ?? $item['unit_price'] ?? 0);
+                        $mapped['total_price'] = (float) ($item['original_total_price'] ?? $item['total_price'] ?? 0);
+                        $mapped['original_unit_price'] = $mapped['unit_price'];
+                        $mapped['original_total_price'] = $mapped['total_price'];
+                        $mapped['status'] = 'rejected';
+
+                        return $this->foldAdditionsIntoServicesForDisplay($mapped);
+                    })
+                    ->values()
+                    ->all();
             }
 
             return successResponse([
@@ -677,6 +786,45 @@ class OrderController extends Controller
         $item['service_additions'] = [];
 
         return $item;
+    }
+
+    /**
+     * Map calculate summary rows into the vendor item shape used by accepted/rejected lists.
+     *
+     * @param  array<string,mixed>  $item
+     * @return array<string,mixed>
+     */
+    private function mapSummaryItemToVendorItem(array $item): array
+    {
+        $services = $item['services'] ?? [];
+        $additions = $item['additional_services'] ?? [];
+
+        return [
+            'item_id' => null,
+            'item_ids' => [],
+            'piece_id' => $item['piece']['id'] ?? null,
+            'item_name' => $item['piece']['name'] ?? 'Item',
+            'service_price' => (float) collect($services)->sum(fn ($s) => (float) ($s['price'] ?? 0)),
+            'additional_services_total' => (float) ($item['additional_services_total'] ?? 0),
+            'quantity' => (int) ($item['quantity'] ?? 1),
+            'unit_price' => (float) ($item['unit_price'] ?? 0),
+            'total_price' => (float) ($item['total_price'] ?? 0),
+            'status' => $item['status'] ?? 'accepted',
+            'original_quantity' => (int) ($item['quantity'] ?? 1),
+            'original_unit_price' => (float) ($item['original_unit_price'] ?? $item['unit_price'] ?? 0),
+            'original_total_price' => (float) ($item['original_total_price'] ?? $item['total_price'] ?? 0),
+            'modified_quantity' => null,
+            'modified_unit_price' => null,
+            'modified_total_price' => null,
+            'vendor_notes' => null,
+            'note' => $item['note'] ?? null,
+            'image' => null,
+            'modifiers' => [],
+            'service_additions' => $additions,
+            'service' => $item['service'] ?? ($services[0] ?? null),
+            'services' => $services,
+            'piece' => $item['piece'] ?? null,
+        ];
     }
 
     /**
