@@ -1025,6 +1025,10 @@ class OrderController extends Controller
     /**
      * Apply unsaved accept/reject decisions onto stored order lines for calculate preview.
      *
+     * Multi-service piece groups share one calculate line. If any sibling item_id is
+     * marked rejected in the preview, the whole line is rejected (later "accepted"
+     * must not overwrite that).
+     *
      * @param  list<array<string,mixed>>  $storedLines
      * @param  array<int, mixed>  $previewItems
      * @return list<array<string,mixed>>
@@ -1033,6 +1037,10 @@ class OrderController extends Controller
     {
         $order->loadMissing(['items']);
         $orderItemIds = $order->items->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $statusByItemId = [];
+        $additionStatusByItemId = [];
+        $rejectedAdditionIdsByItemId = [];
 
         foreach ($previewItems as $preview) {
             if (! is_array($preview)) {
@@ -1068,36 +1076,79 @@ class OrderController extends Controller
                 }
             }
 
-            foreach ($storedLines as &$line) {
-                $lineIds = collect($line['item_ids'] ?? [])
-                    ->when(! empty($line['item_id']), fn ($c) => $c->push($line['item_id']))
-                    ->map(fn ($id) => (int) $id);
-
-                if ($lineIds->intersect($previewIds)->isEmpty()) {
-                    continue;
-                }
-
+            foreach ($previewIds as $itemId) {
                 if ($previewStatus !== null && $previewStatus !== '') {
-                    $line['status'] = $previewStatus;
-                }
-
-                if ($rejectedAdditionIds !== [] || $additionStatusById !== []) {
-                    $lineRejected = collect($line['rejected_additional_service_ids'] ?? []);
-                    foreach ($line['additional_services'] ?? [] as $idx => $addition) {
-                        $additionId = (int) ($addition['service_addition_id'] ?? $addition['id'] ?? 0);
-                        $additionStatus = $additionStatusById[$additionId]
-                            ?? (in_array($additionId, $rejectedAdditionIds, true) ? 'rejected' : ($addition['status'] ?? 'accepted'));
-                        $line['additional_services'][$idx]['status'] = $additionStatus;
-                        $line['additional_services'][$idx]['vendor_status'] = $additionStatus;
-                        if ($additionStatus === 'rejected') {
-                            $lineRejected->push($additionId);
-                        }
+                    // Prefer rejected if conflicting statuses are sent for siblings.
+                    if ($previewStatus === 'rejected' || ! isset($statusByItemId[$itemId])) {
+                        $statusByItemId[$itemId] = $previewStatus;
+                    } elseif ($statusByItemId[$itemId] !== 'rejected') {
+                        $statusByItemId[$itemId] = $previewStatus;
                     }
-                    $line['rejected_additional_service_ids'] = $lineRejected->unique()->values()->all();
+                }
+                if ($additionStatusById !== []) {
+                    $additionStatusByItemId[$itemId] = array_merge(
+                        $additionStatusByItemId[$itemId] ?? [],
+                        $additionStatusById
+                    );
+                }
+                if ($rejectedAdditionIds !== []) {
+                    $rejectedAdditionIdsByItemId[$itemId] = array_values(array_unique(array_merge(
+                        $rejectedAdditionIdsByItemId[$itemId] ?? [],
+                        $rejectedAdditionIds
+                    )));
                 }
             }
-            unset($line);
         }
+
+        foreach ($storedLines as &$line) {
+            $lineIds = collect($line['item_ids'] ?? [])
+                ->when(! empty($line['item_id']), fn ($c) => $c->push($line['item_id']))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $lineStatuses = $lineIds
+                ->map(fn ($id) => $statusByItemId[$id] ?? null)
+                ->filter(fn ($status) => is_string($status) && $status !== '')
+                ->values();
+
+            if ($lineStatuses->contains('rejected')) {
+                $line['status'] = 'rejected';
+            } elseif ($lineStatuses->isNotEmpty()) {
+                $line['status'] = (string) $lineStatuses->first();
+            }
+
+            $additionStatusById = [];
+            $rejectedAdditionIds = [];
+            foreach ($lineIds as $itemId) {
+                foreach ($additionStatusByItemId[$itemId] ?? [] as $additionId => $additionStatus) {
+                    if ($additionStatus === 'rejected' || ! isset($additionStatusById[$additionId])) {
+                        $additionStatusById[(int) $additionId] = $additionStatus;
+                    }
+                }
+                $rejectedAdditionIds = array_merge(
+                    $rejectedAdditionIds,
+                    $rejectedAdditionIdsByItemId[$itemId] ?? []
+                );
+            }
+            $rejectedAdditionIds = array_values(array_unique($rejectedAdditionIds));
+
+            if ($additionStatusById !== [] || $rejectedAdditionIds !== []) {
+                $lineRejected = collect($line['rejected_additional_service_ids'] ?? []);
+                foreach ($line['additional_services'] ?? [] as $idx => $addition) {
+                    $additionId = (int) ($addition['service_addition_id'] ?? $addition['id'] ?? 0);
+                    $additionStatus = $additionStatusById[$additionId]
+                        ?? (in_array($additionId, $rejectedAdditionIds, true) ? 'rejected' : ($addition['status'] ?? 'accepted'));
+                    $line['additional_services'][$idx]['status'] = $additionStatus;
+                    $line['additional_services'][$idx]['vendor_status'] = $additionStatus;
+                    if ($additionStatus === 'rejected') {
+                        $lineRejected->push($additionId);
+                    }
+                }
+                $line['rejected_additional_service_ids'] = $lineRejected->unique()->values()->all();
+            }
+        }
+        unset($line);
 
         return array_values($storedLines);
     }
