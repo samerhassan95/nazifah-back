@@ -982,13 +982,8 @@ class OrderController extends Controller
     {
         $order->loadMissing(['items.additionalServicesPivot.serviceAddition', 'items.service', 'items.piece']);
 
-        // Each order_item row is one physical piece line for calculate preview.
-        // Do not merge by line_group here — duplicate pants / different services on the
-        // same piece_id must stay separate so omitted rows become rejected_items.
-        $normalizedBuckets = [];
-        foreach ($order->items as $item) {
-            $normalizedBuckets[] = collect([$item]);
-        }
+        // Merge by line_group / legacy grouping so calculate aligns with order details view.
+        $normalizedBuckets = \Modules\Order\Support\OrderItemGrouper::buckets($order->items);
 
         $result = [];
         foreach ($normalizedBuckets as $group) {
