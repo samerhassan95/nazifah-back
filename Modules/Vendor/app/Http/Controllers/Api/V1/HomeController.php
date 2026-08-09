@@ -465,6 +465,7 @@ class HomeController extends Controller
                     'rating' => $order->rating !== null ? (int) $order->rating : null,
                     'review' => $order->review,
                     'items' => $items,
+                    'items_count' => \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($order->items),
                 ], $order->clientVisitResponseFields());
 
                 // Only add delivery_name if driver is assigned
