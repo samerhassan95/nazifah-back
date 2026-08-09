@@ -47,7 +47,7 @@ Starting from this update, a driver **cannot** change an order's status to `on_w
 [ Driver Notifies Client / Order Pending Visit Confirmation ]
            │
            ▼
-[ Client Confirms Visit ] ──► (POST /api/v1/user/orders/{order_id}/visit-confirm)
+[Client Confirms Visit] ──► (POST /api/v1/user/orders/{order_id}/visit-response {"action": "confirm"})
            │
            ▼
 [ Driver Updates Status ] ──► (PUT /api/v1/driver/orders/{order_id}/status {"status": "on_way_to_pickup"})
