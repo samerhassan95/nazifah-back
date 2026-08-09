@@ -46,19 +46,6 @@ class OrderStatusService
             throw new \LogicException(__('order.driver_on_way_requires_laundry_handoff'));
         }
 
-        // Home pickup: client must confirm the pickup visit before driver can mark on_way_to_pickup.
-        if (
-            $newStatus === OrderStatus::ON_WAY_TO_PICKUP
-            && ! (bool) $order->pickup_at_vendor
-            && in_array($oldStatus, [
-                OrderStatus::DRIVER_PICKUP_ASSIGNED,
-                OrderStatus::DRIVER_PICKUP_ACCEPTED,
-                OrderStatus::CLIENT_POSTPONED_PICKUP,
-            ], true)
-            && $order->client_pickup_visit_confirmed_at === null
-        ) {
-            throw new \LogicException(__('order.driver_on_way_requires_client_confirmation'));
-        }
 
         $updateData = ['status' => $newStatus->value];
 
