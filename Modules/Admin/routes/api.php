@@ -211,6 +211,7 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
         Route::get('orders_per_city', [AdminOrderController::class, 'ordersPerCity']);
         Route::get('orders_status', [AdminOrderController::class, 'ordersStatus']);
         Route::get('{id}/details', [AdminOrderController::class, 'details']);
+        Route::get('{id}/invoice', [AdminOrderController::class, 'invoice']);
         Route::get('{id}', [AdminOrderController::class, 'show']);
         Route::put('{id}/status', [AdminOrderController::class, 'updateStatus']);
         Route::put('{id}/assign-driver', [AdminOrderController::class, 'assignDriver']);

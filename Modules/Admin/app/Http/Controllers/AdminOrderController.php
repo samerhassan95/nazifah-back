@@ -58,6 +58,33 @@ class AdminOrderController extends Controller
         return successResponse(new OrderResource($order), 'Order retrieved successfully');
     }
 
+    public function invoice(int $id): JsonResponse
+    {
+        $order = $this->orderService->find($id);
+
+        if (! $order) {
+            return ErrorResponse::make('Order not found', null, 404);
+        }
+
+        $invoice = $order->invoice()->first();
+        if (! $invoice) {
+            return ErrorResponse::make('Invoice not found', null, 404);
+        }
+
+        $invoiceService = app(\Modules\Invoice\Services\InvoiceService::class);
+        $shareUrl = $invoiceService->shareUrl($invoice);
+
+        return successResponse([
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'share_url' => $shareUrl,
+            'issued_at' => optional($invoice->issued_at)->toIso8601String(),
+            'status' => $invoice->status,
+            'zatca_status' => $invoice->zatca_status,
+            'total_amount' => (float) $invoice->total_amount,
+        ], 'Invoice retrieved successfully');
+    }
+
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         $order = $this->orderService->find($id);
