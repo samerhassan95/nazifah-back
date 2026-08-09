@@ -118,6 +118,7 @@ class HomeController extends Controller
     public function getDepartments(Request $request): JsonResponse
     {
         $query = Category::where('is_active', true)
+            ->whereHas('services', fn ($q) => $q->where('is_active', true))
             ->with('iconRelation')
             ->orderBy('order', 'asc');
 
