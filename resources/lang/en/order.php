@@ -344,6 +344,7 @@ return [
     'vendor_handoff_error_not_awaiting_driver_pickup_handoff' => 'Order is not awaiting vendor confirmation of pickup-driver handoff',
     'vendor_handoff_error_not_awaiting_delivery_driver_handoff' => 'Order is not awaiting vendor confirmation of delivery-driver handoff',
     'driver_on_way_requires_laundry_handoff' => 'Laundry must confirm handing the order to you before you can mark it as on the way',
+    'driver_on_way_requires_client_confirmation' => 'The client must confirm the pickup visit before you can mark the order as on the way',
     'vendor_handoff_error_not_ready_client_delivery' => 'Order is not ready to be marked completed for branch pickup',
     'vendor_handoff_error_not_awaiting_client_pickup' => 'Order is not awaiting vendor client pickup confirmation',
     'vendor_handoff_log_pickup_received' => 'Laundry confirmed receiving clothes from client at branch',
