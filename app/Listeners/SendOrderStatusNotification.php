@@ -62,16 +62,7 @@ class SendOrderStatusNotification
 
     private function onPending(Order $order, string $num): void
     {
-        $this->notifications->sendToClient($order,
-            'تم استلام طلبك', 'Order Placed',
-            "تم استلام طلبك #{$num} بنجاح.", "Your order #{$num} has been placed successfully.",
-            'order_placed',
-        );
-        $this->notifyVendorAndAdmins($order,
-            'طلب جديد', 'New Order',
-            "طلب جديد رقم #{$num}.", "New order #{$num}.",
-            'new_order',
-        );
+        $this->notifications->sendOrderCreatedNotificationsIfNeeded($order);
     }
 
     private function onBranchReview(Order $order, string $num): void

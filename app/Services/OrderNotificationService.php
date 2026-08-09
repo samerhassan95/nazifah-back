@@ -217,16 +217,14 @@ class OrderNotificationService
 
     public function orderCreatedNotificationsAlreadySent(Order $order): bool
     {
-        if (! $order->client_id) {
+        if (! $order->id) {
             return false;
         }
 
         return Notification::query()
-            ->where('user_type', 'client')
-            ->where('user_id', $order->client_id)
             ->where('type', 'orders')
-            ->where('data->order_id', $order->id)
-            ->where('data->notification_type', 'order_placed')
+            ->where('data->order_id', (int) $order->id)
+            ->whereIn('data->notification_type', ['order_placed', 'new_order'])
             ->exists();
     }
 
