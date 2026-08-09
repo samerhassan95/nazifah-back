@@ -2366,6 +2366,21 @@ class OrderController extends Controller
                     continue;
                 }
 
+                $statusPrimary = $statusItems->first();
+                $statusPieceName = $statusPrimary->piece
+                    ? \App\Support\OrderItemDisplayNames::pieceName($statusPrimary->piece, $branchId, $lang)
+                    : $pieceName;
+
+                $itemWithImage = $statusItems->first(fn ($item) => ! empty($item->images));
+                $itemImage = $itemWithImage?->images
+                    ? $this->uploadFilesService->getFullUrl($itemWithImage->images)
+                    : \App\Support\OrderItemDisplayNames::pieceIconUrl($statusPrimary?->piece);
+
+                $clientNote = $statusItems
+                    ->map(fn ($item) => $item->notes)
+                    ->filter(fn ($v) => filled($v))
+                    ->first();
+
                 $services = [];
                 $servicesTotal = 0.0;
                 $additionalServices = [];
@@ -2412,6 +2427,7 @@ class OrderController extends Controller
 
                 $serviceName = collect($services)->pluck('name')->filter()->implode('، ') ?: 'Unknown';
                 $notes = $vendorNotes !== [] ? implode(' | ', array_unique($vendorNotes)) : null;
+                $itemDescription = $clientNote ?: ($serviceName !== 'Unknown' ? $serviceName : null);
 
                 if ($status === 'rejected') {
                     $allAdditionsTotal = collect($additionalServices)->sum('total');
@@ -2431,13 +2447,16 @@ class OrderController extends Controller
                     $rejectedItems[] = [
                         'id' => $ids[0],
                         'ids' => $ids,
-                        'piece_name' => $pieceName,
+                        'piece_name' => $statusPieceName,
                         'service_name' => $serviceNameWithAdditions !== '' ? $serviceNameWithAdditions : $serviceName,
                         'services' => $servicesWithAdditions,
                         'quantity' => $quantity,
                         'unit_price' => round($servicesTotal, 2),
                         'total_price' => round(($servicesTotal * $quantity) + $allAdditionsTotal, 2),
                         'vendor_notes' => $notes,
+                        'note' => $clientNote,
+                        'description' => $clientNote ?: ($serviceNameWithAdditions !== '' ? $serviceNameWithAdditions : $itemDescription),
+                        'image' => $itemImage,
                         'additional_services' => [],
                     ];
 
@@ -2455,7 +2474,7 @@ class OrderController extends Controller
                     $modifiedItems[] = [
                         'id' => $ids[0],
                         'ids' => $ids,
-                        'piece_name' => $pieceName,
+                        'piece_name' => $statusPieceName,
                         'service_name' => $serviceName,
                         'services' => $services,
                         'original_quantity' => $first->original_quantity ?? $quantity,
@@ -2472,6 +2491,9 @@ class OrderController extends Controller
                         'unit_price' => $modifiedUnit,
                         'total_price' => $modifiedTotal,
                         'vendor_notes' => $notes,
+                        'note' => $clientNote,
+                        'description' => $itemDescription,
+                        'image' => $itemImage,
                         'additional_services' => array_values(array_filter(
                             $additionalServices,
                             fn ($a) => ($a['vendor_status'] ?? 'accepted') !== 'rejected'
@@ -2496,13 +2518,16 @@ class OrderController extends Controller
                 $acceptedItems[] = [
                     'id' => $ids[0],
                     'ids' => $ids,
-                    'piece_name' => $pieceName,
+                    'piece_name' => $statusPieceName,
                     'service_name' => $serviceName,
                     'services' => $services,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'total_price' => $totalPrice,
                     'vendor_notes' => $notes,
+                    'note' => $clientNote,
+                    'description' => $itemDescription,
+                    'image' => $itemImage,
                     'additional_services' => $acceptedAdditions,
                 ];
 
@@ -2525,16 +2550,21 @@ class OrderController extends Controller
                         ->values()
                         ->all();
 
+                    $rejectedAdditionServiceName = collect($servicesFromRejectedAdditions)->pluck('name')->filter()->implode('، ') ?: 'Unknown';
+
                     $rejectedItems[] = [
                         'id' => $ids[0],
                         'ids' => $ids,
-                        'piece_name' => $pieceName,
-                        'service_name' => collect($servicesFromRejectedAdditions)->pluck('name')->filter()->implode('، ') ?: 'Unknown',
+                        'piece_name' => $statusPieceName,
+                        'service_name' => $rejectedAdditionServiceName,
                         'services' => $servicesFromRejectedAdditions,
                         'quantity' => $quantity,
                         'unit_price' => round($rejectedAdditionsTotal, 2),
                         'total_price' => round($rejectedAdditionsTotal, 2),
                         'vendor_notes' => $rejectedAdditionNotes !== [] ? implode(' | ', $rejectedAdditionNotes) : null,
+                        'note' => $clientNote,
+                        'description' => $clientNote ?: $rejectedAdditionServiceName,
+                        'image' => $itemImage,
                         'additional_services' => $rejectedAdditions,
                     ];
                 }
