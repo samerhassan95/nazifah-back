@@ -756,7 +756,7 @@ class OrderController extends Controller
                 'payment_method' => $order->payment_method,
                 'payment_status' => $order->payment_status ?? 'pending',
                 'payment_status_label' => \App\Support\PaymentStatusPresenter::label($order->payment_status ?? 'pending'),
-                'items_count' => $order->items->count(),
+                'items_count' => \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($order->items),
                 'distance' => $order->distance !== null ? (float) $order->distance : 0,
                 'pickup_time' => $order->pickup_time ? $order->pickup_time->toISOString() : null,
                 'time_remaining' => $timeRemaining,
