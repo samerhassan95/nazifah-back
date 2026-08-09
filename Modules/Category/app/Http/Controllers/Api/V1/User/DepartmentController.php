@@ -73,6 +73,7 @@ class DepartmentController extends Controller
 
         $services = Cache::remember($cacheKey, 3600, function () use ($department, $perPage) {
             $query = Service::with('category')
+                ->where('is_active', true)
                 ->orderBy('order', 'asc');
 
             // Filter by department (category) using category_id
@@ -108,8 +109,8 @@ class DepartmentController extends Controller
             return notFoundResponse(__('category.vendor_not_found'));
         }
 
-        // Verify service exists
-        $service = Service::find($service_id);
+        // Verify service exists and is active
+        $service = Service::where('id', $service_id)->where('is_active', true)->first();
         if (! $service) {
             return notFoundResponse(__('service.service_not_found'));
         }
