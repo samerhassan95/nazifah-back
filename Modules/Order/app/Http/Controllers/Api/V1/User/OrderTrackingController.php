@@ -534,6 +534,9 @@ class OrderTrackingController extends Controller
             'items.*.service_id' => ['required', 'exists:services,id'],
             'items.*.additional_service_ids' => ['nullable', 'array'],
             'items.*.additional_service_ids.*' => ['integer', 'exists:service_additions,id'],
+            'items.*.note' => ['nullable', 'string', 'max:500'],
+            'items.*.notes' => ['nullable', 'string', 'max:500'],
+            'items.*.image' => ['nullable', 'sometimes'],
             'notes' => ['nullable', 'string', 'max:500'],
             'pickup_at_vendor' => ['nullable', 'boolean'],
             'delivery_at_vendor' => ['nullable', 'boolean'],
@@ -733,7 +736,7 @@ class OrderTrackingController extends Controller
                 $branchPieceIds = $branch->activePieces()->pluck('pieces.id')->toArray();
                 $branchServiceIds = $branch->activeServices()->pluck('services.id')->toArray();
 
-                foreach ($request->items as $item) {
+                foreach ($request->items as $index => $item) {
                     $pieceId = (int) $item['piece_id'];
                     $mainServiceIds = OrderItemsNormalizer::mainServiceIds($item);
                     if ($mainServiceIds === []) {
@@ -836,6 +839,23 @@ class OrderTrackingController extends Controller
                         $totalAmount += $itemTotal;
                     }
 
+                    $imageFile = $item['image'] ?? null;
+                    if (! ($imageFile instanceof \Illuminate\Http\UploadedFile)) {
+                        $imageFile = $request->file("items.{$index}.image");
+                    }
+
+                    $uploadedImage = null;
+                    if ($imageFile instanceof \Illuminate\Http\UploadedFile) {
+                        $uploadedImage = $this->uploadFilesService->uploadImage($imageFile, 'orders/items');
+                    }
+
+                    $existingItem = $order->items->first(function ($i) use ($pieceId, $servicesRows) {
+                        return (int) $i->piece_id === $pieceId && (int) $i->service_id === (int) $servicesRows[0]['service_id'];
+                    });
+
+                    $itemNote = $item['note'] ?? $item['notes'] ?? $existingItem?->notes;
+                    $itemImage = $uploadedImage ?? $item['images'] ?? $existingItem?->images;
+
                     $itemsData[] = [
                         'piece_id' => $item['piece_id'],
                         'piece_price' => $piecePrice,
@@ -847,7 +867,9 @@ class OrderTrackingController extends Controller
                         'total_price' => $itemTotal,
                         'additional_services' => $additionalServicesData,
                         'additional_services_total' => (float) $additionalServicesTotal,
-                        'note' => $item['note'] ?? null,
+                        'note' => $itemNote,
+                        'notes' => $itemNote,
+                        'images' => $itemImage,
                     ];
                 }
 

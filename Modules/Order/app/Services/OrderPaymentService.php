@@ -1192,7 +1192,8 @@ class OrderPaymentService
                         'quantity' => 1,
                         'unit_price' => $rowUnitPrice,
                         'total_price' => $rowUnitPrice,
-                        'notes' => $itemData['note'] ?? null,
+                        'notes' => $itemData['note'] ?? $itemData['notes'] ?? null,
+                        'images' => $itemData['images'] ?? $itemData['uploaded_image'] ?? null,
                     ]);
 
                     if ($isPrimary && ! empty($itemData['additional_services'])) {
