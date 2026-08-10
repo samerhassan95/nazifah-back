@@ -70,12 +70,13 @@ class AdminLaundryOrderController extends Controller
         // Format orders
         $ordersData = collect($orders->items())->map(function ($order) {
             return [
-                'Order_code' => $order->order_number,
-                'Client_name' => $order->client ? ($order->client->getTranslation('full_name', 'ar') ?? $order->client->full_name ?? 'N/A') : 'N/A',
-                'Driver_name' => $order->driver ? ($order->driver->getTranslation('full_name', 'ar') ?? $order->driver->full_name ?? 'N/A') : 'N/A',
+                'id'           => $order->id,
+                'Order_code'   => $order->order_number,
+                'Client_name'  => $order->client ? ($order->client->getTranslation('full_name', 'ar') ?? $order->client->full_name ?? 'N/A') : 'N/A',
+                'Driver_name'  => $order->driver ? ($order->driver->getTranslation('full_name', 'ar') ?? $order->driver->full_name ?? 'N/A') : 'N/A',
                 'Pieces_count' => $order->items()->count(),
-                'Branch' => 'N/A', // Adjust if you have branch relationship
-                'Order_date' => $order->created_at ? $order->created_at->format('d M Y') : null,
+                'Branch'       => $order->branch?->getTranslation('name', 'ar') ?? $order->branch?->name ?? 'N/A',
+                'Order_date'   => $order->created_at ? $order->created_at->format('d M Y') : null,
                 'Order_status' => $this->mapOrderStatus($order->status),
             ];
         });

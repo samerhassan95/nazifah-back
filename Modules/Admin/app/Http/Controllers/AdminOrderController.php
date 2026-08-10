@@ -66,19 +66,29 @@ class AdminOrderController extends Controller
             return ErrorResponse::make('Order not found', null, 404);
         }
 
-        $invoiceService = app(\Modules\Invoice\Services\InvoiceService::class);
-        $invoice = $invoiceService->createOrFetchForOrder($order);
-        $shareUrl = $invoiceService->shareUrl($invoice);
+        try {
+            $invoiceService = app(\Modules\Invoice\Services\InvoiceService::class);
+            $invoice = $invoiceService->createOrFetchForOrder($order);
+            $shareUrl = $invoiceService->shareUrl($invoice);
 
-        return successResponse([
-            'invoice_id' => $invoice->id,
-            'invoice_number' => $invoice->invoice_number,
-            'share_url' => $shareUrl,
-            'issued_at' => optional($invoice->issued_at)->toIso8601String(),
-            'status' => $invoice->status,
-            'zatca_status' => $invoice->zatca_status,
-            'total_amount' => (float) $invoice->total_amount,
-        ], 'Invoice retrieved successfully');
+            return successResponse([
+                'invoice_id'     => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'share_url'      => $shareUrl,
+                'issued_at'      => optional($invoice->issued_at)->toIso8601String(),
+                'status'         => $invoice->status,
+                'zatca_status'   => $invoice->zatca_status,
+                'total_amount'   => (float) $invoice->total_amount,
+            ], 'Invoice retrieved successfully');
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Invoice creation failed', [
+                'order_id' => $id,
+                'error'    => $e->getMessage(),
+                'trace'    => $e->getTraceAsString(),
+            ]);
+
+            return ErrorResponse::make('Failed to create invoice: '.$e->getMessage(), null, 500);
+        }
     }
 
     public function updateStatus(Request $request, int $id): JsonResponse

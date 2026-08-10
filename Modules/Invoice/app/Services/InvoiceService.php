@@ -53,7 +53,7 @@ class InvoiceService
             'seller_name' => $this->resolveSellerName($order),
             'seller_vat_number' => $order->branch?->vendor?->vat_number ?: $this->invoiceSettings->get('invoice_company_vat_number'),
             'seller_registration_number' => $order->branch?->vendor?->official_number ?: $this->invoiceSettings->get('invoice_company_registration_number'),
-            'seller_address' => $order->branch?->getLocalizedAddress() ?: $this->invoiceSettings->get('invoice_company_address'),
+            'seller_address' => $order->branch?->national_address ?? $this->invoiceSettings->get('invoice_company_address'),
             'issued_at' => $invoice->issued_at ?: now(),
             'last_error' => null,
         ]);
@@ -106,7 +106,7 @@ class InvoiceService
             'seller_name' => $this->resolveSellerName($order),
             'seller_vat_number' => $order->branch?->vendor?->vat_number ?: $this->invoiceSettings->get('invoice_company_vat_number'),
             'seller_registration_number' => $order->branch?->vendor?->official_number ?: $this->invoiceSettings->get('invoice_company_registration_number'),
-            'seller_address' => $order->branch?->getLocalizedAddress() ?: $this->invoiceSettings->get('invoice_company_address'),
+            'seller_address' => $order->branch?->national_address ?? $this->invoiceSettings->get('invoice_company_address'),
             'issued_at' => $invoice->issued_at ?: ($transaction?->paid_at ?? now()),
             'last_error' => null,
         ]);
