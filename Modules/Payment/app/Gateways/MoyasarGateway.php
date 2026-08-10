@@ -882,7 +882,8 @@ class MoyasarGateway extends AbstractPaymentGateway
         }
 
         return match (strtoupper($payfortOption)) {
-            'VISA', 'MASTERCARD', 'CREDIT_CARD', 'SAMSUNGPAY', 'GOOGLEPAY' => ['creditcard'],
+            'CREDIT_CARD'        => [], // Do not restrict — show all enabled Moyasar methods on hosted invoice
+            'VISA', 'MASTERCARD' => ['creditcard'],
             'MADA'               => ['mada'],
             'STCPAY'             => ['stcpay'],
             'APPLEPAY'           => ['applepay'],
