@@ -882,11 +882,10 @@ class MoyasarGateway extends AbstractPaymentGateway
         }
 
         return match (strtoupper($payfortOption)) {
-            'VISA', 'MASTERCARD' => ['creditcard'],
+            'VISA', 'MASTERCARD', 'CREDIT_CARD', 'SAMSUNGPAY', 'GOOGLEPAY' => ['creditcard'],
             'MADA'               => ['mada'],
             'STCPAY'             => ['stcpay'],
             'APPLEPAY'           => ['applepay'],
-            'SAMSUNGPAY'         => ['samsungpay'],
             default              => [],
         };
     }

@@ -153,7 +153,6 @@ class PaymentMethod extends Model
      */
     private static function collapseGatewayMethodsForMoyasar(array $methods, string $locale): array
     {
-        $internalValues = ['cash_on_delivery', 'nazefah_wallet'];
         $creditCardValue = 'credit_card';
 
         $creditCard = null;
@@ -164,27 +163,26 @@ class PaymentMethod extends Model
             }
         }
 
+        if ($creditCard === null) {
+            return $methods;
+        }
+
         $gatewayMethods = array_values(array_filter(
             $methods,
             fn (array $method) => ! in_array(
                 (string) ($method['value'] ?? ''),
-                [...$internalValues, $creditCardValue],
+                ['cash_on_delivery', 'nazefah_wallet', $creditCardValue],
                 true
             )
         ));
 
-        $remaining = array_values(array_filter(
+        // Keep all active individual methods, and include the grouped credit_card option
+        $result = array_values(array_filter(
             $methods,
-            fn (array $method) => in_array((string) ($method['value'] ?? ''), $internalValues, true)
+            fn (array $method) => ($method['value'] ?? '') !== $creditCardValue
         ));
 
-        if ($gatewayMethods === [] || $creditCard === null) {
-            return $remaining;
-        }
-
-        usort($gatewayMethods, fn (array $a, array $b) => ((int) ($a['sort_order'] ?? 9999)) <=> ((int) ($b['sort_order'] ?? 9999)));
-
-        $remaining[] = [
+        $result[] = [
             'id' => (int) $creditCard['id'],
             'type' => 'moyasar',
             'value' => $creditCardValue,
@@ -199,9 +197,9 @@ class PaymentMethod extends Model
             )),
         ];
 
-        usort($remaining, fn (array $a, array $b) => ((int) ($a['sort_order'] ?? 9999)) <=> ((int) ($b['sort_order'] ?? 9999)));
+        usort($result, fn (array $a, array $b) => ((int) ($a['sort_order'] ?? 9999)) <=> ((int) ($b['sort_order'] ?? 9999)));
 
-        return array_values($remaining);
+        return array_values($result);
     }
 
     /**
