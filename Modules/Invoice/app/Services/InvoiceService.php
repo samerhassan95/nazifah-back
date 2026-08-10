@@ -24,6 +24,47 @@ class InvoiceService
         private InvoiceSettingsService $invoiceSettings,
     ) {}
 
+    public function createOrFetchForOrder(Order $order): Invoice
+    {
+        $invoice = Invoice::where('order_id', $order->id)->first();
+        if ($invoice) {
+            return $invoice;
+        }
+
+        $order->loadMissing(['client', 'branch.vendor', 'items.piece', 'items.service']);
+
+        $invoice = Invoice::firstOrNew(['order_id' => $order->id]);
+        $invoice->fill([
+            'client_id' => $order->client_id,
+            'vendor_id' => $order->resolveVendorId(),
+            'branch_id' => $order->branch_id,
+            'invoice_number' => $invoice->invoice_number ?: $this->generateInvoiceNumber($order),
+            'invoice_type' => 'simplified_tax_invoice',
+            'currency' => (string) $this->invoiceSettings->get('invoice_currency', 'SAR'),
+            'status' => $invoice->status ?: Invoice::STATUS_DRAFT,
+            'subtotal_amount' => round((float) $order->total_amount, 2),
+            'discount_amount' => round((float) $order->discount_amount, 2),
+            'tax_amount' => round((float) $order->tax_amount, 2),
+            'delivery_fee' => round((float) $order->delivery_fee, 2),
+            'total_amount' => round((float) $order->final_amount, 2),
+            'customer_name' => $order->client?->full_name,
+            'customer_phone' => $order->client?->phone,
+            'customer_email' => $order->client?->email,
+            'seller_name' => $this->resolveSellerName($order),
+            'seller_vat_number' => $order->branch?->vendor?->vat_number ?: $this->invoiceSettings->get('invoice_company_vat_number'),
+            'seller_registration_number' => $order->branch?->vendor?->official_number ?: $this->invoiceSettings->get('invoice_company_registration_number'),
+            'seller_address' => $order->branch?->getLocalizedAddress() ?: $this->invoiceSettings->get('invoice_company_address'),
+            'issued_at' => $invoice->issued_at ?: now(),
+            'last_error' => null,
+        ]);
+        $invoice->save();
+
+        $payload = $this->payloadBuilder->buildForOrder($order, $invoice);
+        $invoice->forceFill(['invoice_payload' => $payload])->save();
+
+        return $invoice;
+    }
+
     public function issueForOrder(Order $order, ?PaymentTransaction $transaction = null, string $reason = 'payment_completed'): ?Invoice
     {
         if (! $this->invoiceSettings->get('invoice_auto_issue', true)) {

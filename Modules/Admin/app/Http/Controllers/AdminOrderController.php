@@ -66,12 +66,8 @@ class AdminOrderController extends Controller
             return ErrorResponse::make('Order not found', null, 404);
         }
 
-        $invoice = $order->invoice()->first();
-        if (! $invoice) {
-            return ErrorResponse::make('Invoice not found', null, 404);
-        }
-
         $invoiceService = app(\Modules\Invoice\Services\InvoiceService::class);
+        $invoice = $invoiceService->createOrFetchForOrder($order);
         $shareUrl = $invoiceService->shareUrl($invoice);
 
         return successResponse([

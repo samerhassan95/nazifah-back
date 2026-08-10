@@ -19,16 +19,8 @@ class InvoiceController extends Controller
             ], 403);
         }
 
-        $invoice = Invoice::where('order_id', $order->id)->first();
-        if (! $invoice) {
-            return response()->json([
-                'status' => false,
-                'code' => 404,
-                'message' => 'Invoice not found',
-            ], 404);
-        }
-
         $service = app(\Modules\Invoice\Services\InvoiceService::class);
+        $invoice = $service->createOrFetchForOrder($order);
 
         return response()->json([
             'status' => true,
@@ -50,9 +42,15 @@ class InvoiceController extends Controller
 
     public function share(Request $request, Invoice $invoice)
     {
-        $invoice->loadMissing('order.client', 'branch.vendor');
+        $invoice->loadMissing('order.client', 'order.items.piece', 'order.items.service', 'branch.vendor');
 
-        $payload = $invoice->invoice_payload ?? [];
+        $payload = $invoice->invoice_payload;
+        if (empty($payload)) {
+            $builder = app(\Modules\Invoice\Services\InvoicePayloadBuilder::class);
+            $payload = $builder->buildForOrder($invoice->order, $invoice);
+            $invoice->forceFill(['invoice_payload' => $payload])->save();
+        }
+
         $html = view('invoice::show', [
             'invoice' => $invoice,
             'payload' => $payload,
