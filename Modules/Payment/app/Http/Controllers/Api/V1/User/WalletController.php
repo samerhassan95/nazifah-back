@@ -204,6 +204,7 @@ class WalletController extends Controller
                     'wallet_deposit' => true,
                     'client_id' => $user->id,
                     'payment_method' => $request->payment_method,
+                    'payment_option' => $this->getPayfortPaymentOption($request->payment_method),
                     'card_id' => $request->card_id ?? null,
                 ],
                 enableTokenization: false,
