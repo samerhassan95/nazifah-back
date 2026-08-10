@@ -650,8 +650,9 @@ class OrderPaymentService
      * Release pending wallet reservations for an order (cancel / gateway failure).
      *
      * @param  int|null  $modificationIntentId  When set, only surcharge legs for that intent are released.
+     * @return array<int, array<string, mixed>>
      */
-    public function releaseOrderWalletReservations(int $orderId, ?int $modificationIntentId = null): void
+    public function releaseOrderWalletReservations(int $orderId, ?int $modificationIntentId = null): array
     {
         $query = OrderPayment::with('paymentTransaction')
             ->where('order_id', $orderId)
@@ -662,9 +663,23 @@ class OrderPaymentService
             $query->where('modification_intent_id', $modificationIntentId);
         }
 
+        $releasedLines = [];
         foreach ($query->get() as $leg) {
+            $amount = round((float) $leg->amount, 2);
             $this->releaseReservedWalletLeg($leg);
+            if ($amount > 0) {
+                $releasedLines[] = [
+                    'amount' => $amount,
+                    'method' => 'wallet',
+                    'payment_method' => PaymentMethod::Nathefah_WALLET->value,
+                    'gateway_attempted' => false,
+                    'gateway_failed' => false,
+                    'gateway_failure_message' => null,
+                ];
+            }
         }
+
+        return $releasedLines;
     }
 
     /**
@@ -1575,9 +1590,7 @@ class OrderPaymentService
         $reason = $reason ?? $order->cancelled_reason ?? 'Order cancelled';
         $order = $order->fresh() ?? $order;
 
-        $this->releaseOrderWalletReservations($order->id);
-
-        $refundLines = [];
+        $refundLines = $this->releaseOrderWalletReservations($order->id);
 
         $transactions = PaymentTransaction::where('order_id', $order->id)
             ->whereIn('status', ['authorized', 'completed', 'pending'])
