@@ -222,7 +222,7 @@ class InvoiceService
     public function shareUrl(Invoice $invoice): string
     {
         return URL::temporarySignedRoute(
-            'invoice.share',
+            'api.invoice.share',
             now()->addDays((int) $this->invoiceSettings->get('invoice_public_link_ttl_days', 30)),
             ['invoice' => $invoice->id]
         );
