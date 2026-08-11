@@ -747,6 +747,8 @@ class OrderController extends Controller
                 'branch' => $branchData,
                 'first_item_image' => $firstItemImage,
                 'branch_location' => $branchLocation,
+                'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+                'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
                 'total_amount' => (float) $order->total_amount,
                 'discount_amount' => (float) $order->discount_amount,
                 ...$order->couponResponseFields($lang),

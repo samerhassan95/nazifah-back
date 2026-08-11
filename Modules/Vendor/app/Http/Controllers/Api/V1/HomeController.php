@@ -455,6 +455,7 @@ class HomeController extends Controller
                     'sub_title' => $order->order_number,
                     'order_id' => $order->id,
                     'status' => $order->status,
+                    'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
                     'Customer_name' => $order->client ? $order->client->full_name : 'Customer',
                     'distance' => $order->distance !== null ? (float) $order->distance : 0,
                     'first_item_image' => $firstItemImage,
