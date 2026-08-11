@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Admin\Http\Resources\OrderResource;
 use Modules\Admin\Services\OrderService;
+use Modules\Driver\Models\Driver;
 use Modules\Order\Models\Order;
 
 class AdminOrderController extends Controller
@@ -127,15 +128,49 @@ class AdminOrderController extends Controller
             return ErrorResponse::make('Order not found', null, 404);
         }
 
+        if ($order->status === OrderStatus::CANCELLED->value) {
+            return ErrorResponse::make('Cannot assign a driver to a cancelled order', null, 400);
+        }
+
         $validated = $request->validate([
             'driver_id' => 'required|exists:drivers,id',
         ]);
 
-        $order->driver_id = $validated['driver_id'];
-        $order->save();
+        $driver = Driver::find($validated['driver_id']);
+
+        if (! $driver || ! $driver->is_available) {
+            return ErrorResponse::make('Driver is not available', null, 400);
+        }
+
+        // Route through the state machine (same as the vendor-side assignment endpoint)
+        // so the order status actually advances past 'pending', pickup_driver_id /
+        // delivery_driver_id get populated, and the DriverAssigned event fires. The old
+        // raw `$order->driver_id = ...; $order->save();` left status untouched, which
+        // silently dropped the order out of the vendor's "current" list and the driver's
+        // own assignment list whenever it was assigned before being confirmed.
+        $currentStatus = OrderStatus::from($order->status);
+        $onDeliveryLeg = in_array($currentStatus, OrderStatus::vendorDeliveryDriverAssignableStatuses(), true)
+            || in_array($currentStatus, [OrderStatus::PICKED_UP, OrderStatus::DELIVERED], true);
+
+        $statusService = app(OrderStatusService::class);
+        $changedBy = optional(auth()->user())->id;
+
+        try {
+            if ($onDeliveryLeg && $order->needsDeliveryDriver()) {
+                $statusService->assignDeliveryDriver($order, $driver, $changedBy);
+            } elseif ($order->needsPickupDriver()) {
+                $statusService->assignPickupDriver($order, $driver, $changedBy);
+            } elseif ($order->needsDeliveryDriver()) {
+                $statusService->assignDeliveryDriver($order, $driver, $changedBy);
+            } else {
+                return ErrorResponse::make('Order does not need a driver (both legs handled at vendor)', null, 400);
+            }
+        } catch (\Throwable $e) {
+            return ErrorResponse::make($e->getMessage() ?: 'Driver assignment failed', null, 400);
+        }
 
         return successResponse(
-            $order->fresh()->load(['driver']),
+            $order->fresh()->load(['driver', 'pickupDriver', 'deliveryDriver']),
             'Driver assigned successfully'
         );
     }

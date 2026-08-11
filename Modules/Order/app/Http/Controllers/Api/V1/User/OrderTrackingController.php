@@ -1031,7 +1031,7 @@ class OrderTrackingController extends Controller
                         $legs = $alloc['legs'];
 
                         $stagedPricing = [
-                            'status' => \App\Enums\OrderStatus::PENDING->value,
+                            'status' => $this->postEditStatus($order)->value,
                             'total_amount' => $totalAmount,
                             'discount_amount' => $discountAmount,
                             'tax_amount' => $taxAmount,
@@ -1108,7 +1108,7 @@ class OrderTrackingController extends Controller
             }
 
             $updateData = [
-                'status' => \App\Enums\OrderStatus::PENDING->value,
+                'status' => $this->postEditStatus($order)->value,
                 'pickup_at_vendor' => $pickupAtVendor,
                 'delivery_at_vendor' => $deliveryAtVendor,
                 'pickup_address_id' => ! $pickupAtVendor && $pickupAddress ? $pickupAddress->id : null,
@@ -1288,6 +1288,23 @@ class OrderTrackingController extends Controller
 
             return serverErrorResponse(__('order.failed_to_update_order').': '.$e->getMessage());
         }
+    }
+
+    /**
+     * Status to apply after a client edit. Orders still in initial review stay
+     * pending; orders already past that (confirmed, driver assigned, etc.) go to
+     * branch_review instead of pending, so the edit still sends them back for
+     * vendor re-review without dropping them out of the vendor's "current" list
+     * or orphaning an already-assigned driver (pending is excluded from
+     * OrderStatus::vendorCurrentStatusValues()).
+     */
+    private function postEditStatus(Order $order): OrderStatus
+    {
+        $current = OrderStatus::tryFrom($order->status);
+
+        return in_array($current, [OrderStatus::PENDING, OrderStatus::BRANCH_REVIEW], true)
+            ? OrderStatus::PENDING
+            : OrderStatus::BRANCH_REVIEW;
     }
 
     /**
