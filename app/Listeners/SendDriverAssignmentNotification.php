@@ -2,7 +2,6 @@
 
 namespace App\Listeners;
 
-use App\Enums\OrderStatus;
 use App\Events\DriverAssigned;
 use App\Services\OrderNotificationService;
 
@@ -38,10 +37,30 @@ class SendDriverAssignmentNotification
                 ['assignment_type' => $type]
             );
 
-            $isReassignment = ($type === 'pickup' && $order->status === OrderStatus::DRIVER_PICKUP_ASSIGNED->value)
-                || ($type === 'delivery' && $order->status === OrderStatus::DRIVER_DELIVERY_ASSIGNED->value);
+            $previousDriverId = $event->previousDriverId;
+            $isReassignment = $previousDriverId !== null && $previousDriverId !== (int) $driver->id;
 
             if ($isReassignment) {
+                $titleArOld = $type === 'pickup' ? 'تم إلغاء تعيينك من طلب استلام' : 'تم إلغاء تعيينك من طلب توصيل';
+                $titleEnOld = $type === 'pickup' ? 'Removed from Pickup Assignment' : 'Removed from Delivery Assignment';
+                $bodyArOld = $type === 'pickup'
+                    ? "تم إلغاء تعيينك لاستلام الطلب #{$num} وتحويله لسائق آخر."
+                    : "تم إلغاء تعيينك لتوصيل الطلب #{$num} وتحويله لسائق آخر.";
+                $bodyEnOld = $type === 'pickup'
+                    ? "You have been removed from picking up order #{$num}; it was reassigned to another driver."
+                    : "You have been removed from delivering order #{$num}; it was reassigned to another driver.";
+
+                $this->notifications->sendToDriver(
+                    $order,
+                    $previousDriverId,
+                    $titleArOld,
+                    $titleEnOld,
+                    $bodyArOld,
+                    $bodyEnOld,
+                    "driver_{$type}_unassigned",
+                    ['assignment_type' => $type]
+                );
+
                 $this->notifications->sendToVendorAndAdmins(
                     $order,
                     $type === 'pickup' ? 'تم تعيين سائق استلام جديد' : 'تم تعيين سائق توصيل جديد',

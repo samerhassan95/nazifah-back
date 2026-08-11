@@ -519,7 +519,7 @@ class OrderTrackingController extends Controller
             return notFoundResponse(__('order.order_not_found'));
         }
 
-        if (! in_array($order->status, [\App\Enums\OrderStatus::PENDING->value, \App\Enums\OrderStatus::BRANCH_REVIEW->value], true)) {
+        if (! \App\Enums\OrderStatus::isClientEditable($order->status)) {
             return errorResponse(__('order.order_can_only_update_pending'), 400);
         }
 

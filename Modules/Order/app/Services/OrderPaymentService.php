@@ -4,6 +4,7 @@ namespace Modules\Order\Services;
 
 use App\Enums\PaymentMethod;
 use Illuminate\Support\Facades\DB;
+use Modules\Payment\Services\ActiveGatewayResolver;
 use Modules\Order\Exceptions\InsufficientWalletBalanceException;
 use Modules\Order\Models\Order;
 use Modules\Order\Models\OrderItem;
@@ -60,6 +61,7 @@ class OrderPaymentService
             PaymentMethod::STC_PAY->value,
             PaymentMethod::APPLE_PAY->value,
             PaymentMethod::SAMSUNG_PAY->value,
+            PaymentMethod::CREDIT_CARD->value,
         ];
     }
 
@@ -133,11 +135,23 @@ class OrderPaymentService
         return null;
     }
 
+    /**
+     * "credit_card" is the generic card option shown to the client when a gateway
+     * supports it directly. Moyasar accepts it as-is (PaymentMethod::CREDIT_CARD maps
+     * to its 'creditcard' source), so keep it unaliased there — storing/echoing the
+     * actual choice instead of a card brand the customer never confirmed. Payfort/APS
+     * has no generic card option and needs a concrete brand, so it still falls back
+     * to VISA there.
+     */
     private function normalizePaymentMethodAlias(string $method): string
     {
-        return $method === self::CREDIT_CARD_ALIAS
-            ? PaymentMethod::VISA->value
-            : $method;
+        if ($method !== self::CREDIT_CARD_ALIAS) {
+            return $method;
+        }
+
+        return ActiveGatewayResolver::name() === 'moyasar'
+            ? $method
+            : PaymentMethod::VISA->value;
     }
 
     /**

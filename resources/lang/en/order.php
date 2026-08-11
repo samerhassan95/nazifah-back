@@ -65,7 +65,7 @@ return [
     'order_cannot_cancel_status' => 'Order cannot be cancelled in current status',
     'order_updated_success' => 'Order updated successfully',
     'order_update_failed' => 'Failed to update order',
-    'order_can_only_update_pending' => 'Order can only be updated while pending or under branch review',
+    'order_can_only_update_pending' => 'Order can no longer be updated once the pickup driver has accepted the order',
     'delivery_route_retrieved' => 'Delivery route retrieved successfully',
     'no_delivery_address' => 'No delivery address found. Please provide a delivery address or set a default address',
     'estimated_time_retrieved' => 'Estimated time retrieved successfully',

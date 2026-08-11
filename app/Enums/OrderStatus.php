@@ -537,6 +537,30 @@ enum OrderStatus: string
         ];
     }
 
+    /**
+     * Statuses where the client may still edit order items — any point before
+     * the driver accepts the pickup.
+     *
+     * @return list<string>
+     */
+    public static function clientEditableStatusValues(): array
+    {
+        return [
+            self::PENDING->value,
+            self::BRANCH_REVIEW->value,
+            self::CONFIRMED->value,
+            self::WAITING_PAYMENT->value,
+            self::PAYMENT_CONFIRMED->value,
+            self::AWAITING_REMAINING_PAYMENT->value,
+            self::DRIVER_PICKUP_ASSIGNED->value,
+        ];
+    }
+
+    public static function isClientEditable(string $status): bool
+    {
+        return in_array($status, self::clientEditableStatusValues(), true);
+    }
+
     public static function forDriver(): array
     {
         return [

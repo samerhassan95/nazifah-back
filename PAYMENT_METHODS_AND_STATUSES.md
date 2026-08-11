@@ -40,6 +40,9 @@ Source: `App\Enums\PaymentMethod`
 | `apple_pay` | Apple Pay | Apple Pay |
 | `google_pay` | Google Pay | Google Pay |
 | `samsung_pay` | Samsung Pay | Samsung Pay |
+| `credit_card` | Credit Card | بطاقة ائتمانية |
+
+> `credit_card` is the generic "Credit Card" option shown when Moyasar is the active gateway (see [MOYASAR_INTEGRATION.md](MOYASAR_INTEGRATION.md)) — it collapses visa/mastercard/mada/apple_pay/samsung_pay into one tile. When the client sends `credit_card` and Moyasar is active, the order/transaction now stores `credit_card` as-is (any card brand is accepted on Moyasar's hosted page). When Payfort/APS is the active gateway (no generic card option), `credit_card` is still aliased to `visa` at checkout, since Payfort requires a concrete brand.
 
 ---
 

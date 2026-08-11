@@ -106,11 +106,12 @@ enum PaymentMethod: string
     }
 
     /**
-     * Check if this payment method requires Payfort gateway
+     * Check if this payment method routes through an external payment gateway
+     * (Payfort/APS or Moyasar, whichever is active — see getGatewayName()).
      */
     public function requiresPayfort(): bool
     {
-        return in_array($this->value, ['visa', 'mastercard', 'mada', 'stc_pay', 'apple_pay', 'google_pay', 'samsung_pay']);
+        return in_array($this->value, ['visa', 'mastercard', 'mada', 'stc_pay', 'apple_pay', 'google_pay', 'samsung_pay', 'credit_card']);
     }
 
     /**

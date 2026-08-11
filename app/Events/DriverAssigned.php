@@ -15,5 +15,6 @@ class DriverAssigned
         public readonly Order $order,
         public readonly Driver $driver,
         public readonly string $assignmentType, // 'pickup' or 'delivery'
+        public readonly ?int $previousDriverId = null,
     ) {}
 }

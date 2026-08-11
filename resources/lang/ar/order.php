@@ -65,7 +65,7 @@ return [
     'order_cannot_cancel_status' => 'لا يمكن إلغاء الطلب في الحالة الحالية',
     'order_updated_success' => 'تم تحديث الطلب بنجاح',
     'order_update_failed' => 'فشل تحديث الطلب',
-    'order_can_only_update_pending' => 'يمكن تحديث الطلب فقط عندما يكون في حالة الانتظار أو قيد مراجعة الفرع',
+    'order_can_only_update_pending' => 'لا يمكن تعديل الطلب بعد قبول سائق الاستلام له',
     'delivery_route_retrieved' => 'تم استرجاع مسار التسليم بنجاح',
     'no_delivery_address' => 'لم يتم العثور على عنوان تسليم. يرجى تقديم عنوان تسليم أو تعيين عنوان افتراضي',
     'estimated_time_retrieved' => 'تم استرجاع الوقت المقدر بنجاح',

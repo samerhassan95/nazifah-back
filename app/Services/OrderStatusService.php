@@ -204,6 +204,12 @@ class OrderStatusService
             throw new \LogicException(__('driver.driver_assignment_failed'));
         }
 
+        if (! in_array($currentStatus, OrderStatus::vendorPickupDriverAssignableStatuses(), true)) {
+            throw new \LogicException(__('driver.driver_assign_error_pickup_status', [
+                'status' => $currentStatus->localizedLabel(),
+            ]));
+        }
+
         $previousPickupDriverId = $order->pickup_driver_id;
         if ($previousPickupDriverId && (int) $previousPickupDriverId !== (int) $driver->id) {
             Driver::where('id', $previousPickupDriverId)->update(['is_available' => true]);
@@ -253,7 +259,7 @@ class OrderStatusService
             $driver->id
         );
 
-        $this->dispatchEvent(new DriverAssigned($order, $driver, 'pickup'));
+        $this->dispatchEvent(new DriverAssigned($order, $driver, 'pickup', $previousPickupDriverId ? (int) $previousPickupDriverId : null));
 
         return $order;
     }
@@ -273,6 +279,12 @@ class OrderStatusService
 
         if ($currentStatus === OrderStatus::CANCELLED) {
             throw new \LogicException(__('driver.driver_assignment_failed'));
+        }
+
+        if (! in_array($currentStatus, OrderStatus::vendorDeliveryDriverAssignableStatuses(), true)) {
+            throw new \LogicException(__('driver.driver_assign_error_delivery_status', [
+                'status' => $currentStatus->localizedLabel(),
+            ]));
         }
 
         $previousDeliveryDriverId = $order->delivery_driver_id;
@@ -327,7 +339,7 @@ class OrderStatusService
             $driver->id
         );
 
-        $this->dispatchEvent(new DriverAssigned($order, $driver, 'delivery'));
+        $this->dispatchEvent(new DriverAssigned($order, $driver, 'delivery', $previousDeliveryDriverId ? (int) $previousDeliveryDriverId : null));
 
         return $order;
     }
