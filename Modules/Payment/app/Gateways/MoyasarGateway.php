@@ -329,7 +329,10 @@ class MoyasarGateway extends AbstractPaymentGateway
             'currency' => $currency,
             'description' => $this->buildDescription($request, $merchantReference),
             'callback_url' => $callbackUrl,
-            'methods' => ! empty($methods) ? $methods : ['creditcard'],
+            // An empty $methods means "unrestricted" (see mapToMoyasarAllowedMethods) —
+            // show every method enabled on the Moyasar account, not card-only, so
+            // Samsung Pay/Apple Pay/STC Pay/mada still render on the embedded widget.
+            'methods' => ! empty($methods) ? $methods : ['creditcard', 'mada', 'stcpay', 'applepay', 'samsungpay'],
             'metadata' => $metadata,
         ];
 
