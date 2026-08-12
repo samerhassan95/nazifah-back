@@ -1862,12 +1862,17 @@ class OrderController extends Controller
         $handoffActions = $handoffService->availableActions($order);
         $deliveryInfo = $this->buildDeliveryInfo($order, $locale);
 
+        $invoiceSummary = $order->status === OrderStatus::COMPLETED->value
+            ? $this->completedOrderInvoiceSummary($order)
+            : null;
+
         return successResponse(array_merge([
             'id' => $order->id,
             'status' => $order->status,
             'status_label' => $order->status_label,
             'branch_id' => $order->branch_id,
             'order_number' => $order->order_number,
+            'invoice' => $invoiceSummary,
             'total_price' => $subtotal,
             'total_amount' => (float) $order->total_amount,
             'discount_amount' => (float) $order->discount_amount,
