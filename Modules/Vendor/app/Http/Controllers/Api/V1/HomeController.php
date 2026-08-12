@@ -366,8 +366,7 @@ class HomeController extends Controller
                 $query->where('status', $status);
             }
         } else {
-            $query->whereIn('status', OrderStatus::newOrderStatuses())
-                ->whereNull('driver_id');
+            $query->whereIn('status', OrderStatus::newOrderStatuses());
         }
 
         $orders = $query->with([
