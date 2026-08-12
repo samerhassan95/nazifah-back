@@ -4210,15 +4210,40 @@ class OrderController extends Controller
                 return errorResponse($e->userMessage(), 400);
             }
 
-            return successResponse(array_merge([
-                'order_id' => $order->id,
-                'order_number' => $order->order_number,
-                'status' => $order->fresh()->status,
-                'status_label' => OrderStatus::fromString($order->fresh()->status)?->localizedLabel($order->payment_method) ?? $order->fresh()->status,
-            ], $order->fresh()->clientVisitResponseFields()), __('order.receipt_accepted'));
+            $freshOrder = $order->fresh();
+
+            $responseData = array_merge([
+                'order_id' => $freshOrder->id,
+                'order_number' => $freshOrder->order_number,
+                'status' => $freshOrder->status,
+                'status_label' => OrderStatus::fromString($freshOrder->status)?->localizedLabel($order->payment_method) ?? $freshOrder->status,
+            ], $freshOrder->clientVisitResponseFields());
+
+            if ($freshOrder->status === OrderStatus::COMPLETED->value) {
+                $responseData['invoice'] = $this->completedOrderInvoiceSummary($freshOrder);
+            }
+
+            return successResponse($responseData, __('order.receipt_accepted'));
         }
 
         return errorResponse(__('order.invalid_status'), 400);
+    }
+
+    /**
+     * Build the ZATCA tax invoice summary attached to responses once an order is completed.
+     */
+    private function completedOrderInvoiceSummary(Order $order): ?array
+    {
+        try {
+            return app(\Modules\Invoice\Services\InvoiceService::class)->invoiceSummaryForOrder($order);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to build invoice summary for completed order', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**

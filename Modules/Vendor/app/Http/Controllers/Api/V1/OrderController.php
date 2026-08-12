@@ -2120,14 +2120,37 @@ class OrderController extends Controller
 
         $order = $order->fresh();
 
-        return successResponse(array_merge([
+        $responseData = array_merge([
             'id' => $order->id,
             'status' => $order->status,
             'status_label' => $order->status_label,
             'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             ...$this->vendorHandoffMeta($order, $handoffService),
-        ], $order->handoffResponseFields()), __('order.order_status_updated'));
+        ], $order->handoffResponseFields());
+
+        if ($order->status === OrderStatus::COMPLETED->value) {
+            $responseData['invoice'] = $this->completedOrderInvoiceSummary($order);
+        }
+
+        return successResponse($responseData, __('order.order_status_updated'));
+    }
+
+    /**
+     * Build the ZATCA tax invoice summary attached to responses once an order is completed.
+     */
+    private function completedOrderInvoiceSummary(Order $order): ?array
+    {
+        try {
+            return app(\Modules\Invoice\Services\InvoiceService::class)->invoiceSummaryForOrder($order);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to build invoice summary for completed order', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     public function accept(Request $request, $orderId): JsonResponse

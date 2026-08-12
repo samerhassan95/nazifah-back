@@ -228,6 +228,25 @@ class InvoiceService
         );
     }
 
+    /**
+     * Summary of the ZATCA tax invoice for an order, meant to be embedded in
+     * responses that report the order as completed (e.g. status-update endpoints).
+     */
+    public function invoiceSummaryForOrder(Order $order): array
+    {
+        $invoice = $this->createOrFetchForOrder($order);
+
+        return [
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'share_url' => $this->shareUrl($invoice),
+            'issued_at' => optional($invoice->issued_at)->toIso8601String(),
+            'status' => $invoice->status,
+            'zatca_status' => $invoice->zatca_status,
+            'total_amount' => (float) $invoice->total_amount,
+        ];
+    }
+
     private function generateInvoiceNumber(Order $order): string
     {
         return 'INV-'.$order->id.'-'.now()->format('YmdHis');
