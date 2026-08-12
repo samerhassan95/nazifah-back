@@ -12,6 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust the local nginx reverse proxy so scheme/host detection (and
+        // therefore signed URL verification, e.g. invoice share links) is
+        // correct behind SSL termination.
+        $middleware->trustProxies(at: '*');
+
         $middleware->prepend(\App\Http\Middleware\ForceJsonResponse::class);
 
         $middleware->api(prepend: [
