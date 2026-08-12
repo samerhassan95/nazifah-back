@@ -1291,20 +1291,15 @@ class OrderTrackingController extends Controller
     }
 
     /**
-     * Status to apply after a client edit. Orders still in initial review stay
-     * pending; orders already past that (confirmed, driver assigned, etc.) go to
-     * branch_review instead of pending, so the edit still sends them back for
-     * vendor re-review without dropping them out of the vendor's "current" list
-     * or orphaning an already-assigned driver (pending is excluded from
-     * OrderStatus::vendorCurrentStatusValues()).
+     * Status to apply after a client edit: always back to pending for a full
+     * vendor re-review. Any driver already assigned (driver_id/pickup_driver_id/
+     * delivery_driver_id) is left untouched — Order::scopeVendorCurrent() keeps
+     * such pending-but-assigned orders visible in the vendor's "current" list
+     * even though pending is otherwise excluded from vendorCurrentStatusValues().
      */
     private function postEditStatus(Order $order): OrderStatus
     {
-        $current = OrderStatus::tryFrom($order->status);
-
-        return in_array($current, [OrderStatus::PENDING, OrderStatus::BRANCH_REVIEW], true)
-            ? OrderStatus::PENDING
-            : OrderStatus::BRANCH_REVIEW;
+        return OrderStatus::PENDING;
     }
 
     /**

@@ -600,7 +600,11 @@ class Order extends Model
     }
 
     /**
-     * Vendor tab: active orders (accepted, in progress). Excludes pending and finished.
+     * Vendor tab: active orders (accepted, in progress). Excludes pending and finished,
+     * except a pending order that already has a driver assigned — a client edit resets
+     * status to pending for re-review but leaves the driver assignment in place, and it
+     * must stay visible here rather than falling into the "new orders" tab (which only
+     * shows driver-less pending orders).
      */
     public function scopeVendorCurrent($query)
     {
@@ -611,6 +615,14 @@ class Order extends Model
                         ->where('delivery_at_vendor', true)
                         ->whereNull('client_delivery_handoff_at')
                         ->whereNull('vendor_client_delivery_handoff_at');
+                })
+                ->orWhere(function ($q3) {
+                    $q3->where('status', OrderStatus::PENDING->value)
+                        ->where(function ($q4) {
+                            $q4->whereNotNull('driver_id')
+                                ->orWhereNotNull('pickup_driver_id')
+                                ->orWhereNotNull('delivery_driver_id');
+                        });
                 });
         });
     }
