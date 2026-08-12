@@ -1620,6 +1620,7 @@ class OrderPaymentService
                 $authorized = (float) ($transaction->authorized_amount ?: $transaction->amount);
                 $result = $this->refundGatewayOrWalletFallback($order, $transaction, $authorized, $reason);
                 if ($result['amount'] > 0) {
+                    $this->markTransactionLegRefunded($transaction, $result);
                     $refundLines[] = $result;
                 }
 
@@ -1631,6 +1632,7 @@ class OrderPaymentService
                 if ($refundable > 0) {
                     $result = $this->refundGatewayOrWalletFallback($order, $transaction, $refundable, $reason);
                     if ($result['amount'] > 0) {
+                        $this->markTransactionLegRefunded($transaction, $result);
                         $refundLines[] = $result;
                     }
                 }
@@ -2120,6 +2122,27 @@ class OrderPaymentService
         }
 
         $leg->update($updates);
+    }
+
+    /**
+     * Keep the OrderPayment leg ledger in sync after a successful (non-wallet-fallback)
+     * gateway refund on a PaymentTransaction. Without this, a card leg stays 'paid' even
+     * though its money was refunded via the gateway, unlike wallet/COD legs which are
+     * updated inline — see refundOrderOnCancellation().
+     */
+    private function markTransactionLegRefunded(PaymentTransaction $transaction, array $result): void
+    {
+        if (($result['amount'] ?? 0) <= 0) {
+            return;
+        }
+        if (($result['method'] ?? '') !== 'gateway' || ($result['gateway_failed'] ?? false)) {
+            return;
+        }
+
+        $leg = OrderPayment::where('payment_transaction_id', $transaction->id)->first();
+        if ($leg) {
+            $this->markLegPartialRefund($leg, (float) $result['amount']);
+        }
     }
 
     private function reduceCodLegAmount(OrderPayment $leg, float $amount): void
