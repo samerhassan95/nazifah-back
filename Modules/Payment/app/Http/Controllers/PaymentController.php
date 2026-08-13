@@ -603,6 +603,14 @@ class PaymentController extends Controller
 
                                 $transaction->update(['order_id' => $order->id]);
 
+                                // The order is built from the pending order's originally-stored
+                                // payment_method (e.g. generic "credit_card"), which predates the
+                                // brand resolution above — sync it now so the order reflects the
+                                // actual gateway-confirmed method (visa/mastercard/mada).
+                                if ($transaction->payment_method && $order->payment_method !== $transaction->payment_method) {
+                                    $order->update(['payment_method' => $transaction->payment_method]);
+                                }
+
                                 // Payment status is updated on the transaction above.
                                 // Order workflow stays PENDING until the client confirms.
                             });
