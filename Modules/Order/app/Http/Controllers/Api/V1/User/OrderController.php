@@ -3127,7 +3127,11 @@ class OrderController extends Controller
 
         DB::beginTransaction();
         try {
-            $paymentMethod = $request->payment_method;
+            // Same conditional alias as the split/surcharge paths: Payfort has no
+            // generic card option and needs a concrete brand, Moyasar accepts
+            // "credit_card" as-is (see OrderPaymentService::normalizePaymentMethodAlias()).
+            $paymentMethod = $this->orderPaymentService->normalizePaymentMethodsInput($request->payment_method)[0]
+                ?? $request->payment_method;
 
             // Handle different payment methods
             if ($paymentMethod === PaymentMethod::CASH_ON_DELIVERY->value) {

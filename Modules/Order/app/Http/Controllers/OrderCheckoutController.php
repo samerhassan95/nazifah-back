@@ -155,6 +155,19 @@ class OrderCheckoutController extends Controller
 
             $transaction->update($updateData);
 
+            // Moyasar's generic "credit_card" tile only reveals the actual scheme
+            // (visa/mastercard/mada) once the gateway confirms the payment — correct
+            // the stored method now so the order/transaction reflect what was really used.
+            if ($response->isSuccessful() && $transaction->payment_method === \App\Enums\PaymentMethod::CREDIT_CARD->value) {
+                $resolvedBrand = \App\Enums\PaymentMethod::resolveBrandFromMoyasarSource($response->data['source'] ?? null);
+                if ($resolvedBrand) {
+                    $transaction->update(['payment_method' => $resolvedBrand->value]);
+                    if ($order) {
+                        $order->update(['payment_method' => $resolvedBrand->value]);
+                    }
+                }
+            }
+
             if ($response->isSuccessful() && ! $order) {
                 $pOrderId = $transaction->response_data['pending_order_id'] ?? null;
                 if (! $pOrderId) {

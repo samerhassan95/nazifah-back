@@ -3,6 +3,7 @@
 namespace Modules\Payment\Http\Controllers;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Services\OrderNotificationService;
 use Illuminate\Http\Request;
@@ -490,6 +491,23 @@ class PaymentController extends Controller
             }
 
             $transaction->update($updateData);
+
+            // Moyasar's generic "credit_card" tile only reveals the actual scheme
+            // (visa/mastercard/mada) once the gateway confirms the payment — correct
+            // the stored method now so the order/transaction/leg reflect what was really used.
+            if ($response->isSuccessful() && $transaction->payment_method === PaymentMethod::CREDIT_CARD->value) {
+                $resolvedBrand = PaymentMethod::resolveBrandFromMoyasarSource($response->data['source'] ?? null);
+                if ($resolvedBrand) {
+                    $transaction->update(['payment_method' => $resolvedBrand->value]);
+
+                    OrderPayment::where('payment_transaction_id', $transaction->id)
+                        ->update(['payment_method' => $resolvedBrand->value]);
+
+                    if ($order && ! $transaction->is_additional_charge) {
+                        $order->update(['payment_method' => $resolvedBrand->value]);
+                    }
+                }
+            }
 
             if ($response->isSuccessful() && $tokenName) {
                 $this->clientCardService->upsertFromPaymentTransaction(

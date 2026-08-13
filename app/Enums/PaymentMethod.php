@@ -139,4 +139,29 @@ enum PaymentMethod: string
     {
         return in_array($this, [self::VISA, self::MASTERCARD, self::MADA], true);
     }
+
+    /**
+     * Resolve the actual card brand from Moyasar's verified `source` object, so a
+     * generic CREDIT_CARD selection can be corrected to the concrete scheme the
+     * customer actually paid with (visa/mastercard/mada) once the gateway confirms it.
+     *
+     * ⚠️ CONFIRM `company` values against real Moyasar payloads — their docs use
+     * "visa" / "master" / "mada" / "amex"; "mastercard" is accepted defensively too.
+     */
+    public static function resolveBrandFromMoyasarSource(?array $source): ?self
+    {
+        if (! $source) {
+            return null;
+        }
+
+        $company = strtolower((string) ($source['company'] ?? ''));
+        $type = strtolower((string) ($source['type'] ?? ''));
+
+        return match (true) {
+            $company === 'visa' => self::VISA,
+            in_array($company, ['master', 'mastercard'], true) => self::MASTERCARD,
+            $company === 'mada' || $type === 'mada' => self::MADA,
+            default => null,
+        };
+    }
 }
