@@ -938,8 +938,13 @@ class HomeController extends Controller
             return notFoundResponse(__('order.order_not_found'));
         }
 
+        // When re-assigning, hide the driver already assigned on the current leg
+        // so the vendor can pick a different one.
+        $excludeDriverId = $this->resolveCurrentlyAssignedDriverIdForAvailableList($order);
+
         $drivers = Driver::where('branch_id', $order->branch_id)
             ->where('is_available', true)
+            ->when($excludeDriverId, fn ($query) => $query->where('id', '!=', $excludeDriverId))
             ->get()
             ->map(function ($driver) {
                 $lang = app()->getLocale();
@@ -1214,5 +1219,33 @@ class HomeController extends Controller
             OrderStatus::PICKED_UP,
             OrderStatus::DELIVERED,
         ], true);
+    }
+
+    /**
+     * Driver already assigned on the active assignment leg — exclude from available list
+     * so re-assignment cannot offer the same driver again.
+     */
+    private function resolveCurrentlyAssignedDriverIdForAvailableList(Order $order): ?int
+    {
+        $status = OrderStatus::tryFrom($order->status);
+
+        if ($status === OrderStatus::DRIVER_PICKUP_ASSIGNED && $order->pickup_driver_id) {
+            return (int) $order->pickup_driver_id;
+        }
+
+        if ($status === OrderStatus::DRIVER_DELIVERY_ASSIGNED && $order->delivery_driver_id) {
+            return (int) $order->delivery_driver_id;
+        }
+
+        // Broader re-assign cases on the same leg (accepted / on the way / postponed, etc.)
+        if ($this->orderIsOnDeliveryLeg($order) && $order->delivery_driver_id) {
+            return (int) $order->delivery_driver_id;
+        }
+
+        if ($order->pickup_driver_id && ! $this->orderIsOnDeliveryLeg($order)) {
+            return (int) $order->pickup_driver_id;
+        }
+
+        return null;
     }
 }
