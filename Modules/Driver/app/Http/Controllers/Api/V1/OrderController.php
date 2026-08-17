@@ -689,6 +689,7 @@ class OrderController extends Controller
             'payment_method' => $order->payment_method ?? 'cash_on_delivery',
             'payment_status' => $order->payment_status ?? 'pending',
             'payment_status_label' => \App\Support\PaymentStatusPresenter::label($order->payment_status ?? 'pending'),
+            'payment_breakdown' => $order->paymentBreakdownForApi(),
         ];
 
         // Add branch location info (always available)
@@ -797,6 +798,7 @@ class OrderController extends Controller
             $response['order_info']['payment_method'] = $order->payment_method ?? 'cash_on_delivery';
             $response['order_info']['payment_status'] = $order->payment_status ?? 'pending';
             $response['order_info']['payment_status_label'] = \App\Support\PaymentStatusPresenter::label($order->payment_status ?? 'pending');
+            $response['order_info']['payment_breakdown'] = $order->paymentBreakdownForApi();
         }
 
         // Items info — exclude laundry-rejected pieces/services from driver delivery view
@@ -840,6 +842,7 @@ class OrderController extends Controller
         $response['pieces_count'] = \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($deliverableItems);
 
         $response['delivery_fee'] = (float) $order->getDeliveryFeeForDriver($driver->id);
+        $response['payment_breakdown'] = $order->paymentBreakdownForApi();
 
         if ($order->payment_method === 'cash_on_delivery') {
             $response['payment_collection'] = [

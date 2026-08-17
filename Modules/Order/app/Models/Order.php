@@ -447,6 +447,17 @@ class Order extends Model
     }
 
     /**
+     * Wallet vs card vs cash amounts for order detail / tracking screens.
+     *
+     * @return array<string, mixed>
+     */
+    public function paymentBreakdownForApi(): array
+    {
+        return app(\Modules\Order\Services\OrderPaymentService::class)
+            ->buildOrderPaymentBreakdownForApi($this);
+    }
+
+    /**
      * Merge newly used methods into the stored payment_methods list.
      *
      * @param  list<string>  $methods

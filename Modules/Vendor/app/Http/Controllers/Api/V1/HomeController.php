@@ -887,6 +887,7 @@ class HomeController extends Controller
             'payment_method' => $order->payment_method,
             'payment_status' => $order->payment_status ?? 'pending',
             'payment_status_label' => \App\Support\PaymentStatusPresenter::label($order->payment_status ?? 'pending'),
+            'payment_breakdown' => $order->paymentBreakdownForApi(),
             'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             'driver_id' => $order->driver_id,

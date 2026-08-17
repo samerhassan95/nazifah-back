@@ -1792,6 +1792,7 @@ class OrderController extends Controller
                 'payment_method' => $order->payment_method,
                 'payment_status' => $order->payment_status ?? 'pending',
                 'payment_status_label' => \App\Support\PaymentStatusPresenter::label($order->payment_status ?? 'pending'),
+                'payment_breakdown' => $order->paymentBreakdownForApi(),
                 'gateway_payments' => $paymentBreakdown['gateway_payments'],
                 'wallet_payments' => $paymentBreakdown['wallet_payments'],
                 'payment_legs' => $paymentBreakdown['payment_legs'],

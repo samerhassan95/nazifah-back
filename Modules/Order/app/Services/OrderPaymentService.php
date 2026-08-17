@@ -535,6 +535,97 @@ class OrderPaymentService
     }
 
     /**
+     * Compact payment breakdown for order detail / tracking UIs.
+     *
+     * @return array{
+     *     payment_method: ?string,
+     *     payment_methods: list<string>,
+     *     wallet_amount: float,
+     *     credit_card_amount: float,
+     *     cash_amount: float,
+     *     total_amount: float,
+     *     final_amount: float,
+     *     is_split_payment: bool,
+     *     currency: string
+     * }
+     */
+    public function buildOrderPaymentBreakdownForApi(Order $order): array
+    {
+        $finalAmount = round((float) $order->final_amount, 2);
+        $usePaidLegsOnly = ($order->payment_status ?? 'pending') === 'paid';
+
+        $query = OrderPayment::where('order_id', $order->id);
+        if ($usePaidLegsOnly) {
+            $query->where('status', OrderPayment::STATUS_PAID);
+        } else {
+            $query->whereNotIn('status', [
+                OrderPayment::STATUS_FAILED,
+                OrderPayment::STATUS_CANCELLED,
+                OrderPayment::STATUS_REFUNDED,
+            ]);
+        }
+
+        $walletAmount = 0.0;
+        $creditCardAmount = 0.0;
+        $cashAmount = 0.0;
+
+        foreach ($query->get() as $leg) {
+            $amount = (float) $leg->amount;
+            $method = (string) $leg->payment_method;
+
+            if ($this->isWalletMethod($method)) {
+                $walletAmount += $amount;
+
+                continue;
+            }
+
+            if ($this->isCodMethod($method)) {
+                $cashAmount += $amount;
+
+                continue;
+            }
+
+            if ($this->isGatewayMethod($method)) {
+                $creditCardAmount += $amount;
+
+                continue;
+            }
+
+            $creditCardAmount += $amount;
+        }
+
+        if ($walletAmount <= 0 && $creditCardAmount <= 0 && $cashAmount <= 0) {
+            $method = (string) ($order->payment_method ?? '');
+            if ($this->isWalletMethod($method)) {
+                $walletAmount = $finalAmount;
+            } elseif ($this->isCodMethod($method)) {
+                $cashAmount = $finalAmount;
+            } elseif ($method !== '') {
+                $creditCardAmount = $finalAmount;
+            }
+        }
+
+        $walletAmount = round($walletAmount, 2);
+        $creditCardAmount = round($creditCardAmount, 2);
+        $cashAmount = round($cashAmount, 2);
+        $sourcesWithAmount = collect([$walletAmount, $creditCardAmount, $cashAmount])
+            ->filter(fn ($amount) => $amount > 0)
+            ->count();
+
+        return [
+            'payment_method' => $order->payment_method,
+            'payment_methods' => $order->resolvedPaymentMethods(),
+            'wallet_amount' => $walletAmount,
+            'credit_card_amount' => $creditCardAmount,
+            'cash_amount' => $cashAmount,
+            'total_amount' => round($walletAmount + $creditCardAmount + $cashAmount, 2),
+            'final_amount' => $finalAmount,
+            'is_split_payment' => $sourcesWithAmount > 1,
+            'currency' => 'SAR',
+        ];
+    }
+
+    /**
      * @deprecated Use buildSplitPaymentResponse() — kept as alias for order-update surcharges.
      *
      * @param  array<int, array<string, mixed>>  $gatewayPayments

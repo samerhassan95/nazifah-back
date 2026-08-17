@@ -283,6 +283,7 @@ class OrderTrackingController extends Controller
             'final_amount' => (float) $order->final_amount,
             'distance' => $order->distance !== null ? (float) $order->distance : 0,
             ...$order->paymentFieldsForApi(),
+            'payment_breakdown' => $order->paymentBreakdownForApi(),
             'payment_status' => $order->payment_status ?? 'pending',
             'payment_status_label' => \App\Support\PaymentStatusPresenter::label($order->payment_status ?? 'pending'),
             'notes' => $order->notes,
