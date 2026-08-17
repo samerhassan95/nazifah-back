@@ -42,4 +42,15 @@ return [
     */
     'otp_channel' => env('OTP_CHANNEL', 'sms'),
 
+    /*
+    | Order/system notifications over the same Deewan SMS sender used for OTP.
+    | Push (FCM) stays enabled. WhatsApp is not used for these yet.
+    */
+    'notification_sms' => [
+        'enabled' => env('NOTIFICATION_SMS_ENABLED', true),
+        'audiences' => env('NOTIFICATION_SMS_AUDIENCES', 'client,vendor,driver,admin'),
+        // "*" = every notification type (same events as FCM).
+        'types' => env('NOTIFICATION_SMS_TYPES', '*'),
+    ],
+
 ];

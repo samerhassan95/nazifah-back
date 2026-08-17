@@ -22,7 +22,10 @@ class UserNotificationService
 
     private const NEW_ORDER_ANDROID_CHANNEL = 'new_order_channel';
 
-    public function __construct(protected FirebaseService $firebaseService) {}
+    public function __construct(
+        protected FirebaseService $firebaseService,
+        protected NotificationSmsService $notificationSms,
+    ) {}
 
     /**
      * Persist in-app notification and send FCM push to all user devices.
@@ -71,6 +74,20 @@ class UserNotificationService
             $this->pushToUser($user, $titleAr, $titleEn, $bodyAr, $bodyEn, $pushData);
         } catch (\Throwable $e) {
             $this->logWarning('Notification FCM push failed', $userType, (int) $user->id, $e);
+        }
+
+        try {
+            $this->notificationSms->sendIfEnabled(
+                $user,
+                $userType,
+                $titleAr,
+                $titleEn,
+                $bodyAr,
+                $bodyEn,
+                $data
+            );
+        } catch (\Throwable $e) {
+            $this->logWarning('Notification SMS failed', $userType, (int) $user->id, $e);
         }
     }
 
