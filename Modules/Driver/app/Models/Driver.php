@@ -36,6 +36,7 @@ class Driver extends Authenticatable
         'image',
         'latitude',
         'longitude',
+        'location',
         'is_available',
         'is_banned',
         'ban_reason',
@@ -46,7 +47,7 @@ class Driver extends Authenticatable
         'otp_expires_at',
     ];
 
-    public $translatable = ['full_name'];
+    public $translatable = ['full_name', 'location'];
 
     protected $hidden = [
         'otp_code',

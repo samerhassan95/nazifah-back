@@ -19,21 +19,29 @@ class LocationController extends Controller
         $validator = Validator::make($request->all(), [
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'location_text' => ['nullable', 'string', 'max:500'],
         ]);
 
         if ($validator->fails()) {
             return validationErrorResponse($validator->errors());
         }
 
-        $driver->update([
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-        ]);
+        $driver->latitude = $request->latitude;
+        $driver->longitude = $request->longitude;
+
+        $addressText = $request->input('address', $request->input('location_text'));
+        if (is_string($addressText) && trim($addressText) !== '') {
+            $driver->setTranslation('location', app()->getLocale(), trim($addressText));
+        }
+
+        $driver->save();
 
         return successResponse([
             'location' => [
                 'latitude' => $driver->latitude,
                 'longitude' => $driver->longitude,
+                'address' => $driver->location,
             ],
         ], 'Location updated successfully');
     }

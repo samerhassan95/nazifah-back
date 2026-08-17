@@ -932,7 +932,9 @@ class HomeController extends Controller
         $vendorId = $employee->vendor_id;
         $branchIds = Branch::where('vendor_id', $vendorId)->pluck('id');
 
-        $order = Order::whereIn('branch_id', $branchIds)->find($request->order_id);
+        $order = Order::with(['pickupAddress', 'deliveryAddress', 'branch'])
+            ->whereIn('branch_id', $branchIds)
+            ->find($request->order_id);
 
         if (! $order) {
             return notFoundResponse(__('order.order_not_found'));
@@ -941,19 +943,33 @@ class HomeController extends Controller
         // When re-assigning, hide the driver already assigned on the current leg
         // so the vendor can pick a different one.
         $excludeDriverId = $this->resolveCurrentlyAssignedDriverIdForAvailableList($order);
+        $assignmentLeg = $this->resolveDriversAvailableAssignmentLeg($order);
+        $sortReference = $assignmentLeg
+            ? $this->resolveDriversAvailableSortCoordinates($order, $assignmentLeg)
+            : null;
 
         $drivers = Driver::where('branch_id', $order->branch_id)
             ->where('is_available', true)
             ->when($excludeDriverId, fn ($query) => $query->where('id', '!=', $excludeDriverId))
             ->get()
-            ->map(function ($driver) {
+            ->map(function ($driver) use ($sortReference) {
                 $lang = app()->getLocale();
+                $distanceKm = null;
+
+                if ($sortReference && $driver->latitude && $driver->longitude) {
+                    $distanceKm = round($this->calculateDistance(
+                        $sortReference['latitude'],
+                        $sortReference['longitude'],
+                        (float) $driver->latitude,
+                        (float) $driver->longitude
+                    ), 2);
+                }
 
                 return [
                     'driver_id' => $driver->id,
                     'name' => $driver->getTranslation('full_name', $lang),
                     'rating' => (float) ($driver->rating ?? 0),
-                    'location_text' => null,
+                    'location_text' => $this->formatDriverLocationText($driver),
                     'image' => $this->uploadFilesService->getFullUrl($driver->image),
                     'branch_id' => $driver->branch_id,
                     'phone' => $driver->phone,
@@ -961,12 +977,22 @@ class HomeController extends Controller
                     'email' => $driver->email,
                     'latitude' => $driver->latitude ? (float) $driver->latitude : null,
                     'longitude' => $driver->longitude ? (float) $driver->longitude : null,
+                    'distance_km' => $distanceKm,
                     'total_orders' => (int) $driver->total_orders,
                 ];
-            });
+            })
+            ->sortBy(function ($driver) {
+                return $driver['distance_km'] ?? PHP_FLOAT_MAX;
+            })
+            ->values();
 
         $address = null;
-        if ($order->pickupAddress) {
+        if ($assignmentLeg === 'delivery' && $order->branch) {
+            $branchLocation = $order->branch->location;
+            $address = is_array($branchLocation)
+                ? ($branchLocation[app()->getLocale()] ?? $branchLocation['ar'] ?? $branchLocation['en'] ?? null)
+                : $branchLocation;
+        } elseif ($order->pickupAddress) {
             $address = $order->pickupAddress->street_name ?: ($order->pickupAddress->building_number ?: $order->pickupAddress->national_address);
         } elseif ($order->deliveryAddress) {
             $address = $order->deliveryAddress->street_name ?: ($order->deliveryAddress->building_number ?: $order->deliveryAddress->national_address);
@@ -975,6 +1001,8 @@ class HomeController extends Controller
         return successResponse([
             'order_id' => $order->id,
             'branch_id' => $order->branch_id,
+            'assignment_leg' => $assignmentLeg,
+            'sort_reference' => $sortReference['reference'] ?? null,
             'address' => $address,
             'drivers' => $drivers,
         ], __('vendor.available_drivers_retrieved'));
@@ -1166,6 +1194,77 @@ class HomeController extends Controller
             });
 
         return successResponse($reviews, __('vendor.reviews_retrieved'));
+    }
+
+    /**
+     * Pickup leg: nearest to customer. Delivery leg: nearest to branch (laundry).
+     */
+    private function resolveDriversAvailableAssignmentLeg(Order $order): ?string
+    {
+        if ($this->orderIsOnDeliveryLeg($order) && $order->needsDeliveryDriver()) {
+            return 'delivery';
+        }
+
+        if ($order->needsPickupDriver()) {
+            return 'pickup';
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{latitude: float, longitude: float, reference: string}|null
+     */
+    private function resolveDriversAvailableSortCoordinates(Order $order, string $leg): ?array
+    {
+        if ($leg === 'delivery') {
+            $branch = $order->branch;
+            if ($branch?->latitude && $branch?->longitude) {
+                return [
+                    'latitude' => (float) $branch->latitude,
+                    'longitude' => (float) $branch->longitude,
+                    'reference' => 'branch',
+                ];
+            }
+
+            return null;
+        }
+
+        $address = $order->pickupAddress ?? $order->deliveryAddress;
+        if ($address?->latitude && $address?->longitude) {
+            return [
+                'latitude' => (float) $address->latitude,
+                'longitude' => (float) $address->longitude,
+                'reference' => 'customer',
+            ];
+        }
+
+        return null;
+    }
+
+    private function formatDriverLocationText(Driver $driver): ?string
+    {
+        $lang = app()->getLocale();
+
+        if (method_exists($driver, 'getTranslation')) {
+            $text = $driver->getTranslation('location', $lang, false);
+            if (is_string($text) && trim($text) !== '') {
+                return trim($text);
+            }
+
+            foreach (['ar', 'en'] as $fallbackLang) {
+                $text = $driver->getTranslation('location', $fallbackLang, false);
+                if (is_string($text) && trim($text) !== '') {
+                    return trim($text);
+                }
+            }
+        }
+
+        if ($driver->latitude && $driver->longitude) {
+            return sprintf('%.5f, %.5f', (float) $driver->latitude, (float) $driver->longitude);
+        }
+
+        return null;
     }
 
     /**
