@@ -130,23 +130,33 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             var config = @json($moyasarConfig);
-            
-            // Initialize Moyasar Payment Form
-            Moyasar.init({
+            var init = {
                 element: '.mysr-form',
                 amount: config.amount,
                 currency: config.currency,
                 description: config.description,
                 publishable_api_key: config.publishable_api_key,
                 callback_url: config.callback_url,
-                methods: config.methods,
-                metadata: config.metadata,
-                apple_pay: {
-                    country: 'SA',
-                    label: 'Nathefah',
-                    validate_merchant_url: 'https://api.moyasar.com/v1/applepay/initiate'
-                }
-            });
+                methods: config.methods || ['creditcard', 'mada', 'stcpay', 'applepay', 'samsungpay'],
+                metadata: config.metadata || {},
+                language: config.language || 'ar',
+                supported_networks: config.supported_networks || ['mada', 'visa', 'mastercard']
+            };
+
+            if (config.invoice_id) {
+                init.invoice_id = config.invoice_id;
+            }
+            if (config.manual) {
+                init.manual = config.manual;
+            }
+            if (config.apple_pay) {
+                init.apple_pay = config.apple_pay;
+            }
+            if (config.samsung_pay) {
+                init.samsung_pay = config.samsung_pay;
+            }
+
+            Moyasar.init(init);
         });
     </script>
 </body>

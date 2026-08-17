@@ -91,6 +91,12 @@ return [
             // client's OWN page, so no hosted URL / invoice id is produced. The web
             // frontend must render the moyasar.js form for this to work.
             'mode' => env('MOYASAR_INTEGRATION_MODE', 'invoice'),
+            // Samsung Pay (moyasar.js). Service ID comes from Moyasar Dashboard after
+            // Samsung Pay is enabled on the account. Without it the button is hidden.
+            'samsung_pay_service_id' => env('MOYASAR_SAMSUNG_PAY_SERVICE_ID', ''),
+            'samsung_pay_label' => env('MOYASAR_SAMSUNG_PAY_LABEL', 'Nathefah'),
+            'samsung_pay_country' => env('MOYASAR_SAMSUNG_PAY_COUNTRY', 'SA'),
+            'samsung_pay_environment' => env('MOYASAR_SAMSUNG_PAY_ENVIRONMENT', 'PRODUCTION'),
             // PURCHASE = charge immediately (default, universally supported).
             // AUTHORIZATION = hold then capture/void — REQUIRES Moyasar manual capture
             // enabled on the account (confirm before using). Mirrors AMAZON_PAY_COMMAND.

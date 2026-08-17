@@ -825,6 +825,33 @@ class PaymentController extends Controller
     }
 
     /**
+     * Local Moyasar checkout (moyasar.js). Used for hosted_local mode and for
+     * invoice payments so Samsung Pay / Apple Pay / STC Pay can render.
+     */
+    public function showMoyasarCheckout(string $transactionId)
+    {
+        $transaction = PaymentTransaction::query()
+            ->where('transaction_id', $transactionId)
+            ->first();
+
+        if (! $transaction) {
+            abort(404, 'Checkout session not found');
+        }
+
+        $moyasarConfig = $transaction->response_data['moyasar'] ?? null;
+        if (! is_array($moyasarConfig) || empty($moyasarConfig['publishable_api_key'])) {
+            abort(404, 'Checkout session is not ready');
+        }
+
+        return response()
+            ->view('payment::moyasar_checkout', [
+                'transaction' => $transaction,
+                'moyasarConfig' => $moyasarConfig,
+            ])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+
+    /**
      * Moyasar server-to-server webhook (the reliable settlement path; the browser
      * redirect may be lost if the customer closes the tab).
      *
