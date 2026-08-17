@@ -204,12 +204,15 @@ class MoyasarGateway extends AbstractPaymentGateway
             // value sent is ignored. Upload the logo in the Moyasar Dashboard account
             // branding settings instead.
 
-            // Always send methods (including samsungpay). Omitting this field lets
-            // Moyasar's hosted invoice fall back to card-only on many test accounts.
+            // Restrict only when the user picked a specific method (STC Pay, mada).
+            // credit_card / samsung_pay / empty = omit the field so the hosted invoice
+            // shows every method enabled on the Moyasar account (same as order checkout).
             $paymentOption = $request->paymentOption
                 ?? ($request->metadata['payment_option'] ?? null);
             $allowedMethods = $this->mapToMoyasarAllowedMethods($paymentOption);
-            $payload['allowed_payment_methods'] = $allowedMethods;
+            if ($allowedMethods !== []) {
+                $payload['allowed_payment_methods'] = $allowedMethods;
+            }
 
             // AUTHORIZATION (hold→capture) parity with APS. CONFIRM: Moyasar manual
             // capture must be enabled on the account, and the exact field for invoices
@@ -248,26 +251,15 @@ class MoyasarGateway extends AbstractPaymentGateway
 
             $invoiceId = $body['id'] ?? null;
             $hostedInvoiceUrl = $body['url'];
-            $moyasarConfig = $this->buildMoyasarJsConfig(
-                $request,
-                $merchantReference,
-                $callbackUrl,
-                $metadata,
-                $allowedMethods,
-                is_string($invoiceId) ? $invoiceId : null,
-            );
 
-            // moyasar.js (our checkout page) can show Samsung Pay / Apple Pay / STC Pay.
-            // Moyasar's hosted invoice page typically only renders the card form.
-            $localCheckoutUrl = $this->publishableKey !== ''
-                ? $this->localCheckoutUrl($merchantReference)
-                : null;
-            $paymentUrl = $localCheckoutUrl ?: $hostedInvoiceUrl;
-
+            // Invoice mode must keep Moyasar's hosted page (checkout.moyasar.com).
+            // That is the page that already shows Samsung Pay for order checkout in
+            // the app WebView. Our local moyasar.js page needs a Samsung Pay Service ID
+            // and times out in WebView without it — do not send wallet deposits there.
             return new PaymentResponse(
                 success: true,
                 transactionId: $merchantReference,
-                paymentUrl: $paymentUrl,
+                paymentUrl: $hostedInvoiceUrl,
                 status: 'pending',
                 amount: $request->amount,
                 currency: $payload['currency'],
@@ -281,9 +273,7 @@ class MoyasarGateway extends AbstractPaymentGateway
                     // No POST form params (simple GET redirect to `url`). Kept null so
                     // the controllers treat this as a redirect, not an auto-submit form.
                     'payment_params' => null,
-                    'redirect_url' => $paymentUrl,
-                    'hosted_invoice_url' => $hostedInvoiceUrl,
-                    'moyasar' => $moyasarConfig,
+                    'redirect_url' => $hostedInvoiceUrl,
                     'raw_response' => $body,
                 ]
             );
@@ -887,24 +877,25 @@ class MoyasarGateway extends AbstractPaymentGateway
     /**
      * Map a Payfort/internal payment option to Moyasar's allowed methods list.
      *
-     * Moyasar values: creditcard, mada, stcpay, applepay, samsungpay.
-     * credit_card / visa / mastercard (and empty) keep every method so Samsung Pay
-     * still appears on wallet top-up and checkout.
+     * Empty = unrestricted hosted invoice (creditcard, mada, stcpay, applepay, samsungpay
+     * as enabled on the Moyasar account) — this is what order checkout uses, so wallet
+     * top-up must do the same or Samsung Pay disappears in the WebView.
      *
      * @return list<string>
      */
     private function mapToMoyasarAllowedMethods(?string $payfortOption): array
     {
         if ($payfortOption === null || $payfortOption === '') {
-            return $this->defaultMoyasarMethods();
+            return [];
         }
 
         return match (strtoupper($payfortOption)) {
             'MADA' => ['mada'],
             'STCPAY' => ['stcpay'],
             'APPLEPAY' => ['applepay'],
-            'SAMSUNGPAY' => ['samsungpay', 'creditcard'],
-            default => $this->defaultMoyasarMethods(),
+            // Same unrestricted page as a generic card payment so Samsung Pay still shows.
+            'SAMSUNGPAY', 'VISA', 'MASTERCARD', 'CREDIT_CARD' => [],
+            default => [],
         };
     }
 
@@ -913,7 +904,46 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     private function defaultMoyasarMethods(): array
     {
-        return ['creditcard', 'mada', 'stcpay', 'applepay', 'samsungpay'];
+        $methods = ['creditcard', 'stcpay', 'applepay'];
+        if ($this->hasSamsungPayServiceId()) {
+            $methods[] = 'samsungpay';
+        }
+
+        return $methods;
+    }
+
+    /**
+     * moyasar.js only accepts creditcard, stcpay, applepay, samsungpay.
+     * `mada` is a card network, not a method — passing it makes the form hang.
+     * Samsung Pay without a Service ID loads Samsung's SDK and times out in the WebView.
+     *
+     * @param  list<string>  $methods
+     * @return list<string>
+     */
+    private function moyasarJsMethods(array $methods): array
+    {
+        $mapped = [];
+        foreach ($methods as $method) {
+            $method = strtolower((string) $method);
+            if ($method === 'mada') {
+                $method = 'creditcard';
+            }
+            if (in_array($method, ['creditcard', 'stcpay', 'applepay', 'samsungpay'], true)) {
+                $mapped[] = $method;
+            }
+        }
+
+        $mapped = array_values(array_unique($mapped));
+        if (! $this->hasSamsungPayServiceId()) {
+            $mapped = array_values(array_filter($mapped, fn (string $method) => $method !== 'samsungpay'));
+        }
+
+        return $mapped !== [] ? $mapped : ['creditcard', 'stcpay'];
+    }
+
+    private function hasSamsungPayServiceId(): bool
+    {
+        return trim((string) $this->getConfig('samsung_pay_service_id', ''), " \t\n\r\0\x0B\"'") !== '';
     }
 
     /**
@@ -932,6 +962,7 @@ class MoyasarGateway extends AbstractPaymentGateway
         array $methods,
         ?string $invoiceId = null,
     ): array {
+        $jsMethods = $this->moyasarJsMethods($methods !== [] ? $methods : $this->defaultMoyasarMethods());
         $currency = strtoupper($request->currency !== '' ? $request->currency : $this->currency);
         $config = [
             'publishable_api_key' => $this->publishableKey,
@@ -940,14 +971,9 @@ class MoyasarGateway extends AbstractPaymentGateway
             'description' => $this->buildDescription($request, $merchantReference),
             'callback_url' => $callbackUrl,
             'language' => $this->language,
-            'methods' => $methods !== [] ? $methods : $this->defaultMoyasarMethods(),
+            'methods' => $jsMethods,
             'supported_networks' => ['mada', 'visa', 'mastercard'],
             'metadata' => $metadata,
-            'apple_pay' => [
-                'country' => 'SA',
-                'label' => 'Nathefah',
-                'validate_merchant_url' => 'https://api.moyasar.com/v1/applepay/initiate',
-            ],
         ];
 
         if ($invoiceId) {
@@ -958,10 +984,18 @@ class MoyasarGateway extends AbstractPaymentGateway
             $config['manual'] = true;
         }
 
+        if (in_array('applepay', $jsMethods, true)) {
+            $config['apple_pay'] = [
+                'country' => 'SA',
+                'label' => 'Nathefah',
+                'validate_merchant_url' => 'https://api.moyasar.com/v1/applepay/initiate',
+            ];
+        }
+
         $samsungPay = $this->buildSamsungPayConfig($merchantReference);
-        if ($samsungPay !== null) {
+        if ($samsungPay !== null && in_array('samsungpay', $jsMethods, true)) {
             $config['samsung_pay'] = $samsungPay;
-        } elseif (in_array('samsungpay', $config['methods'], true)) {
+        } elseif (in_array('samsungpay', $methods, true) && $samsungPay === null) {
             $this->log('warning', 'Samsung Pay is requested but MOYASAR_SAMSUNG_PAY_SERVICE_ID is empty — Moyasar will hide the Samsung Pay button. Set the Service ID from the Moyasar Dashboard.');
         }
 

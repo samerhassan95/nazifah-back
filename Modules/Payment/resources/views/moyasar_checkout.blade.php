@@ -5,15 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('Nathefah Checkout') }}</title>
 
-    <!-- Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-
     <!-- Moyasar Styles -->
     <link rel="stylesheet" href="https://cdn.moyasar.com/mpf/1.14.0/moyasar.css" />
-    
+
     <style>
         body {
-            font-family: 'Tajawal', sans-serif;
+            font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
             background-color: #f3f4f6;
             margin: 0;
             padding: 0;
@@ -124,12 +121,24 @@
         </div>
     </div>
 
-    <!-- Moyasar Scripts -->
-    <script src="https://polyfill.io/v3/polyfill.min.js?features=fetch"></script>
+    <!-- Moyasar Scripts (no polyfill.io — that host hangs and times out WebViews) -->
     <script src="https://cdn.moyasar.com/mpf/1.14.0/moyasar.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             var config = @json($moyasarConfig);
+            var ua = navigator.userAgent || '';
+            var isIos = /iP(hone|ad|od)/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            var isSamsung = /SamsungBrowser|SAMSUNG|SM-|GT-/i.test(ua);
+
+            var methods = (config.methods || ['creditcard', 'stcpay']).filter(function (method) {
+                if (method === 'applepay') return isIos;
+                if (method === 'samsungpay') return isSamsung && !!config.samsung_pay;
+                return method !== 'mada';
+            });
+            if (methods.indexOf('creditcard') === -1 && methods.indexOf('stcpay') === -1) {
+                methods.push('creditcard');
+            }
+
             var init = {
                 element: '.mysr-form',
                 amount: config.amount,
@@ -137,7 +146,7 @@
                 description: config.description,
                 publishable_api_key: config.publishable_api_key,
                 callback_url: config.callback_url,
-                methods: config.methods || ['creditcard', 'mada', 'stcpay', 'applepay', 'samsungpay'],
+                methods: methods,
                 metadata: config.metadata || {},
                 language: config.language || 'ar',
                 supported_networks: config.supported_networks || ['mada', 'visa', 'mastercard']
@@ -149,10 +158,10 @@
             if (config.manual) {
                 init.manual = config.manual;
             }
-            if (config.apple_pay) {
+            if (config.apple_pay && methods.indexOf('applepay') !== -1) {
                 init.apple_pay = config.apple_pay;
             }
-            if (config.samsung_pay) {
+            if (config.samsung_pay && methods.indexOf('samsungpay') !== -1) {
                 init.samsung_pay = config.samsung_pay;
             }
 
