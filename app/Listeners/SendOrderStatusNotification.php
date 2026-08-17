@@ -25,11 +25,12 @@ class SendOrderStatusNotification
             $order = $event->order->fresh(['client', 'branch', 'vendor']);
             $status = $event->newStatus;
             $num = $order->order_number;
+            $context = $event->context;
 
             match ($status) {
                 OrderStatus::PENDING => $this->onPending($order, $num),
                 OrderStatus::BRANCH_REVIEW => $this->onBranchReview($order, $num),
-                OrderStatus::CONFIRMED => $this->onConfirmed($order, $num),
+                OrderStatus::CONFIRMED => $this->onConfirmed($order, $num, $context),
                 OrderStatus::WAITING_PAYMENT => $this->onWaitingPayment($order, $num),
                 OrderStatus::PAYMENT_CONFIRMED => $this->onPaymentConfirmed($order, $num),
                 OrderStatus::DRIVER_PICKUP_ASSIGNED => $this->onDriverPickupAssigned($order, $num),
@@ -80,13 +81,19 @@ class SendOrderStatusNotification
         );
     }
 
-    private function onConfirmed(Order $order, string $num): void
+    private function onConfirmed(Order $order, string $num, array $context = []): void
     {
         $this->notifications->sendToClient($order,
             'تم تأكيد الطلب', 'Order Confirmed',
             "تم تأكيد طلبك #{$num}.", "Your order #{$num} has been confirmed.",
             'order_confirmed',
         );
+
+        // Vendor auto-accepted every item: the client did not approve anything.
+        if (! empty($context['auto_confirmed'])) {
+            return;
+        }
+
         $this->notifyVendorAndAdmins($order,
             'وافق العميل على الطلب', 'Client Approved Order',
             "وافق العميل على الطلب #{$num}.", "Client approved order #{$num}.",

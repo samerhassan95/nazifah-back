@@ -291,11 +291,14 @@ class VendorOrderReviewService
                     $statusService->transitionTo($order, OrderStatus::BRANCH_REVIEW, [
                         'notes' => 'Vendor accepted all items.',
                         'changed_by' => auth('sanctum')->id() ?? null,
+                        // Internal hop before auto-confirm — do not notify "order reviewed".
+                        'skip_notifications' => true,
                     ]);
                 }
                 $statusService->transitionTo($order, OrderStatus::CONFIRMED, [
                     'notes' => 'All items accepted — auto-confirmed.',
                     'changed_by' => auth('sanctum')->id() ?? null,
+                    'auto_confirmed' => true,
                 ]);
             }
 
