@@ -3,6 +3,7 @@
 namespace Modules\Order\Services;
 
 use App\Enums\PaymentMethod;
+use App\Support\PaymentStatusPresenter;
 use Illuminate\Support\Facades\DB;
 use Modules\Payment\Services\ActiveGatewayResolver;
 use Modules\Order\Exceptions\InsufficientWalletBalanceException;
@@ -536,25 +537,32 @@ class OrderPaymentService
 
     /**
      * Compact payment breakdown for order detail / tracking UIs.
+     * Only returns payment methods that were actually used (amount > 0).
      *
      * @return array{
      *     payment_method: ?string,
-     *     payment_methods: list<string>,
-     *     wallet_amount: float,
-     *     credit_card_amount: float,
-     *     cash_amount: float,
-     *     total_amount: float,
      *     final_amount: float,
+     *     total_amount: float,
      *     is_split_payment: bool,
-     *     currency: string
+     *     currency: string,
+     *     payments: list<array{
+     *         payment_method: string,
+     *         payment_method_label: string,
+     *         amount: float,
+     *         status: string,
+     *         status_label: string
+     *     }>
      * }
      */
     public function buildOrderPaymentBreakdownForApi(Order $order): array
     {
         $finalAmount = round((float) $order->final_amount, 2);
         $usePaidLegsOnly = ($order->payment_status ?? 'pending') === 'paid';
+        $locale = app()->getLocale();
 
-        $query = OrderPayment::where('order_id', $order->id);
+        $query = OrderPayment::where('order_id', $order->id)
+            ->orderBy('sequence');
+
         if ($usePaidLegsOnly) {
             $query->where('status', OrderPayment::STATUS_PAID);
         } else {
@@ -565,64 +573,103 @@ class OrderPaymentService
             ]);
         }
 
-        $walletAmount = 0.0;
-        $creditCardAmount = 0.0;
-        $cashAmount = 0.0;
+        $legs = $query->get();
+        $paymentsByMethod = [];
 
-        foreach ($query->get() as $leg) {
-            $amount = (float) $leg->amount;
+        foreach ($legs as $leg) {
             $method = (string) $leg->payment_method;
+            $amount = round((float) $leg->amount, 2);
 
-            if ($this->isWalletMethod($method)) {
-                $walletAmount += $amount;
-
+            if ($amount <= 0) {
                 continue;
             }
 
-            if ($this->isCodMethod($method)) {
-                $cashAmount += $amount;
-
-                continue;
+            if (! isset($paymentsByMethod[$method])) {
+                $paymentsByMethod[$method] = [
+                    'payment_method' => $method,
+                    'payment_method_label' => $this->paymentMethodLabel($method, $locale),
+                    'amount' => 0.0,
+                    'status' => (string) $leg->status,
+                ];
             }
 
-            if ($this->isGatewayMethod($method)) {
-                $creditCardAmount += $amount;
-
-                continue;
-            }
-
-            $creditCardAmount += $amount;
+            $paymentsByMethod[$method]['amount'] = round(
+                $paymentsByMethod[$method]['amount'] + $amount,
+                2
+            );
+            $paymentsByMethod[$method]['status'] = $this->mergeBreakdownLegStatus(
+                $paymentsByMethod[$method]['status'],
+                (string) $leg->status
+            );
         }
 
-        if ($walletAmount <= 0 && $creditCardAmount <= 0 && $cashAmount <= 0) {
+        if ($paymentsByMethod === []) {
             $method = (string) ($order->payment_method ?? '');
-            if ($this->isWalletMethod($method)) {
-                $walletAmount = $finalAmount;
-            } elseif ($this->isCodMethod($method)) {
-                $cashAmount = $finalAmount;
-            } elseif ($method !== '') {
-                $creditCardAmount = $finalAmount;
+            if ($method !== '' && $finalAmount > 0) {
+                $status = ($order->payment_status ?? 'pending') === 'paid'
+                    ? OrderPayment::STATUS_PAID
+                    : OrderPayment::STATUS_PENDING;
+
+                $paymentsByMethod[$method] = [
+                    'payment_method' => $method,
+                    'payment_method_label' => $this->paymentMethodLabel($method, $locale),
+                    'amount' => $finalAmount,
+                    'status' => $status,
+                ];
             }
         }
 
-        $walletAmount = round($walletAmount, 2);
-        $creditCardAmount = round($creditCardAmount, 2);
-        $cashAmount = round($cashAmount, 2);
-        $sourcesWithAmount = collect([$walletAmount, $creditCardAmount, $cashAmount])
-            ->filter(fn ($amount) => $amount > 0)
-            ->count();
+        $payments = collect($paymentsByMethod)
+            ->values()
+            ->map(function (array $payment) {
+                $payment['amount'] = round((float) $payment['amount'], 2);
+                $payment['status_label'] = PaymentStatusPresenter::label($payment['status']);
+
+                return $payment;
+            })
+            ->values()
+            ->all();
+
+        $totalAmount = round(array_sum(array_column($payments, 'amount')), 2);
 
         return [
             'payment_method' => $order->payment_method,
-            'payment_methods' => $order->resolvedPaymentMethods(),
-            'wallet_amount' => $walletAmount,
-            'credit_card_amount' => $creditCardAmount,
-            'cash_amount' => $cashAmount,
-            'total_amount' => round($walletAmount + $creditCardAmount + $cashAmount, 2),
             'final_amount' => $finalAmount,
-            'is_split_payment' => $sourcesWithAmount > 1,
+            'total_amount' => $totalAmount,
+            'is_split_payment' => count($payments) > 1,
             'currency' => 'SAR',
+            'payments' => $payments,
         ];
+    }
+
+    private function paymentMethodLabel(string $method, string $locale): string
+    {
+        $enum = PaymentMethod::tryFrom($method);
+
+        return $enum
+            ? $enum->getDisplayName($locale)
+            : $method;
+    }
+
+    private function mergeBreakdownLegStatus(string $current, string $incoming): string
+    {
+        if ($current === OrderPayment::STATUS_PENDING || $incoming === OrderPayment::STATUS_PENDING) {
+            return OrderPayment::STATUS_PENDING;
+        }
+
+        if ($current === OrderPayment::STATUS_FAILED || $incoming === OrderPayment::STATUS_FAILED) {
+            return OrderPayment::STATUS_FAILED;
+        }
+
+        if ($current === OrderPayment::STATUS_REFUNDED || $incoming === OrderPayment::STATUS_REFUNDED) {
+            return OrderPayment::STATUS_REFUNDED;
+        }
+
+        if ($current === OrderPayment::STATUS_CANCELLED || $incoming === OrderPayment::STATUS_CANCELLED) {
+            return OrderPayment::STATUS_CANCELLED;
+        }
+
+        return OrderPayment::STATUS_PAID;
     }
 
     /**
