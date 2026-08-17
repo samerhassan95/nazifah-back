@@ -44,7 +44,7 @@ POST /api/v1/user/orders/{orderId}/confirm-handoff
 
 | نوع Handoff | السيناريو | الشروط | بعد التأكيد |
 |-------------|-----------|--------|-------------|
-| `give_to_driver` | استلام من البيت — العميل يؤكد أنه سلّم للمندوب **بعد** ما السائق يعمل pickup | `pickup_at_vendor = false` · `status = picked_up` · `client_pickup_handoff_at` فارغ | يُحدَّث `client_pickup_handoff_at` فقط (الحالة أصلًا `picked_up`) |
+| `give_to_driver` | استلام من البيت — العميل يؤكد أنه سلّم للسائق **بعد** ما السائق يعمل pickup | `pickup_at_vendor = false` · `status = picked_up` · `client_pickup_handoff_at` فارغ | يُحدَّث `client_pickup_handoff_at` فقط (الحالة أصلًا `picked_up`) |
 | `give_to_laundry` | تسليم في الفرع — العميل يسلّم في المغسلة | `pickup_at_vendor = true` · `status = confirmed` أو `payment_confirmed` · `client_pickup_handoff_at` فارغ | يُحدَّث `client_pickup_handoff_at` فقط (بدون تغيير الحالة) |
 | `receive_from_driver` | توصيل للبيت — العميل يستلم من سائق التوصيل | `delivery_at_vendor = false` · `status = waiting_client_receipt` أو `delivered` · `client_delivery_handoff_at` فارغ | الحالة → `delivered` · يُحدَّث `client_delivery_handoff_at` · COD يُسجَّل مدفوع إن وُجد |
 | `receive_from_laundry` | استلام من الفرع — العميل يستلم من المغسلة | `delivery_at_vendor = true` · `status = completed` · `client_delivery_handoff_at` فارغ | الحالة → `delivered` · يُحدَّث `client_delivery_handoff_at` · COD إن وُجد |
@@ -55,7 +55,7 @@ POST /api/v1/user/orders/{orderId}/confirm-handoff
 
 1. تعيين السائق → في الطريق → `on_way_to_pickup`
 2. السائق يعمل pickup complete → الحالة تصبح `picked_up`
-3. العميل يرى **تأكيد التسليم** — «سلّمت الملابس للمندوب» (`give_to_driver`)
+3. العميل يرى **تأكيد التسليم** — «سلّمت الملابس للسائق» (`give_to_driver`)
 4. العميل يؤكد → يُحدَّث `client_pickup_handoff_at` (الحالة تبقى `picked_up`)
 
 **مهم:** سائق الاستلام هو من ينقل الحالة إلى `picked_up`. تأكيد العميل بعد ذلك إقرار بالتسليم، وليس هو من ينشئ حالة الاستلام.
@@ -165,7 +165,7 @@ POST /api/v1/user/orders/{orderId}/visit-response
   "handoff": {
     "type": "receive_from_driver",
     "direction": "receive",
-    "confirm_label": "أكّد أنك استلمت الملابس من المندوب",
+    "confirm_label": "أكّد أنك استلمت الملابس من السائق",
     "endpoint": "/api/v1/user/orders/417/confirm-handoff",
     "confirm_action": "confirm"
   }

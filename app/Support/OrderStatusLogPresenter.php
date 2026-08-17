@@ -148,52 +148,52 @@ class OrderStatusLogPresenter
         return [
             [
                 'key' => 'order.status_log_pickup_driver_assigned',
-                'regex' => '/^(?:Pickup driver assigned|تعيين مندوب الاستلام): #(?<id>\d+)$/u',
+                'regex' => '/^(?:Pickup driver assigned|تعيين (?:مندوب|سائق) الاستلام): #(?<id>\d+)$/u',
                 'params' => ['id'],
             ],
             [
                 'key' => 'order.status_log_pickup_driver_assigned_postponed',
-                'regex' => '/^(?:Pickup driver assigned after client postponed pickup|تعيين مندوب الاستلام بعد تأجيل العميل): #(?<id>\d+)$/u',
+                'regex' => '/^(?:Pickup driver assigned after client postponed pickup|تعيين (?:مندوب|سائق) الاستلام بعد تأجيل العميل): #(?<id>\d+)$/u',
                 'params' => ['id'],
             ],
             [
                 'key' => 'order.status_log_pickup_driver_reassigned',
-                'regex' => '/^(?:Pickup driver re-assigned|إعادة تعيين مندوب الاستلام): #(?<id>\d+)$/u',
+                'regex' => '/^(?:Pickup driver re-assigned|إعادة تعيين (?:مندوب|سائق) الاستلام): #(?<id>\d+)$/u',
                 'params' => ['id'],
             ],
             [
                 'key' => 'order.status_log_pickup_driver_reassigned_from',
-                'regex' => '/^(?:Pickup driver re-assigned \(from|إعادة تعيين مندوب الاستلام \(من) (?<status>[^)]+)\): #(?<id>\d+)$/u',
+                'regex' => '/^(?:Pickup driver re-assigned \(from|إعادة تعيين (?:مندوب|سائق) الاستلام \(من) (?<status>[^)]+)\): #(?<id>\d+)$/u',
                 'params' => ['status', 'id'],
             ],
             [
                 'key' => 'order.status_log_delivery_driver_assigned',
-                'regex' => '/^(?:Delivery driver assigned|تعيين مندوب التوصيل): #(?<id>\d+)$/u',
+                'regex' => '/^(?:Delivery driver assigned|تعيين (?:مندوب|سائق) التوصيل): #(?<id>\d+)$/u',
                 'params' => ['id'],
             ],
             [
                 'key' => 'order.status_log_delivery_driver_assigned_postponed',
-                'regex' => '/^(?:Delivery driver assigned after client postponed delivery|تعيين مندوب التوصيل بعد تأجيل العميل): #(?<id>\d+)$/u',
+                'regex' => '/^(?:Delivery driver assigned after client postponed delivery|تعيين (?:مندوب|سائق) التوصيل بعد تأجيل العميل): #(?<id>\d+)$/u',
                 'params' => ['id'],
             ],
             [
                 'key' => 'order.status_log_delivery_driver_reassigned',
-                'regex' => '/^(?:Delivery driver re-assigned|إعادة تعيين مندوب التوصيل): #(?<id>\d+)$/u',
+                'regex' => '/^(?:Delivery driver re-assigned|إعادة تعيين (?:مندوب|سائق) التوصيل): #(?<id>\d+)$/u',
                 'params' => ['id'],
             ],
             [
                 'key' => 'order.status_log_delivery_driver_reassigned_from',
-                'regex' => '/^(?:Delivery driver re-assigned \(from|إعادة تعيين مندوب التوصيل \(من) (?<status>[^)]+)\): #(?<id>\d+)$/u',
+                'regex' => '/^(?:Delivery driver re-assigned \(from|إعادة تعيين (?:مندوب|سائق) التوصيل \(من) (?<status>[^)]+)\): #(?<id>\d+)$/u',
                 'params' => ['status', 'id'],
             ],
             [
                 'key' => 'order.status_log_pickup_driver_accepted',
-                'regex' => '/^(?:Pickup driver #|قبل مندوب الاستلام #)(?<id>\d+)(?: accepted| الطلب)$/u',
+                'regex' => '/^(?:Pickup driver #|قبل (?:مندوب|سائق) الاستلام #)(?<id>\d+)(?: accepted| الطلب)$/u',
                 'params' => ['id'],
             ],
             [
                 'key' => 'order.status_log_delivery_driver_accepted',
-                'regex' => '/^(?:Delivery driver #|قبل مندوب التوصيل #)(?<id>\d+)(?: accepted| الطلب)$/u',
+                'regex' => '/^(?:Delivery driver #|قبل (?:مندوب|سائق) التوصيل #)(?<id>\d+)(?: accepted| الطلب)$/u',
                 'params' => ['id'],
             ],
             [
@@ -223,12 +223,12 @@ class OrderStatusLogPresenter
             ],
             [
                 'key' => 'order.status_log_driver_rejected',
-                'regex' => '/^(?:رفض مندوب (?<type>[^:]+) #(?<id>\d+): (?<reason>.+) — الطلب متاح لإعادة التعيين|(?<type_en>\w+) driver #(?<id_en>\d+) rejected: (?<reason_en>.+) — order available for re-assignment)$/u',
+                'regex' => '/^(?:رفض (?:مندوب|سائق) (?<type>[^:]+) #(?<id>\d+): (?<reason>.+) — الطلب متاح لإعادة التعيين|(?<type_en>\w+) driver #(?<id_en>\d+) rejected: (?<reason_en>.+) — order available for re-assignment)$/u',
                 'params' => ['type', 'id', 'reason'],
             ],
             [
                 'key' => 'order.status_log_driver_rejected_no_reason',
-                'regex' => '/^(?:رفض مندوب (?<type>[^:]+) #(?<id>\d+) — الطلب متاح لإعادة التعيين|(?<type_en>\w+) driver #(?<id_en>\d+) rejected — order available for re-assignment)$/u',
+                'regex' => '/^(?:رفض (?:مندوب|سائق) (?<type>[^:]+) #(?<id>\d+) — الطلب متاح لإعادة التعيين|(?<type_en>\w+) driver #(?<id_en>\d+) rejected — order available for re-assignment)$/u',
                 'params' => ['type', 'id'],
             ],
             [

@@ -42,7 +42,7 @@ With note:
 
 ```json
 {
-  "notes": "تم استلام الطلب من المندوب"
+  "notes": "تم استلام الطلب من السائق"
 }
 ```
 
@@ -318,8 +318,8 @@ Body: {"status":"on_way_to_delivery"}
   - `can_confirm_pickup_from_driver`
   - `can_confirm_handover_to_delivery`
 - If either flag is `true`, show the corresponding confirmation button:
-  - `can_confirm_pickup_from_driver`: "تأكيد استلام الطلب من المندوب" / "Confirm order received from driver"
-  - `can_confirm_handover_to_delivery`: "تأكيد تسليم الطلب للمندوب" / "Confirm order handed to driver"
+  - `can_confirm_pickup_from_driver`: "تأكيد استلام الطلب من السائق" / "Confirm order received from driver"
+  - `can_confirm_handover_to_delivery`: "تأكيد تسليم الطلب للسائق" / "Confirm order handed to driver"
 - On tap, call `POST /vendor/orders/{id}/confirm-handoff`
 - Refresh order details after success
 - For delivery handoff success: expect status to stay `driver_delivery_accepted` (not on the way)
