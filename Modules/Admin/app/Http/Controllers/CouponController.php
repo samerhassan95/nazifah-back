@@ -34,6 +34,15 @@ class CouponController extends Controller
         if ($request->has('discount_type')) {
             $query->where('discount_type', $request->discount_type);
         }
+        if ($request->filled('promotion_domain')) {
+            $query->where('promotion_domain', $request->promotion_domain);
+        }
+        if ($request->filled('promotion_kind')) {
+            $query->where('promotion_kind', $request->promotion_kind);
+        }
+        if ($request->has('is_automatic')) {
+            $query->where('is_automatic', $request->boolean('is_automatic'));
+        }
 
         // Filter by status (active, expired, scheduled)
         if ($request->has('status')) {
@@ -82,7 +91,7 @@ class CouponController extends Controller
      */
     public function store(StoreDiscountRequest $request): JsonResponse
     {
-        $data = $request->validated();
+        $data = $this->normalizeDiscountPayload($request->validated());
 
         // Generate unique code if not provided
         if (empty($data['code'])) {
@@ -137,7 +146,7 @@ class CouponController extends Controller
             return notFoundResponse('Coupon not found');
         }
 
-        $coupon->update($request->validated());
+        $coupon->update($this->normalizeDiscountPayload($request->validated(), true));
 
         // Sync relationships if discount_type is updated or relevant IDs are provided
         if ($request->has('vendor_ids') || ($request->discount_type === 'vendors')) {
@@ -299,6 +308,77 @@ class CouponController extends Controller
         } while (Discount::where('code', $code)->exists());
 
         return $code;
+    }
+
+    /**
+     * Normalize both legacy dashboard payloads and the new promotion-engine payload.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizeDiscountPayload(array $data, bool $isUpdate = false): array
+    {
+        if (! isset($data['code']) && isset($data['discount_code'])) {
+            $data['code'] = $data['discount_code'];
+        }
+
+        if (! isset($data['name']) && isset($data['discount_title'])) {
+            $title = (string) $data['discount_title'];
+            $data['name'] = ['ar' => $title, 'en' => $title];
+        }
+
+        if (! isset($data['type']) && isset($data['discount_type']) && in_array($data['discount_type'], ['fixed', 'percentage'], true)) {
+            $data['type'] = $data['discount_type'];
+            $data['discount_type'] = match ((string) ($data['target_category'] ?? 'all_clients')) {
+                'new_clients' => 'client',
+                default => 'global',
+            };
+            if (($data['target_category'] ?? null) === 'current_clients') {
+                $data['segment_filters'] = array_merge((array) ($data['segment_filters'] ?? []), ['min_orders' => 1]);
+            }
+            if (($data['target_category'] ?? null) === 'new_clients') {
+                $data['first_order_only'] = true;
+            }
+        }
+
+        if (! isset($data['value']) && isset($data['discount_amount'])) {
+            $data['value'] = $data['discount_amount'];
+        }
+
+        $data['promotion_domain'] = $data['promotion_domain'] ?? Discount::DOMAIN_ORDER;
+        $data['promotion_kind'] = $data['promotion_kind']
+            ?? (($data['promotion_domain'] ?? Discount::DOMAIN_ORDER) === Discount::DOMAIN_WALLET_TOPUP
+                ? Discount::KIND_WALLET_TOPUP_BONUS
+                : ($data['applies_to_delivery'] ?? false ? Discount::KIND_DELIVERY_DISCOUNT : Discount::KIND_ORDER_TOTAL_THRESHOLD));
+        $data['usage_condition'] = $data['usage_condition'] ?? Discount::USAGE_CONDITION_ALL;
+        $data['application_scope'] = $data['application_scope'] ?? Discount::APPLICATION_SCOPE_ORDER_TOTAL;
+        $data['is_automatic'] = (bool) ($data['is_automatic'] ?? false);
+        $data['is_active'] = array_key_exists('is_active', $data) ? (bool) $data['is_active'] : true;
+        $data['priority'] = (int) ($data['priority'] ?? 100);
+        $data['funding_source'] = $data['funding_source'] ?? 'platform';
+
+        foreach ([
+            'usage_service_ids',
+            'discount_service_ids',
+            'vendor_ids',
+            'zone_ids',
+            'client_ids',
+            'branch_ids',
+            'city_names',
+            'active_days_of_week',
+            'required_piece_ids',
+            'bundle_rules',
+        ] as $listField) {
+            if (isset($data[$listField]) && ! is_array($data[$listField])) {
+                $data[$listField] = [$data[$listField]];
+            }
+        }
+
+        if (empty($data['code']) && (! $isUpdate || array_key_exists('code', $data))) {
+            $data['code'] = $this->generateUniqueCouponCode();
+        }
+
+        return $data;
     }
 
     /**

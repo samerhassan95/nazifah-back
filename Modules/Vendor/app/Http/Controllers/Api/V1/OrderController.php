@@ -409,13 +409,16 @@ class OrderController extends Controller
                 }
             }
 
+            $deliveryDiscountAmount = 0.0;
+
             // Soft-apply coupon against NEW item totals.
             if ($request->filled('coupon_code')) {
                 $soft = $this->discountService->softApplyCouponCode(
                     (string) $request->coupon_code,
                     (float) $totalAmount,
                     $clientId,
-                    $vendorId
+                    $vendorId,
+                    ['delivery_fee' => (float) $existingOrder->delivery_fee]
                 );
                 if ($soft['applied']) {
                     $appliedDiscount = $soft['discount'];
@@ -427,7 +430,8 @@ class OrderController extends Controller
                     (float) $totalAmount,
                     $clientId,
                     $vendorId,
-                    true
+                    true,
+                    ['delivery_fee' => (float) $existingOrder->delivery_fee]
                 );
                 if ($soft['applied']) {
                     $appliedDiscount = $soft['discount'];
@@ -455,10 +459,27 @@ class OrderController extends Controller
                 'distance' => round((float) ($existingOrder->distance ?? 0), 2),
             ];
 
+            if ($appliedDiscount) {
+                $known = $this->discountService->evaluateKnownOrderDiscount(
+                    $appliedDiscount,
+                    [],
+                    (float) $totalAmount,
+                    $clientId,
+                    $vendorId,
+                    (int) $branchId,
+                    (float) $deliveryFees['delivery_fee'],
+                    null,
+                    true
+                );
+                $discountAmount = (float) $known['discount_amount'];
+                $deliveryDiscountAmount = (float) ($known['delivery_discount_amount'] ?? 0);
+            }
+
             $pricing = Order::calculatePricingTotals(
                 (float) $totalAmount,
                 (float) $discountAmount,
-                (float) $deliveryFees['delivery_fee']
+                (float) $deliveryFees['delivery_fee'],
+                (float) $deliveryDiscountAmount
             );
 
             $acceptedItems = [];

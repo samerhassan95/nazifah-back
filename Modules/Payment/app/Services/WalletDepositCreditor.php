@@ -73,6 +73,30 @@ class WalletDepositCreditor
                 ->where('id', $clientId)
                 ->increment('wallet_balance', $locked->amount);
 
+            $bonusAmount = round((float) ($locked->response_data['wallet_bonus_amount'] ?? 0), 2);
+            if ($bonusAmount > 0 && ! empty($locked->response_data['wallet_bonus_discount_id'])) {
+                $bonusTxnId = $this->bonusWalletTransactionId($locked);
+                try {
+                    DB::table('wallet_transactions')->insert([
+                        'client_id' => $clientId,
+                        'type' => 'credit',
+                        'amount' => $bonusAmount,
+                        'payment_method' => 'discount_bonus',
+                        'description' => 'Nathefah Wallet top-up bonus',
+                        'transaction_id' => $bonusTxnId,
+                        'status' => 'completed',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    DB::table('clients')
+                        ->where('id', $clientId)
+                        ->increment('wallet_balance', $bonusAmount);
+                } catch (UniqueConstraintViolationException $e) {
+                    // Bonus already credited for this deposit.
+                }
+            }
+
             return [
                 'credited' => true,
                 'wallet_txn' => DB::table('wallet_transactions')->where('id', $walletTxnId)->first(),
@@ -113,5 +137,10 @@ class WalletDepositCreditor
             $transaction->transaction_id
             ?? $transaction->response_data['wallet_reference_id']
         );
+    }
+
+    private function bonusWalletTransactionId(PaymentTransaction $transaction): string
+    {
+        return $this->canonicalWalletTransactionId($transaction).'-BONUS-'.(int) ($transaction->response_data['wallet_bonus_discount_id'] ?? 0);
     }
 }

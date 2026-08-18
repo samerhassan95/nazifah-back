@@ -314,20 +314,22 @@ class OrderController extends Controller
     private function buildOrderPricingSummary(
         float $totalAmount,
         float $discountAmount,
+        float $deliveryDiscountAmount,
         array $deliveryFees,
         bool $pickupAtVendor,
         bool $deliveryAtVendor
     ): array {
-        // Coupon discount applies to items (subtotal) only; tax is on full items subtotal, delivery unchanged.
         $totals = Order::calculatePricingTotals(
             $totalAmount,
             $discountAmount,
-            (float) $deliveryFees['delivery_fee']
+            (float) $deliveryFees['delivery_fee'],
+            $deliveryDiscountAmount
         );
 
         return [
             'subtotal' => (float) $totals['subtotal'],
             'discount_amount' => (float) $totals['discount_amount'],
+            'delivery_discount_amount' => (float) ($totals['delivery_discount_amount'] ?? 0),
             'subtotal_after_discount' => (float) $totals['subtotal_after_discount'],
             'tax_percentage' => (float) $totals['tax_percentage'],
             'tax_amount' => (float) $totals['tax_amount'],
@@ -426,11 +428,13 @@ class OrderController extends Controller
 
             // Calculate items total and validate
             $discountAmount = 0;
+            $deliveryDiscountAmount = 0;
             $appliedDiscount = null;
             $couponSuccessMessage = null;
             $totalAmount = 0;
             $itemsSummary = [];
             $pieces = null;
+            $discountItemsBreakdown = [];
 
             if ($request->has('coupon_code') && $request->coupon_code) {
                 $result = $this->discountService->validateAndCalculateDiscount(
@@ -448,8 +452,10 @@ class OrderController extends Controller
 
                 $totalAmount = $result['data']['order_amount'];
                 $discountAmount = $result['data']['discount_amount'];
+                $deliveryDiscountAmount = (float) ($result['data']['delivery_discount_amount'] ?? 0);
                 $appliedDiscount = $result['data']['discount'];
                 $pieces = $result['data']['pieces'];
+                $discountItemsBreakdown = $result['data']['items_breakdown'] ?? [];
                 $couponSuccessMessage = $result['message'];
             } else {
                 $pieceIds = collect($request->items)->pluck('piece_id')->unique();
@@ -591,9 +597,43 @@ class OrderController extends Controller
                 return $deliveryFees;
             }
 
+            $discountCity = $deliveryAddress?->city ?? $pickupAddress?->city;
+            if ($appliedDiscount && $discountItemsBreakdown !== []) {
+                $rechecked = $this->discountService->evaluateKnownOrderDiscount(
+                    $appliedDiscount,
+                    $discountItemsBreakdown,
+                    (float) $totalAmount,
+                    (int) $user->id,
+                    (int) $vendorId,
+                    (int) $branchId,
+                    (float) $deliveryFees['delivery_fee'],
+                    $discountCity,
+                    false,
+                    $lang
+                );
+                $discountAmount = (float) $rechecked['discount_amount'];
+                $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);
+            } elseif (! $request->filled('coupon_code')) {
+                $automatic = $this->discountService->findBestAutomaticOrderDiscount(
+                    $request->items,
+                    (int) $user->id,
+                    (int) $vendorId,
+                    $lang,
+                    (int) $branchId,
+                    (float) $deliveryFees['delivery_fee'],
+                    $discountCity
+                );
+                if ($automatic['applied']) {
+                    $appliedDiscount = $automatic['discount'];
+                    $discountAmount = (float) $automatic['discount_amount'];
+                    $deliveryDiscountAmount = (float) ($automatic['delivery_discount_amount'] ?? 0);
+                }
+            }
+
             $pricingSummary = $this->buildOrderPricingSummary(
                 (float) $totalAmount,
                 (float) $discountAmount,
+                (float) $deliveryDiscountAmount,
                 $deliveryFees,
                 $pickupAtVendor,
                 $deliveryAtVendor
@@ -931,10 +971,12 @@ class OrderController extends Controller
             $lang = Str::contains(strtolower($accept), 'ar') ? 'ar' : 'en';
 
             $discountAmount = 0;
+            $deliveryDiscountAmount = 0;
             $appliedDiscount = null;
             $totalAmount = 0;
             $itemsData = [];
             $pieces = null;
+            $discountItemsBreakdown = [];
 
             if ($request->has('coupon_code') && $request->coupon_code) {
                 // Validate coupon and calculate with items (branch-aware pricing)
@@ -953,8 +995,10 @@ class OrderController extends Controller
 
                 $totalAmount = $result['data']['order_amount'];
                 $discountAmount = $result['data']['discount_amount'];
+                $deliveryDiscountAmount = (float) ($result['data']['delivery_discount_amount'] ?? 0);
                 $appliedDiscount = $result['data']['discount'];
                 $pieces = $result['data']['pieces'];
+                $discountItemsBreakdown = $result['data']['items_breakdown'] ?? [];
             } else {
                 // No coupon — still validate items belong to vendor
                 $pieceIds = collect($request->items)->pluck('piece_id')->unique();
@@ -1168,7 +1212,40 @@ class OrderController extends Controller
                 $deliveryFee = $pickupFee + $deliveryFeeAmount;
             }
 
-            $pricingTotals = Order::calculatePricingTotals($totalAmount, $discountAmount, $deliveryFee);
+            $discountCity = $deliveryAddress?->city ?? $pickupAddress?->city;
+            if ($appliedDiscount && $discountItemsBreakdown !== []) {
+                $rechecked = $this->discountService->evaluateKnownOrderDiscount(
+                    $appliedDiscount,
+                    $discountItemsBreakdown,
+                    (float) $totalAmount,
+                    (int) $user->id,
+                    (int) $vendorId,
+                    $storeBranchId,
+                    (float) $deliveryFee,
+                    $discountCity,
+                    false,
+                    $lang
+                );
+                $discountAmount = (float) $rechecked['discount_amount'];
+                $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);
+            } elseif (! $request->filled('coupon_code')) {
+                $automatic = $this->discountService->findBestAutomaticOrderDiscount(
+                    $request->items,
+                    (int) $user->id,
+                    (int) $vendorId,
+                    $lang,
+                    $storeBranchId,
+                    (float) $deliveryFee,
+                    $discountCity
+                );
+                if ($automatic['applied']) {
+                    $appliedDiscount = $automatic['discount'];
+                    $discountAmount = (float) $automatic['discount_amount'];
+                    $deliveryDiscountAmount = (float) ($automatic['delivery_discount_amount'] ?? 0);
+                }
+            }
+
+            $pricingTotals = Order::calculatePricingTotals($totalAmount, $discountAmount, $deliveryFee, $deliveryDiscountAmount);
             $taxAmount = $pricingTotals['tax_amount'];
             $finalAmount = $pricingTotals['final_amount'];
 
@@ -1274,7 +1351,7 @@ class OrderController extends Controller
                         'discount_amount' => $discountAmount,
                         'discount_id' => $appliedDiscount?->id,
                         'tax_amount' => $taxAmount,
-                        'delivery_fee' => $deliveryFee,
+                        'delivery_fee' => (float) $pricingTotals['delivery_fee'],
                         'final_amount' => $finalAmount,
                         'pickup_at_vendor' => $pickupAtVendor,
                         'delivery_at_vendor' => $deliveryAtVendor,
@@ -2003,8 +2080,10 @@ class OrderController extends Controller
 
             $totalAmount = $result['data']['order_amount'];
             $discountAmount = $result['data']['discount_amount'];
+            $deliveryDiscountAmount = (float) ($result['data']['delivery_discount_amount'] ?? 0);
             $appliedDiscount = $result['data']['discount'];
             $pieces = $result['data']['pieces'];
+            $discountItemsBreakdown = $result['data']['items_breakdown'] ?? [];
             $branchId = (int) $request->branch_id;
             $itemsSummary = [];
 
@@ -2079,9 +2158,27 @@ class OrderController extends Controller
                 return $deliveryFees;
             }
 
+            if ($appliedDiscount && $discountItemsBreakdown !== []) {
+                $rechecked = $this->discountService->evaluateKnownOrderDiscount(
+                    $appliedDiscount,
+                    $discountItemsBreakdown,
+                    (float) $totalAmount,
+                    (int) $user->id,
+                    (int) $vendorId,
+                    $branchId,
+                    (float) $deliveryFees['delivery_fee'],
+                    $deliveryAddress?->city ?? $pickupAddress?->city,
+                    false,
+                    $lang
+                );
+                $discountAmount = (float) $rechecked['discount_amount'];
+                $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);
+            }
+
             $pricingSummary = $this->buildOrderPricingSummary(
                 (float) $totalAmount,
                 (float) $discountAmount,
+                (float) $deliveryDiscountAmount,
                 $deliveryFees,
                 $pickupAtVendor,
                 $deliveryAtVendor

@@ -10,7 +10,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
+use Modules\Address\Models\Address;
 use Modules\Client\Models\ClientCard;
+use Modules\Discount\Services\DiscountService;
 use Modules\Payment\DTOs\PaymentRequest;
 use Modules\Payment\Models\PaymentTransaction;
 use Modules\Payment\Services\PaymentService;
@@ -21,6 +23,7 @@ class WalletController extends Controller
     public function __construct(
         private PaymentService $paymentService,
         private WalletDepositCreditor $walletDepositCreditor,
+        private DiscountService $discountService,
     ) {}
 
     /**
@@ -174,6 +177,19 @@ class WalletController extends Controller
             $customerEmail = $user->email ?? $request->input('customer_email') ?? config('payment.default_customer_email', 'noreply@nathefah.com');
             $customerName = $user->name ?? $request->input('customer_name');
             $customerPhone = $user->phone ?? $request->input('customer_phone');
+            $defaultAddress = Address::query()
+                ->where('client_id', $user->id)
+                ->where('is_default', true)
+                ->latest('id')
+                ->first()
+                ?? Address::query()->where('client_id', $user->id)->latest('id')->first();
+            $walletPromotion = $this->discountService->findBestWalletTopupDiscount(
+                (float) $request->amount,
+                (int) $user->id,
+                null,
+                $defaultAddress?->city,
+                app()->getLocale()
+            );
 
             // Build payment callback URLs
             $baseUrl = config('app.url');
@@ -206,6 +222,8 @@ class WalletController extends Controller
                     'payment_method' => $request->payment_method,
                     'payment_option' => $this->getPayfortPaymentOption($request->payment_method),
                     'card_id' => $request->card_id ?? null,
+                    'wallet_bonus_discount_id' => $walletPromotion['applied'] ? $walletPromotion['discount']?->id : null,
+                    'wallet_bonus_amount' => $walletPromotion['applied'] ? (float) $walletPromotion['bonus_amount'] : 0,
                 ],
                 enableTokenization: false,
             );
@@ -238,6 +256,8 @@ class WalletController extends Controller
                     'wallet_reference_id' => $walletReferenceId,
                     'wallet_deposit' => true,
                     'client_id' => $user->id,
+                    'wallet_bonus_discount_id' => $walletPromotion['applied'] ? $walletPromotion['discount']?->id : null,
+                    'wallet_bonus_amount' => $walletPromotion['applied'] ? (float) $walletPromotion['bonus_amount'] : 0,
                 ]),
             ]);
 
@@ -265,6 +285,14 @@ class WalletController extends Controller
                     'transaction_id' => $paymentTransaction->transaction_id,
                     'status' => $paymentTransaction->status,
                     'reference_id' => $walletReferenceId,
+                    'wallet_bonus_amount' => $walletPromotion['applied'] ? (float) $walletPromotion['bonus_amount'] : 0,
+                    'wallet_bonus_discount' => $walletPromotion['applied'] ? [
+                        'id' => $walletPromotion['discount']?->id,
+                        'code' => $walletPromotion['discount']?->code,
+                        'name' => method_exists($walletPromotion['discount'], 'getTranslation')
+                            ? $walletPromotion['discount']?->getTranslation('name', app()->getLocale())
+                            : $walletPromotion['discount']?->name,
+                    ] : null,
                     'verify_url' => $verifyUrl,
                     'payment_params' => $paymentParams,
                     'payment_method_type' => 'redirect',
@@ -307,6 +335,7 @@ class WalletController extends Controller
                             'date' => now()->toISOString(),
                         ],
                         'new_balance' => (float) $newBalance,
+                        'wallet_bonus_amount' => $walletPromotion['applied'] ? (float) $walletPromotion['bonus_amount'] : 0,
                         'verify_url' => route('user.wallet.deposit.verify', ['transactionId' => $walletReferenceId]),
                     ], __('client.deposit_added'), 201);
 

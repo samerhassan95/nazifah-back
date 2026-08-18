@@ -683,9 +683,11 @@ class OrderTrackingController extends Controller
             $itemsData = [];
             $totalAmount = 0;
             $discountAmount = 0;
+            $deliveryDiscountAmount = 0;
             $appliedDiscount = null;
             $pieces = null;
             $storeBranchId = (int) $order->branch_id;
+            $discountItemsBreakdown = [];
 
             if ($request->has('items') && is_array($request->items) && count($request->items) > 0) {
                 if ($request->has('coupon_code') && $request->coupon_code) {
@@ -706,8 +708,10 @@ class OrderTrackingController extends Controller
 
                     $totalAmount = $result['data']['order_amount'];
                     $discountAmount = $result['data']['discount_amount'];
+                    $deliveryDiscountAmount = (float) ($result['data']['delivery_discount_amount'] ?? 0);
                     $appliedDiscount = $result['data']['discount'];
                     $pieces = $result['data']['pieces'];
+                    $discountItemsBreakdown = $result['data']['items_breakdown'] ?? [];
                 } else {
                     $pieceIds = collect($request->items)->pluck('piece_id')->unique()->map(fn ($id) => (int) $id);
                     $pieces = Piece::withTrashed()
@@ -946,7 +950,40 @@ class OrderTrackingController extends Controller
                 $deliveryFee = $pickupFee + $deliveryFeeAmount;
             }
 
-            $pricingTotals = Order::calculatePricingTotals($totalAmount, $discountAmount, $deliveryFee);
+            $discountCity = $deliveryAddress?->city ?? $pickupAddress?->city;
+            if ($appliedDiscount && $discountItemsBreakdown !== []) {
+                $rechecked = $this->discountService->evaluateKnownOrderDiscount(
+                    $appliedDiscount,
+                    $discountItemsBreakdown,
+                    (float) $totalAmount,
+                    (int) $user->id,
+                    (int) $vendorId,
+                    $storeBranchId,
+                    (float) $deliveryFee,
+                    $discountCity,
+                    false,
+                    $lang
+                );
+                $discountAmount = (float) $rechecked['discount_amount'];
+                $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);
+            } elseif (! $request->filled('coupon_code')) {
+                $automatic = $this->discountService->findBestAutomaticOrderDiscount(
+                    $request->items ?? [],
+                    (int) $user->id,
+                    (int) $vendorId,
+                    $lang,
+                    $storeBranchId,
+                    (float) $deliveryFee,
+                    $discountCity
+                );
+                if ($automatic['applied']) {
+                    $appliedDiscount = $automatic['discount'];
+                    $discountAmount = (float) $automatic['discount_amount'];
+                    $deliveryDiscountAmount = (float) ($automatic['delivery_discount_amount'] ?? 0);
+                }
+            }
+
+            $pricingTotals = Order::calculatePricingTotals($totalAmount, $discountAmount, $deliveryFee, $deliveryDiscountAmount);
             $taxAmount = $pricingTotals['tax_amount'];
             $finalAmount = $pricingTotals['final_amount'];
 
@@ -1036,7 +1073,7 @@ class OrderTrackingController extends Controller
                             'total_amount' => $totalAmount,
                             'discount_amount' => $discountAmount,
                             'tax_amount' => $taxAmount,
-                            'delivery_fee' => $deliveryFee,
+                            'delivery_fee' => (float) $pricingTotals['delivery_fee'],
                             'final_amount' => $finalAmount,
                             'distance' => $totalDistance,
                             'pickup_at_vendor' => $pickupAtVendor,
@@ -1118,7 +1155,7 @@ class OrderTrackingController extends Controller
                 'discount_amount' => $discountAmount,
                 'discount_id' => $appliedDiscount?->id,
                 'tax_amount' => $taxAmount,
-                'delivery_fee' => $deliveryFee,
+                            'delivery_fee' => (float) $pricingTotals['delivery_fee'],
                 'final_amount' => $finalAmount,
                 'distance' => $totalDistance,
             ];

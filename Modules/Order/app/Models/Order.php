@@ -752,6 +752,7 @@ class Order extends Model
      * @return array{
      *     subtotal: float,
      *     discount_amount: float,
+     *     delivery_discount_amount: float,
      *     subtotal_after_discount: float,
      *     tax_percentage: float,
      *     tax_amount: float,
@@ -763,21 +764,25 @@ class Order extends Model
         float $itemsSubtotal,
         float $discountAmount,
         float $deliveryFee,
+        float $deliveryDiscountAmount = 0.0,
         ?float $taxPercentage = null
     ): array {
         $taxPercentage ??= self::getTaxRate();
         $discountAmount = min(max(0, $discountAmount), max(0, $itemsSubtotal));
+        $deliveryDiscountAmount = min(max(0, $deliveryDiscountAmount), max(0, $deliveryFee));
         $itemsAfterDiscount = $itemsSubtotal - $discountAmount;
+        $effectiveDeliveryFee = $deliveryFee - $deliveryDiscountAmount;
         $taxAmount = round($itemsSubtotal * $taxPercentage / 100, 2);
-        $finalAmount = round($itemsAfterDiscount + $taxAmount + $deliveryFee, 2);
+        $finalAmount = round($itemsAfterDiscount + $taxAmount + $effectiveDeliveryFee, 2);
 
         return [
             'subtotal' => round($itemsSubtotal, 2),
             'discount_amount' => round($discountAmount, 2),
+            'delivery_discount_amount' => round($deliveryDiscountAmount, 2),
             'subtotal_after_discount' => round($itemsAfterDiscount, 2),
             'tax_percentage' => (float) $taxPercentage,
             'tax_amount' => $taxAmount,
-            'delivery_fee' => round($deliveryFee, 2),
+            'delivery_fee' => round($effectiveDeliveryFee, 2),
             'final_amount' => $finalAmount,
         ];
     }

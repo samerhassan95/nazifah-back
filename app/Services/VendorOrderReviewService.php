@@ -624,6 +624,11 @@ class VendorOrderReviewService
      */
     private function recalculateDiscount(Order $order, float $newTotal): float
     {
+        if ($order->discount) {
+            return app(\Modules\Discount\Services\DiscountService::class)
+                ->amountForOrderTotal($order->discount, $newTotal);
+        }
+
         if (! $order->original_total_amount || (float) $order->original_total_amount == 0) {
             return 0;
         }
