@@ -14,7 +14,7 @@ return [
     'mastercard' => 'ماستركارد',
     'mada' => 'مدى',
     'credit_card' => 'دفع إلكتروني',
-    'nazefah_wallet' => 'محفظة نتيفة',
+    'nazefah_wallet' => 'محفظة نظيفة',
     'stc_pay' => 'STC Pay',
     'samsung_pay' => 'سامسونج باي',
 
