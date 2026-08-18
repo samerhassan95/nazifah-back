@@ -640,7 +640,7 @@ class OrderController extends Controller
             );
 
             return successResponse([
-                'have_coupon' => (bool) $appliedDiscount,
+                'have_coupon' => $request->filled('coupon_code') && (bool) $appliedDiscount,
                 'summary' => array_merge([
                     'items' => $itemsSummary,
                     'items_count' => count($itemsSummary),
@@ -666,6 +666,8 @@ class OrderController extends Controller
                     'type' => $appliedDiscount->type,
                     'value' => (float) $appliedDiscount->value,
                     'discount_amount' => (float) $discountAmount,
+                    'delivery_discount_amount' => (float) $deliveryDiscountAmount,
+                    'is_automatic' => (bool) ($appliedDiscount->is_automatic ?? false),
                 ] : null,
             ], $couponSuccessMessage ?? __('order.order_calculation_completed'));
 

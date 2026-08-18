@@ -1218,6 +1218,9 @@ class DiscountService
             }
 
             $savings = (float) ($evaluation['discount_amount'] ?? 0.0) + (float) ($evaluation['delivery_discount_amount'] ?? 0.0);
+            if ($savings <= 0) {
+                continue;
+            }
             if ($best === null || $this->isBetterCandidate($discount, $savings, $best['discount'], $best['savings'])) {
                 $best = [
                     'discount' => $discount,
