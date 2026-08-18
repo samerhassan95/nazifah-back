@@ -26,11 +26,11 @@ class PaymentMethod extends Model
     }
 
     /**
-     * Client-facing method value. Internally we still store credit_card.
+     * Client-facing method value. Keys stay as stored; only labels change.
      */
     public static function publicValue(string $methodKey): string
     {
-        return $methodKey === 'credit_card' ? 'digital_payment' : $methodKey;
+        return $methodKey;
     }
 
     /**
@@ -157,12 +157,14 @@ class PaymentMethod extends Model
         }
 
         $isInternal = in_array($method->method_key, ['cash_on_delivery', 'nazefah_wallet'], true);
-        $gatewayKey = $isInternal ? $method->method_key : $activeGateway;
+        $type = in_array($method->method_key, ['cash_on_delivery', 'nazefah_wallet', 'credit_card'], true)
+            ? $method->method_key
+            : $activeGateway;
 
         $payload = [
             'id' => $method->id,
-            'type' => $gatewayKey,
-            'value' => self::publicValue($method->method_key),
+            'type' => $type,
+            'value' => $method->method_key,
             'label' => $enum->getDisplayName($locale),
             'is_active' => $method->is_active,
             'sort_order' => $method->sort_order,
@@ -223,9 +225,9 @@ class PaymentMethod extends Model
 
         $remaining[] = [
             'id' => (int) $creditCard['id'],
-            'type' => 'moyasar',
-            'value' => 'digital_payment',
-            'label' => __('payment.digital_payment', [], $locale),
+            'type' => 'credit_card',
+            'value' => 'credit_card',
+            'label' => __('payment.credit_card', [], $locale),
             'is_active' => true,
             'sort_order' => (int) ($creditCard['sort_order'] ?? 1),
             'payfort_option' => null,
