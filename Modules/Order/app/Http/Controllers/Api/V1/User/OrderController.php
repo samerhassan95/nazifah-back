@@ -2707,7 +2707,32 @@ class OrderController extends Controller
     }
 
     /**
-     * Qty-split / twin rejected rows of the same piece + services become one line.
+     * Keep one service row per name so a main service and an addition
+     * with the same Arabic label do not appear twice.
+     *
+     * @param  list<array<string, mixed>>  $services
+     * @return list<array<string, mixed>>
+     */
+    private function uniquePendingApprovalServices(array $services): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($services as $service) {
+            $name = trim((string) ($service['name'] ?? ''));
+            if ($name === '' || isset($seen[$name])) {
+                continue;
+            }
+            $seen[$name] = true;
+            $unique[] = $service;
+        }
+
+        return $unique;
+    }
+
+    /**
+     * One rejected line per piece: unique service names, no twin rows
+     * from qty-split, notes, images, or main-vs-addition id mismatch.
      *
      * @param  list<array<string, mixed>>  $rejectedItems
      * @return list<array<string, mixed>>
@@ -2717,32 +2742,56 @@ class OrderController extends Controller
         $merged = [];
 
         foreach ($rejectedItems as $item) {
-            $serviceKey = collect($item['services'] ?? [])
-                ->map(fn ($service) => (string) ($service['id'] ?? '').':'.(string) ($service['name'] ?? ''))
-                ->sort()
-                ->implode(',');
-            $key = implode('|', [
-                (string) ($item['piece_name'] ?? ''),
-                $serviceKey,
-                (string) ($item['note'] ?? ''),
-                (string) ($item['image'] ?? ''),
-                (string) ($item['vendor_notes'] ?? ''),
-            ]);
+            $item['services'] = $this->uniquePendingApprovalServices($item['services'] ?? []);
+            $incomingNames = collect($item['services'])->pluck('name')->filter()->values();
+            $item['service_name'] = $incomingNames->implode('، ') ?: ($item['service_name'] ?? 'Unknown');
+            $pieceKey = (string) ($item['piece_name'] ?? '');
 
-            if (! isset($merged[$key])) {
-                $merged[$key] = $item;
+            if (! isset($merged[$pieceKey])) {
+                $merged[$pieceKey] = $item;
                 continue;
             }
 
-            $merged[$key]['ids'] = array_values(array_unique(array_merge(
-                $merged[$key]['ids'] ?? [],
+            $existingNames = collect($merged[$pieceKey]['services'] ?? [])->pluck('name')->filter()->values();
+            $isSameServices = $existingNames->sort()->values()->all() === $incomingNames->sort()->values()->all();
+
+            $merged[$pieceKey]['ids'] = array_values(array_unique(array_merge(
+                $merged[$pieceKey]['ids'] ?? [],
                 $item['ids'] ?? []
             )));
-            $merged[$key]['quantity'] = (int) ($merged[$key]['quantity'] ?? 0) + (int) ($item['quantity'] ?? 0);
-            $merged[$key]['total_price'] = round(
-                (float) ($merged[$key]['total_price'] ?? 0) + (float) ($item['total_price'] ?? 0),
+            $merged[$pieceKey]['services'] = $this->uniquePendingApprovalServices(array_merge(
+                $merged[$pieceKey]['services'] ?? [],
+                $item['services'] ?? []
+            ));
+            $merged[$pieceKey]['service_name'] = collect($merged[$pieceKey]['services'])
+                ->pluck('name')
+                ->filter()
+                ->implode('، ') ?: 'Unknown';
+            $merged[$pieceKey]['unit_price'] = round(
+                collect($merged[$pieceKey]['services'])->sum(fn ($service) => (float) ($service['price'] ?? 0)),
                 2
             );
+
+            if ($isSameServices) {
+                $merged[$pieceKey]['quantity'] = (int) ($merged[$pieceKey]['quantity'] ?? 0) + (int) ($item['quantity'] ?? 0);
+            } else {
+                $merged[$pieceKey]['quantity'] = max(
+                    (int) ($merged[$pieceKey]['quantity'] ?? 1),
+                    (int) ($item['quantity'] ?? 1)
+                );
+            }
+
+            $merged[$pieceKey]['total_price'] = round(
+                (float) ($merged[$pieceKey]['unit_price'] ?? 0) * (int) ($merged[$pieceKey]['quantity'] ?? 1),
+                2
+            );
+
+            if (empty($merged[$pieceKey]['image']) && ! empty($item['image'])) {
+                $merged[$pieceKey]['image'] = $item['image'];
+            }
+            if (empty($merged[$pieceKey]['vendor_notes']) && ! empty($item['vendor_notes'])) {
+                $merged[$pieceKey]['vendor_notes'] = $item['vendor_notes'];
+            }
         }
 
         return array_values($merged);
