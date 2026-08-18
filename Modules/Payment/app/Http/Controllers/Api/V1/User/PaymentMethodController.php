@@ -20,7 +20,7 @@ class PaymentMethodController extends Controller
         $activeGateway = ActiveGatewayResolver::name();
         $tags = ['payment_methods'];
         $versionKey = getTagVersionKey($tags);
-        $cacheKey = "user:v1:payment_methods:{$activeGateway}:v{$versionKey}:{$locale}";
+        $cacheKey = "user:v2:payment_methods:{$activeGateway}:v{$versionKey}:{$locale}";
 
         $payload = Cache::remember($cacheKey, 86400, function () use ($locale) {
             return PaymentMethod::getActivePayloadForUser($locale);

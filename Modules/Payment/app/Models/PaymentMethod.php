@@ -25,6 +25,14 @@ class PaymentMethod extends Model
         flushCacheTags(['payment_methods']);
     }
 
+    /**
+     * Client-facing method value. Internally we still store credit_card.
+     */
+    public static function publicValue(string $methodKey): string
+    {
+        return $methodKey === 'credit_card' ? 'digital_payment' : $methodKey;
+    }
+
     protected $fillable = [
         'method_key',
         'is_active',
@@ -89,7 +97,11 @@ class PaymentMethod extends Model
         // Amazon Pay keeps per-method options; hide the Moyasar-only aggregate row.
         return array_values(array_filter(
             $methods,
-            fn (array $method) => ($method['value'] ?? '') !== 'credit_card'
+            fn (array $method) => ! in_array(
+                (string) ($method['value'] ?? ''),
+                ['credit_card', 'digital_payment'],
+                true
+            )
         ));
     }
 
@@ -125,7 +137,7 @@ class PaymentMethod extends Model
         $payload = [
             'id' => $method->id,
             'type' => $gatewayKey,
-            'value' => $method->method_key,
+            'value' => self::publicValue($method->method_key),
             'label' => $enum->getDisplayName($locale),
             'is_active' => $method->is_active,
             'sort_order' => $method->sort_order,
@@ -154,11 +166,11 @@ class PaymentMethod extends Model
     private static function collapseGatewayMethodsForMoyasar(array $methods, string $locale): array
     {
         $internalValues = ['cash_on_delivery', 'nazefah_wallet'];
-        $creditCardValue = 'credit_card';
+        $aggregateValues = ['credit_card', 'digital_payment'];
 
         $creditCard = null;
         foreach ($methods as $method) {
-            if (($method['value'] ?? '') === $creditCardValue) {
+            if (in_array((string) ($method['value'] ?? ''), $aggregateValues, true)) {
                 $creditCard = $method;
                 break;
             }
@@ -168,7 +180,7 @@ class PaymentMethod extends Model
             $methods,
             fn (array $method) => ! in_array(
                 (string) ($method['value'] ?? ''),
-                [...$internalValues, $creditCardValue],
+                [...$internalValues, ...$aggregateValues],
                 true
             )
         ));
@@ -187,8 +199,8 @@ class PaymentMethod extends Model
         $remaining[] = [
             'id' => (int) $creditCard['id'],
             'type' => 'moyasar',
-            'value' => $creditCardValue,
-            'label' => __('payment.credit_card', [], $locale),
+            'value' => 'digital_payment',
+            'label' => __('payment.digital_payment', [], $locale),
             'is_active' => true,
             'sort_order' => (int) ($creditCard['sort_order'] ?? 1),
             'payfort_option' => null,
