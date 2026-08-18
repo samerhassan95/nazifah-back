@@ -660,12 +660,12 @@ class OrderController extends Controller
                     ] : null,
                     'branch_location' => $branch->getApiLocation($lang),
                 ],
-                'discount' => $appliedDiscount ? [
+                'discount' => ($request->filled('coupon_code') && $appliedDiscount) ? [
                     'code' => $appliedDiscount->code,
                     'name' => $appliedDiscount->name,
                     'type' => $appliedDiscount->type,
                     'value' => (float) $appliedDiscount->value,
-                    'discount_amount' => (float) $discountAmount,
+                    'discount_amount' => round((float) $discountAmount + (float) $deliveryDiscountAmount, 2),
                     'delivery_discount_amount' => (float) $deliveryDiscountAmount,
                     'is_automatic' => (bool) ($appliedDiscount->is_automatic ?? false),
                 ] : null,
