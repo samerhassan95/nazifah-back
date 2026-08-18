@@ -203,6 +203,31 @@ class OrderTrackingController extends Controller
             $lang,
             fn ($item) => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null
         ))->values();
+        $rejectedItems = $mappedItems
+            ->filter(fn (array $line) => ($line['status'] ?? 'accepted') === 'rejected')
+            ->map(function (array $line) {
+                $services = $line['services'] ?? [];
+
+                return [
+                    'id' => $line['id'] ?? null,
+                    'ids' => $line['ids'] ?? [],
+                    'piece_name' => $line['piece']['name'] ?? 'Unknown',
+                    'service_name' => collect($services)->pluck('name')->filter()->implode('، ') ?: 'Unknown',
+                    'services' => $services,
+                    'quantity' => (int) ($line['quantity'] ?? 1),
+                    'unit_price' => (float) ($line['unit_price'] ?? 0),
+                    'total_price' => (float) ($line['total_price'] ?? 0),
+                    'vendor_notes' => $line['vendor_notes'] ?? null,
+                    'note' => $line['note'] ?? null,
+                    'description' => $line['note'] ?? null,
+                    'image' => $line['image'] ?? null,
+                    'additional_services' => [],
+                    'status' => 'rejected',
+                    'piece' => $line['piece'] ?? null,
+                    'service' => $line['service'] ?? null,
+                ];
+            })
+            ->values();
 
         return successResponse(array_merge([
             'order_id' => $order->id,
@@ -247,6 +272,8 @@ class OrderTrackingController extends Controller
                 'is_default' => (bool) $clientDefaultAddress->is_default,
             ] : null,
             'items' => $mappedItems,
+            'rejected_items' => $rejectedItems,
+            'rejected_count' => $rejectedItems->count(),
             'pickup_address' => ($order->pickup_at_vendor || ! $order->pickup_address_id) ? null : ($order->pickupAddress ? [
                 'id' => $order->pickupAddress->id,
                 'title' => $order->pickupAddress->title,

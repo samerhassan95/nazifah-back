@@ -189,6 +189,24 @@ class OrderItemGrouper
             : $acceptedAdditionsTotal;
         $totalPrice = round(($unitPrice * $quantity) + $displayAdditionsTotal, 2);
 
+        if ($itemStatus === 'rejected') {
+            foreach ($additionalServices as $addition) {
+                $services[] = [
+                    'id' => $addition['id'] ?? null,
+                    'service_id' => $addition['id'] ?? null,
+                    'name' => $addition['name'] ?? '',
+                    'service_name' => $addition['name'] ?? '',
+                    'icon' => $addition['icon'] ?? null,
+                    'price' => (float) ($addition['price'] ?? 0),
+                ];
+            }
+            $services = self::uniqueServicesByName($services);
+            $additionalServices = [];
+            $displayAdditionsTotal = 0.0;
+            $unitPrice = round(collect($services)->sum(fn ($service) => (float) ($service['price'] ?? 0)), 2);
+            $totalPrice = round($unitPrice * $quantity, 2);
+        }
+
         return [
             'id' => $primary->id,
             'ids' => $ids,
@@ -293,7 +311,18 @@ class OrderItemGrouper
                 continue;
             }
 
+            foreach ($line['additional_services'] ?? [] as $addition) {
+                $line['services'][] = [
+                    'id' => $addition['id'] ?? null,
+                    'service_id' => $addition['id'] ?? null,
+                    'name' => $addition['name'] ?? '',
+                    'service_name' => $addition['name'] ?? '',
+                    'icon' => $addition['icon'] ?? null,
+                    'price' => (float) ($addition['price'] ?? 0),
+                ];
+            }
             $line['services'] = self::uniqueServicesByName($line['services'] ?? []);
+            $line['additional_services'] = [];
             $piece = is_array($line['piece'] ?? null) ? $line['piece'] : [];
             $pieceKey = (string) (($piece['id'] ?? '').'|'.($piece['name'] ?? ''));
             if ($pieceKey === '|') {
@@ -303,6 +332,8 @@ class OrderItemGrouper
             if (! isset($rejectedIndexByPiece[$pieceKey])) {
                 $rejectedIndexByPiece[$pieceKey] = count($result);
                 $line['service'] = $line['services'][0] ?? ($line['service'] ?? null);
+                $line['additional_services'] = [];
+                $line['additional_services_total'] = 0.0;
                 $result[] = $line;
 
                 continue;
@@ -323,14 +354,9 @@ class OrderItemGrouper
                 $line['services'] ?? []
             ));
             $existing['service'] = $existing['services'][0] ?? ($existing['service'] ?? null);
-            $existing['additional_services'] = self::uniqueAdditionsByKey(array_merge(
-                $existing['additional_services'] ?? [],
-                $line['additional_services'] ?? []
-            ));
+            $existing['additional_services'] = [];
 
             $servicesTotal = (float) collect($existing['services'])->sum(fn ($service) => (float) ($service['price'] ?? 0));
-            $additionsTotal = (float) collect($existing['additional_services'])
-                ->sum(fn ($addition) => (float) ($addition['total'] ?? $addition['total_price'] ?? 0));
 
             if ($isSameServices) {
                 $existing['quantity'] = (int) ($existing['quantity'] ?? 0) + (int) ($line['quantity'] ?? 0);
@@ -339,8 +365,8 @@ class OrderItemGrouper
             }
 
             $existing['unit_price'] = round($servicesTotal, 2);
-            $existing['additional_services_total'] = round($additionsTotal, 2);
-            $existing['total_price'] = round(($existing['unit_price'] * (int) $existing['quantity']) + $additionsTotal, 2);
+            $existing['additional_services_total'] = 0.0;
+            $existing['total_price'] = round($existing['unit_price'] * (int) $existing['quantity'], 2);
 
             if (empty($existing['image']) && ! empty($line['image'])) {
                 $existing['image'] = $line['image'];
@@ -371,27 +397,6 @@ class OrderItemGrouper
             }
             $seen[$name] = true;
             $unique[] = $service;
-        }
-
-        return $unique;
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $additions
-     * @return list<array<string, mixed>>
-     */
-    private static function uniqueAdditionsByKey(array $additions): array
-    {
-        $seen = [];
-        $unique = [];
-
-        foreach ($additions as $addition) {
-            $key = (string) ($addition['id'] ?? '').'#'.trim((string) ($addition['name'] ?? ''));
-            if (isset($seen[$key])) {
-                continue;
-            }
-            $seen[$key] = true;
-            $unique[] = $addition;
         }
 
         return $unique;
