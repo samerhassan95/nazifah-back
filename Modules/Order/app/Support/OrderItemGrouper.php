@@ -52,7 +52,7 @@ class OrderItemGrouper
             $lines[] = self::mapGroup($groupItems, $branchId, $lang, $imageResolver);
         }
 
-        return $lines;
+        return self::collapseRejectedLines($lines);
     }
 
     /**
@@ -272,5 +272,128 @@ class OrderItemGrouper
             'additional_services_total' => $acceptedAdditionsTotal,
             'all_additional_services_total' => $allAdditionsTotal,
         ];
+    }
+
+    /**
+     * Qty-split / twin rejected rows of the same piece become one line,
+     * with unique service names (main service vs addition with the same label).
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @return list<array<string, mixed>>
+     */
+    private static function collapseRejectedLines(array $lines): array
+    {
+        $result = [];
+        $rejectedIndexByPiece = [];
+
+        foreach ($lines as $line) {
+            if (($line['status'] ?? 'accepted') !== 'rejected') {
+                $result[] = $line;
+
+                continue;
+            }
+
+            $line['services'] = self::uniqueServicesByName($line['services'] ?? []);
+            $piece = is_array($line['piece'] ?? null) ? $line['piece'] : [];
+            $pieceKey = (string) (($piece['id'] ?? '').'|'.($piece['name'] ?? ''));
+            if ($pieceKey === '|') {
+                $pieceKey = 'line:'.($line['id'] ?? spl_object_id((object) $line));
+            }
+
+            if (! isset($rejectedIndexByPiece[$pieceKey])) {
+                $rejectedIndexByPiece[$pieceKey] = count($result);
+                $line['service'] = $line['services'][0] ?? ($line['service'] ?? null);
+                $result[] = $line;
+
+                continue;
+            }
+
+            $index = $rejectedIndexByPiece[$pieceKey];
+            $existing = $result[$index];
+            $existingNames = collect($existing['services'] ?? [])->pluck('name')->filter()->sort()->values()->all();
+            $incomingNames = collect($line['services'] ?? [])->pluck('name')->filter()->sort()->values()->all();
+            $isSameServices = $existingNames === $incomingNames;
+
+            $existing['ids'] = array_values(array_unique(array_merge(
+                $existing['ids'] ?? [],
+                $line['ids'] ?? []
+            )));
+            $existing['services'] = self::uniqueServicesByName(array_merge(
+                $existing['services'] ?? [],
+                $line['services'] ?? []
+            ));
+            $existing['service'] = $existing['services'][0] ?? ($existing['service'] ?? null);
+            $existing['additional_services'] = self::uniqueAdditionsByKey(array_merge(
+                $existing['additional_services'] ?? [],
+                $line['additional_services'] ?? []
+            ));
+
+            $servicesTotal = (float) collect($existing['services'])->sum(fn ($service) => (float) ($service['price'] ?? 0));
+            $additionsTotal = (float) collect($existing['additional_services'])
+                ->sum(fn ($addition) => (float) ($addition['total'] ?? $addition['total_price'] ?? 0));
+
+            if ($isSameServices) {
+                $existing['quantity'] = (int) ($existing['quantity'] ?? 0) + (int) ($line['quantity'] ?? 0);
+            } else {
+                $existing['quantity'] = max((int) ($existing['quantity'] ?? 1), (int) ($line['quantity'] ?? 1));
+            }
+
+            $existing['unit_price'] = round($servicesTotal, 2);
+            $existing['additional_services_total'] = round($additionsTotal, 2);
+            $existing['total_price'] = round(($existing['unit_price'] * (int) $existing['quantity']) + $additionsTotal, 2);
+
+            if (empty($existing['image']) && ! empty($line['image'])) {
+                $existing['image'] = $line['image'];
+            }
+            if (empty($existing['note']) && ! empty($line['note'])) {
+                $existing['note'] = $line['note'];
+            }
+
+            $result[$index] = $existing;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $services
+     * @return list<array<string, mixed>>
+     */
+    private static function uniqueServicesByName(array $services): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($services as $service) {
+            $name = trim((string) ($service['name'] ?? $service['service_name'] ?? ''));
+            if ($name === '' || isset($seen[$name])) {
+                continue;
+            }
+            $seen[$name] = true;
+            $unique[] = $service;
+        }
+
+        return $unique;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $additions
+     * @return list<array<string, mixed>>
+     */
+    private static function uniqueAdditionsByKey(array $additions): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($additions as $addition) {
+            $key = (string) ($addition['id'] ?? '').'#'.trim((string) ($addition['name'] ?? ''));
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $unique[] = $addition;
+        }
+
+        return $unique;
     }
 }
