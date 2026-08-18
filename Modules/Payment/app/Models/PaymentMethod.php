@@ -33,6 +33,31 @@ class PaymentMethod extends Model
         return $methodKey === 'credit_card' ? 'digital_payment' : $methodKey;
     }
 
+    /**
+     * Resolve a client payment-method payload (value, type, id, or object) to a stored key.
+     */
+    public static function resolveFromClientInput(mixed $raw): ?string
+    {
+        if (is_array($raw)) {
+            $raw = $raw['value'] ?? $raw['payment_method'] ?? $raw['type'] ?? $raw['moyasar_source'] ?? $raw[0] ?? null;
+        }
+
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        $raw = trim((string) $raw);
+
+        if ($raw !== '' && ctype_digit($raw)) {
+            $row = self::query()->find((int) $raw);
+            if ($row) {
+                $raw = $row->method_key;
+            }
+        }
+
+        return \App\Enums\PaymentMethod::normalize($raw);
+    }
+
     protected $fillable = [
         'method_key',
         'is_active',

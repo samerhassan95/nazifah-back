@@ -10,10 +10,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Modules\Address\Models\Address;
 use Modules\Client\Models\ClientCard;
 use Modules\Discount\Services\DiscountService;
 use Modules\Payment\DTOs\PaymentRequest;
+use Modules\Payment\Models\PaymentMethod as PaymentMethodRecord;
 use Modules\Payment\Models\PaymentTransaction;
 use Modules\Payment\Services\PaymentService;
 use Modules\Payment\Services\WalletDepositCreditor;
@@ -126,15 +128,21 @@ class WalletController extends Controller
      */
     public function addDeposit(Request $request): JsonResponse
     {
-        // Payment methods allowed for wallet deposits (exclude cash_on_delivery and nazefah_wallet)
-        $allowedPaymentMethods = array_filter(
-            PaymentMethod::acceptedValues(),
-            fn ($method) => ! in_array($method, [PaymentMethod::CASH_ON_DELIVERY->value, PaymentMethod::Nathefah_WALLET->value])
+        $resolvedMethod = PaymentMethodRecord::resolveFromClientInput(
+            $request->input('payment_method', $request->input('payment_methods'))
         );
+        if ($resolvedMethod !== null) {
+            $request->merge(['payment_method' => $resolvedMethod]);
+        }
+
+        $allowedPaymentMethods = array_values(array_filter(
+            PaymentMethod::values(),
+            fn ($method) => ! in_array($method, [PaymentMethod::CASH_ON_DELIVERY->value, PaymentMethod::Nathefah_WALLET->value], true)
+        ));
 
         $validator = Validator::make($request->all(), [
             'amount' => ['required', 'numeric', 'min:1'],
-            'payment_method' => ['required', 'string', 'in:'.implode(',', $allowedPaymentMethods)],
+            'payment_method' => ['required', 'string', Rule::in($allowedPaymentMethods)],
             'card_id' => ['nullable', 'integer', 'exists:client_cards,id'],
         ]);
 

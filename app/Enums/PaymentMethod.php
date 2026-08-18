@@ -38,7 +38,28 @@ enum PaymentMethod: string
      */
     public static function normalize(string $value): string
     {
-        return $value === self::DIGITAL_PAYMENT ? self::CREDIT_CARD->value : $value;
+        $trimmed = trim($value);
+        $arabicAliases = [
+            'دفع إلكتروني' => self::CREDIT_CARD->value,
+            'دفع الكتروني' => self::CREDIT_CARD->value,
+            'الدفع الإلكتروني' => self::CREDIT_CARD->value,
+            'الدفع الالكتروني' => self::CREDIT_CARD->value,
+        ];
+        if (isset($arabicAliases[$trimmed])) {
+            return $arabicAliases[$trimmed];
+        }
+
+        $key = strtolower(str_replace(['-', ' '], '_', $trimmed));
+
+        return match ($key) {
+            'digital_payment',
+            'electronic_payment',
+            'electronic',
+            'moyasar',
+            'creditcard',
+            'credit_card' => self::CREDIT_CARD->value,
+            default => $key !== '' ? $key : $trimmed,
+        };
     }
 
     /**

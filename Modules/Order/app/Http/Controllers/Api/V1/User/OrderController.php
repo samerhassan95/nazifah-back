@@ -3194,8 +3194,15 @@ class OrderController extends Controller
      */
     public function completePayment(Request $request, int $orderId): JsonResponse
     {
+        $resolvedMethod = \Modules\Payment\Models\PaymentMethod::resolveFromClientInput(
+            $request->input('payment_method', $request->input('payment_methods'))
+        );
+        if ($resolvedMethod !== null) {
+            $request->merge(['payment_method' => $resolvedMethod]);
+        }
+
         $validator = Validator::make($request->all(), [
-            'payment_method' => ['required', 'string', 'in:'.implode(',', PaymentMethod::acceptedValues())],
+            'payment_method' => ['required', 'string', Rule::in(PaymentMethod::values())],
         ]);
 
         if ($validator->fails()) {
