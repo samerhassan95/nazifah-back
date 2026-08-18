@@ -146,7 +146,7 @@ class OrderPaymentService
      */
     private function normalizePaymentMethodAlias(string $method): string
     {
-        if ($method === 'digital_payment') {
+        if ($method === PaymentMethod::DIGITAL_PAYMENT) {
             $method = self::CREDIT_CARD_ALIAS;
         }
 

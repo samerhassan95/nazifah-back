@@ -128,7 +128,7 @@ class WalletController extends Controller
     {
         // Payment methods allowed for wallet deposits (exclude cash_on_delivery and nazefah_wallet)
         $allowedPaymentMethods = array_filter(
-            PaymentMethod::values(),
+            PaymentMethod::acceptedValues(),
             fn ($method) => ! in_array($method, [PaymentMethod::CASH_ON_DELIVERY->value, PaymentMethod::Nathefah_WALLET->value])
         );
 
@@ -143,9 +143,10 @@ class WalletController extends Controller
         }
 
         $user = $request->user();
+        $paymentMethod = PaymentMethod::normalize((string) $request->payment_method);
 
         // Validate card belongs to user if payment method is visa/mastercard AND card_id is provided
-        if (in_array($request->payment_method, [
+        if (in_array($paymentMethod, [
             PaymentMethod::VISA->value,
             PaymentMethod::MASTERCARD->value,
         ]) && $request->has('card_id') && $request->card_id) {
@@ -161,7 +162,7 @@ class WalletController extends Controller
 
         // Map payment method to the ACTIVE gateway (admin-selected, DB-backed:
         // amazon_pay <-> moyasar). cash/wallet are settled in-app.
-        $gatewayName = PaymentMethod::getGatewayName($request->payment_method);
+        $gatewayName = PaymentMethod::getGatewayName($paymentMethod);
 
         try {
             // Set the payment gateway
@@ -215,12 +216,12 @@ class WalletController extends Controller
                 customerPhone: $customerPhone,
                 returnUrl: $returnUrl,
                 cancelUrl: $cancelUrl,
-                paymentOption: $this->getPayfortPaymentOption($request->payment_method),
+                paymentOption: $this->getPayfortPaymentOption($paymentMethod),
                 metadata: [
                     'wallet_deposit' => true,
                     'client_id' => $user->id,
-                    'payment_method' => $request->payment_method,
-                    'payment_option' => $this->getPayfortPaymentOption($request->payment_method),
+                    'payment_method' => $paymentMethod,
+                    'payment_option' => $this->getPayfortPaymentOption($paymentMethod),
                     'card_id' => $request->card_id ?? null,
                     'wallet_bonus_discount_id' => $walletPromotion['applied'] ? $walletPromotion['discount']?->id : null,
                     'wallet_bonus_amount' => $walletPromotion['applied'] ? (float) $walletPromotion['bonus_amount'] : 0,
@@ -248,7 +249,7 @@ class WalletController extends Controller
                 'amount' => $paymentResponse->amount ?? $request->amount,
                 'currency' => $paymentResponse->currency ?? config('payment.currency', 'SAR'),
                 'status' => $paymentResponse->status ?? 'pending',
-                'payment_method' => $request->payment_method,
+                'payment_method' => $paymentMethod,
                 'customer_email' => $customerEmail,
                 'customer_name' => $customerName,
                 'customer_phone' => $customerPhone,
@@ -330,7 +331,7 @@ class WalletController extends Controller
                             'payment_transaction_id' => $paymentTransaction->id,
                             'transaction_id' => $paymentTransaction->transaction_id,
                             'amount' => (float) $request->amount,
-                            'payment_method' => $request->payment_method,
+                            'payment_method' => $paymentMethod,
                             'status' => 'completed',
                             'date' => now()->toISOString(),
                         ],

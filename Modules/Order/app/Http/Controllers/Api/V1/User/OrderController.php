@@ -3195,7 +3195,7 @@ class OrderController extends Controller
     public function completePayment(Request $request, int $orderId): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'payment_method' => ['required', 'string', 'in:'.implode(',', PaymentMethod::values())],
+            'payment_method' => ['required', 'string', 'in:'.implode(',', PaymentMethod::acceptedValues())],
         ]);
 
         if ($validator->fails()) {

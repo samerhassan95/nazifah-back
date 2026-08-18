@@ -15,12 +15,30 @@ enum PaymentMethod: string
     case SAMSUNG_PAY = 'samsung_pay';           // Samsung Pay via Payfort
     case CREDIT_CARD = 'credit_card';           // Moyasar UI aggregate (all card/wallet gateway methods)
 
+    public const DIGITAL_PAYMENT = 'digital_payment';
+
     /**
      * Get all payment method values
      */
     public static function values(): array
     {
         return array_column(self::cases(), 'value');
+    }
+
+    /**
+     * Values accepted from the client app, including public aliases.
+     */
+    public static function acceptedValues(): array
+    {
+        return array_values(array_unique([...self::values(), self::DIGITAL_PAYMENT]));
+    }
+
+    /**
+     * Map client-facing aliases to the stored method key.
+     */
+    public static function normalize(string $value): string
+    {
+        return $value === self::DIGITAL_PAYMENT ? self::CREDIT_CARD->value : $value;
     }
 
     /**
@@ -84,7 +102,7 @@ enum PaymentMethod: string
      */
     public static function isValid(string $value): bool
     {
-        return in_array($value, self::values());
+        return in_array($value, self::acceptedValues(), true);
     }
 
     /**
