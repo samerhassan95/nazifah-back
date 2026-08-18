@@ -24,6 +24,7 @@ use Modules\Order\Models\OrderStatusLog;
 use Modules\Order\Services\OrderPaymentService;
 use Modules\Order\Support\OrderItemGrouper;
 use Modules\Order\Support\OrderItemsNormalizer;
+use Modules\Order\Support\PendingApprovalItemCategorizer;
 use Modules\Payment\Models\PaymentTransaction;
 use Modules\Payment\Services\PaymentService;
 use Modules\Piece\Models\Piece;
@@ -197,36 +198,38 @@ class OrderTrackingController extends Controller
         }
 
         $branchId = (int) ($order->branch_id ?? 0);
+        $imageUrlResolver = fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null;
+        $categorized = PendingApprovalItemCategorizer::categorize($order, $lang, $imageUrlResolver);
+        $rejectedItems = collect($categorized['rejected'])->values();
         $mappedItems = collect(OrderItemGrouper::toApiLines(
             $order->items,
             $branchId,
             $lang,
             fn ($item) => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null
-        ))->values();
-        $rejectedItems = $mappedItems
-            ->filter(fn (array $line) => ($line['status'] ?? 'accepted') === 'rejected')
-            ->map(function (array $line) {
-                $services = $line['services'] ?? [];
-
+        ))
+            ->reject(fn (array $line) => ($line['status'] ?? 'accepted') === 'rejected')
+            ->concat($rejectedItems->map(function (array $item) {
                 return [
-                    'id' => $line['id'] ?? null,
-                    'ids' => $line['ids'] ?? [],
-                    'piece_name' => $line['piece']['name'] ?? 'Unknown',
-                    'service_name' => collect($services)->pluck('name')->filter()->implode('، ') ?: 'Unknown',
-                    'services' => $services,
-                    'quantity' => (int) ($line['quantity'] ?? 1),
-                    'unit_price' => (float) ($line['unit_price'] ?? 0),
-                    'total_price' => (float) ($line['total_price'] ?? 0),
-                    'vendor_notes' => $line['vendor_notes'] ?? null,
-                    'note' => $line['note'] ?? null,
-                    'description' => $line['note'] ?? null,
-                    'image' => $line['image'] ?? null,
+                    'id' => $item['id'] ?? null,
+                    'ids' => $item['ids'] ?? [],
+                    'line_group' => null,
+                    'piece' => [
+                        'id' => $item['piece']['id'] ?? null,
+                        'name' => $item['piece_name'] ?? 'Unknown',
+                        'icon' => $item['piece']['icon'] ?? null,
+                    ],
+                    'service' => ($item['services'][0] ?? null),
+                    'services' => $item['services'] ?? [],
+                    'quantity' => (int) ($item['quantity'] ?? 1),
+                    'unit_price' => (float) ($item['unit_price'] ?? 0),
+                    'total_price' => (float) ($item['total_price'] ?? 0),
+                    'additional_services_total' => 0.0,
                     'additional_services' => [],
                     'status' => 'rejected',
-                    'piece' => $line['piece'] ?? null,
-                    'service' => $line['service'] ?? null,
+                    'note' => $item['note'] ?? null,
+                    'image' => $item['image'] ?? null,
                 ];
-            })
+            }))
             ->values();
 
         return successResponse(array_merge([
