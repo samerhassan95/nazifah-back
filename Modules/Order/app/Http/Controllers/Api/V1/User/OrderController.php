@@ -2525,6 +2525,8 @@ class OrderController extends Controller
                     }
                 }
 
+                $additionalServices = $this->uniquePendingApprovalAdditions($additionalServices);
+
                 $serviceName = collect($services)->pluck('name')->filter()->implode('، ') ?: 'Unknown';
                 $notes = $vendorNotes !== [] ? implode(' | ', array_unique($vendorNotes)) : null;
                 $itemDescription = $clientNote ?: null;
@@ -2633,7 +2635,9 @@ class OrderController extends Controller
 
                 // Group all rejected additions under one rejected line per piece
                 // (do not emit one rejected piece line per addition).
-                if ($rejectedAdditions !== []) {
+                // If this piece also has rejected main services, those additions
+                // already appear on that rejected line — do not emit a twin.
+                if ($rejectedAdditions !== [] && $byStatus['rejected']->isEmpty()) {
                     $rejectedAdditionsTotal = (float) collect($rejectedAdditions)->sum('total');
                     $servicesFromRejectedAdditions = collect($rejectedAdditions)
                         ->map(fn (array $addition) => [
@@ -2665,7 +2669,8 @@ class OrderController extends Controller
                         'note' => $clientNote,
                         'description' => $clientNote,
                         'image' => $itemImage,
-                        'additional_services' => $rejectedAdditions,
+                        // Mobile expands additional_services as sub-rows; keep them only in services.
+                        'additional_services' => [],
                     ];
                 }
             }
@@ -2673,9 +2678,74 @@ class OrderController extends Controller
 
         return [
             'accepted' => $acceptedItems,
-            'rejected' => $rejectedItems,
+            'rejected' => $this->mergeDuplicateRejectedPendingItems($rejectedItems),
             'modified' => $modifiedItems,
         ];
+    }
+
+    /**
+     * Keep one additional-service row per addition id inside a piece group.
+     *
+     * @param  list<array<string, mixed>>  $additionalServices
+     * @return list<array<string, mixed>>
+     */
+    private function uniquePendingApprovalAdditions(array $additionalServices): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($additionalServices as $addition) {
+            $key = (string) ($addition['id'] ?? '').'#'.(string) ($addition['name'] ?? '');
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $unique[] = $addition;
+        }
+
+        return $unique;
+    }
+
+    /**
+     * Qty-split / twin rejected rows of the same piece + services become one line.
+     *
+     * @param  list<array<string, mixed>>  $rejectedItems
+     * @return list<array<string, mixed>>
+     */
+    private function mergeDuplicateRejectedPendingItems(array $rejectedItems): array
+    {
+        $merged = [];
+
+        foreach ($rejectedItems as $item) {
+            $serviceKey = collect($item['services'] ?? [])
+                ->map(fn ($service) => (string) ($service['id'] ?? '').':'.(string) ($service['name'] ?? ''))
+                ->sort()
+                ->implode(',');
+            $key = implode('|', [
+                (string) ($item['piece_name'] ?? ''),
+                $serviceKey,
+                (string) ($item['note'] ?? ''),
+                (string) ($item['image'] ?? ''),
+                (string) ($item['vendor_notes'] ?? ''),
+            ]);
+
+            if (! isset($merged[$key])) {
+                $merged[$key] = $item;
+                continue;
+            }
+
+            $merged[$key]['ids'] = array_values(array_unique(array_merge(
+                $merged[$key]['ids'] ?? [],
+                $item['ids'] ?? []
+            )));
+            $merged[$key]['quantity'] = (int) ($merged[$key]['quantity'] ?? 0) + (int) ($item['quantity'] ?? 0);
+            $merged[$key]['total_price'] = round(
+                (float) ($merged[$key]['total_price'] ?? 0) + (float) ($item['total_price'] ?? 0),
+                2
+            );
+        }
+
+        return array_values($merged);
     }
 
     /**
