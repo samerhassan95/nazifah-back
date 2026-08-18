@@ -15,7 +15,7 @@ return [
     'mada' => 'MADA',
     'credit_card' => 'Digital Payment',
     'digital_payment' => 'Digital Payment',
-    'nazefah_wallet' => 'Nathefah Wallet',
+    'nazefah_wallet' => 'Wallet',
     'stc_pay' => 'STC Pay',
     'samsung_pay' => 'Samsung Pay',
 
