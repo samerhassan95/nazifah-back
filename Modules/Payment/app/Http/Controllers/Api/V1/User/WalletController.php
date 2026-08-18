@@ -128,21 +128,37 @@ class WalletController extends Controller
      */
     public function addDeposit(Request $request): JsonResponse
     {
+        $blockedMethods = [
+            PaymentMethod::CASH_ON_DELIVERY->value,
+            PaymentMethod::Nathefah_WALLET->value,
+        ];
+        $gatewayMethods = array_values(array_filter(
+            PaymentMethod::values(),
+            fn ($method) => ! in_array($method, $blockedMethods, true)
+        ));
+
         $resolvedMethod = PaymentMethodRecord::resolveFromClientInput(
-            $request->input('payment_method', $request->input('payment_methods'))
+            $request->input('payment_method')
+            ?? $request->input('payment_methods')
+            ?? $request->input('method')
+            ?? $request->input('type')
         );
-        if ($resolvedMethod !== null) {
-            $request->merge(['payment_method' => $resolvedMethod]);
+
+        if ($resolvedMethod !== null && in_array($resolvedMethod, $blockedMethods, true)) {
+            return validationErrorResponse([
+                'payment_method' => [__('validation.in', ['attribute' => 'payment method'])],
+            ]);
         }
 
-        $allowedPaymentMethods = array_values(array_filter(
-            PaymentMethod::values(),
-            fn ($method) => ! in_array($method, [PaymentMethod::CASH_ON_DELIVERY->value, PaymentMethod::Nathefah_WALLET->value], true)
-        ));
+        if ($resolvedMethod === null || ! in_array($resolvedMethod, $gatewayMethods, true)) {
+            $resolvedMethod = PaymentMethod::CREDIT_CARD->value;
+        }
+
+        $request->merge(['payment_method' => $resolvedMethod]);
 
         $validator = Validator::make($request->all(), [
             'amount' => ['required', 'numeric', 'min:1'],
-            'payment_method' => ['required', 'string', Rule::in($allowedPaymentMethods)],
+            'payment_method' => ['required', 'string', Rule::in($gatewayMethods)],
             'card_id' => ['nullable', 'integer', 'exists:client_cards,id'],
         ]);
 

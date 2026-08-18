@@ -175,6 +175,8 @@ return [
     */
 
     'attributes' => [
+        'payment_method' => 'طريقة الدفع',
+        'payment_methods' => 'طريقة الدفع',
         'service_name' => 'اسم الخدمة',
         'service_name.ar' => 'اسم الخدمة (عربي)',
         'service_name.en' => 'اسم الخدمة (إنجليزي)',

@@ -49,11 +49,13 @@ enum PaymentMethod: string
             return $arabicAliases[$trimmed];
         }
 
-        $key = strtolower(str_replace(['-', ' '], '_', $trimmed));
+        $key = strtolower(preg_replace('/([a-z0-9])([A-Z])/', '$1_$2', str_replace(['-', ' '], '_', $trimmed)) ?? $trimmed);
 
         return match ($key) {
             'digital_payment',
+            'digitalpayment',
             'electronic_payment',
+            'electronicpayment',
             'electronic',
             'moyasar',
             'creditcard',
