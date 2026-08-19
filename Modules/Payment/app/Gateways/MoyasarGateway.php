@@ -156,10 +156,12 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     public function initializePayment(PaymentRequest $request): PaymentResponse
     {
-        // Same path for orders and wallet deposits. Do not send wallet to a separate
-        // moyasar.js page — that is what required a Samsung Pay Service ID. Order
-        // checkout already shows Samsung Pay on Moyasar's hosted invoice without it.
-        if ($this->mode === 'embedded' || $this->mode === 'hosted_local') {
+        // Wallet top-up uses the same Moyasar SDK config as order checkout.
+        // Returning a hosted invoice URL makes the app WebView checkout.moyasar.com
+        // (STC + card only). Flutter renders Samsung Pay from the SDK payload.
+        if ($this->isWalletDepositRequest($request)
+            || $this->mode === 'embedded'
+            || $this->mode === 'hosted_local') {
             return $this->initializeEmbeddedPayment($request);
         }
 
@@ -376,6 +378,15 @@ class MoyasarGateway extends AbstractPaymentGateway
                 'payment_params' => null,
                 'callback_url' => $callbackUrl,
                 'moyasar' => $moyasarConfig,
+                'available_methods' => [
+                    'credit_card',
+                    'visa',
+                    'mastercard',
+                    'mada',
+                    'stc_pay',
+                    'apple_pay',
+                    'samsung_pay',
+                ],
             ]
         );
     }
@@ -922,12 +933,7 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     private function defaultMoyasarMethods(): array
     {
-        $methods = ['creditcard', 'stcpay', 'applepay'];
-        if ($this->hasSamsungPayServiceId()) {
-            $methods[] = 'samsungpay';
-        }
-
-        return $methods;
+        return ['creditcard', 'stcpay', 'applepay', 'samsungpay'];
     }
 
     /**
@@ -952,11 +958,8 @@ class MoyasarGateway extends AbstractPaymentGateway
         }
 
         $mapped = array_values(array_unique($mapped));
-        if (! $this->hasSamsungPayServiceId()) {
-            $mapped = array_values(array_filter($mapped, fn (string $method) => $method !== 'samsungpay'));
-        }
 
-        return $mapped !== [] ? $mapped : ['creditcard', 'stcpay'];
+        return $mapped !== [] ? $mapped : ['creditcard', 'stcpay', 'applepay', 'samsungpay'];
     }
 
     private function hasSamsungPayServiceId(): bool

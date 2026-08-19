@@ -305,6 +305,60 @@ class WalletController extends Controller
             // PayFort/Amazon (STC Pay, MADA, Visa, etc.) - always has payment_params for redirect
             $paymentParams = $paymentResponse->data['payment_params'] ?? null;
             $paymentUrl = $paymentResponse->paymentUrl ?? $paymentResponse->data['form_url'] ?? null;
+            $moyasarConfig = $paymentResponse->data['moyasar'] ?? null;
+            $isMoyasarSdk = is_array($moyasarConfig)
+                && ! empty($moyasarConfig['publishable_api_key'])
+                && ($paymentResponse->data['mode'] ?? null) === 'embedded';
+
+            // Moyasar Flutter SDK (same path as order checkout). Do not return a
+            // hosted invoice URL or the app WebViews checkout.moyasar.com.
+            if ($isMoyasarSdk) {
+                $verifyUrl = route('user.wallet.deposit.verify', ['transactionId' => $walletReferenceId]);
+                $creditCardMethod = collect(PaymentMethodRecord::getActivePayloadForUser(app()->getLocale())['payment_methods'] ?? [])
+                    ->firstWhere('value', PaymentMethod::CREDIT_CARD->value);
+
+                return successResponse([
+                    'payment_url' => null,
+                    'transaction_id' => $paymentTransaction->transaction_id,
+                    'amount' => (float) ($paymentResponse->amount ?? $request->amount),
+                    'currency' => $paymentResponse->currency ?? config('payment.currency', 'SAR'),
+                    'gateway' => 'moyasar',
+                    'status' => $paymentTransaction->status,
+                    'reference_id' => $walletReferenceId,
+                    'wallet_bonus_amount' => $walletPromotion['applied'] ? (float) $walletPromotion['bonus_amount'] : 0,
+                    'wallet_bonus_discount' => $walletPromotion['applied'] ? [
+                        'id' => $walletPromotion['discount']?->id,
+                        'code' => $walletPromotion['discount']?->code,
+                        'name' => method_exists($walletPromotion['discount'], 'getTranslation')
+                            ? $walletPromotion['discount']?->getTranslation('name', app()->getLocale())
+                            : $walletPromotion['discount']?->name,
+                    ] : null,
+                    'verify_url' => $verifyUrl,
+                    'payment_params' => null,
+                    'payment_method' => $paymentMethod,
+                    'payment_method_type' => 'sdk',
+                    'redirect_instructions' => null,
+                    'mode' => 'embedded',
+                    'moyasar' => $moyasarConfig,
+                    'available_methods' => $paymentResponse->data['available_methods'] ?? [
+                        PaymentMethod::CREDIT_CARD->value,
+                        PaymentMethod::VISA->value,
+                        PaymentMethod::MASTERCARD->value,
+                        PaymentMethod::MADA->value,
+                        PaymentMethod::STC_PAY->value,
+                        PaymentMethod::APPLE_PAY->value,
+                        PaymentMethod::SAMSUNG_PAY->value,
+                    ],
+                    'grouped_method_values' => $creditCardMethod['grouped_method_values'] ?? [
+                        PaymentMethod::VISA->value,
+                        PaymentMethod::MASTERCARD->value,
+                        PaymentMethod::MADA->value,
+                        PaymentMethod::STC_PAY->value,
+                        PaymentMethod::APPLE_PAY->value,
+                        PaymentMethod::SAMSUNG_PAY->value,
+                    ],
+                ], 'Payment initialized. Please complete payment.', 200);
+            }
 
             // Fallback: PayFort always uses redirect - URL from config if missing
             if (empty($paymentUrl) && $paymentParams) {
