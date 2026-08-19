@@ -156,14 +156,10 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     public function initializePayment(PaymentRequest $request): PaymentResponse
     {
-        // Wallet top-up must stay on Moyasar's hosted invoice (checkout.moyasar.com).
-        // That is the page order checkout already uses in the app WebView, where
-        // Samsung Pay appears. Local moyasar.js hides the button without a Service ID.
-        $isWalletDeposit = $this->isWalletDepositRequest($request);
-
-        // Embedded / Hosted Local modes return the client-side form config instead of
-        // creating a hosted invoice — no API call, no hosted URL/invoice id.
-        if (! $isWalletDeposit && ($this->mode === 'embedded' || $this->mode === 'hosted_local')) {
+        // Same path for orders and wallet deposits. Do not send wallet to a separate
+        // moyasar.js page — that is what required a Samsung Pay Service ID. Order
+        // checkout already shows Samsung Pay on Moyasar's hosted invoice without it.
+        if ($this->mode === 'embedded' || $this->mode === 'hosted_local') {
             return $this->initializeEmbeddedPayment($request);
         }
 
@@ -209,13 +205,10 @@ class MoyasarGateway extends AbstractPaymentGateway
             // value sent is ignored. Upload the logo in the Moyasar Dashboard account
             // branding settings instead.
 
-            // Restrict only when the user picked a specific method (STC Pay).
-            // Wallet deposits and credit_card / samsung_pay / empty omit the field so
-            // the hosted invoice shows every method enabled on the Moyasar account
-            // (same as order checkout — otherwise Samsung Pay disappears).
-            $paymentOption = $isWalletDeposit
-                ? null
-                : ($request->paymentOption ?? ($request->metadata['payment_option'] ?? null));
+            // Restrict only when the user picked STC Pay. credit_card / samsung_pay /
+            // empty omit the field so the hosted invoice shows every method enabled
+            // on the Moyasar account (orders and wallet must match).
+            $paymentOption = $request->paymentOption ?? ($request->metadata['payment_option'] ?? null);
             $allowedMethods = $this->mapToMoyasarAllowedMethods($paymentOption);
             if ($allowedMethods !== []) {
                 $payload['allowed_payment_methods'] = $allowedMethods;
@@ -259,34 +252,12 @@ class MoyasarGateway extends AbstractPaymentGateway
             $invoiceId = $body['id'] ?? null;
             $hostedInvoiceUrl = $body['url'];
 
-            // Hosted invoices (checkout.moyasar.com) only render STC Pay + cards.
-            // Samsung Pay needs moyasar.js plus a Service ID. Wallet top-up therefore
-            // opens our checkout page, tied to this invoice via invoice_id.
-            $moyasarConfig = $this->publishableKey !== ''
-                ? $this->buildMoyasarJsConfig(
-                    $request,
-                    $merchantReference,
-                    $callbackUrl,
-                    $metadata,
-                    [],
-                    $invoiceId,
-                )
-                : [
-                    'methods' => ['creditcard', 'stcpay', 'applepay', 'samsungpay'],
-                    'supported_networks' => ['mada', 'visa', 'mastercard'],
-                ];
-
-            $useLocalCheckout = $isWalletDeposit
-                && $this->publishableKey !== ''
-                && isset($moyasarConfig['publishable_api_key']);
-            $paymentUrl = $useLocalCheckout
-                ? $this->localCheckoutUrl($merchantReference)
-                : $hostedInvoiceUrl;
-
+            // Same hosted invoice URL orders already use. Samsung Pay on that page
+            // comes from the Moyasar account, not MOYASAR_SAMSUNG_PAY_SERVICE_ID.
             return new PaymentResponse(
                 success: true,
                 transactionId: $merchantReference,
-                paymentUrl: $paymentUrl,
+                paymentUrl: $hostedInvoiceUrl,
                 status: 'pending',
                 amount: $request->amount,
                 currency: $payload['currency'],
@@ -294,17 +265,17 @@ class MoyasarGateway extends AbstractPaymentGateway
                 data: [
                     'gateway' => 'moyasar',
                     'environment' => $this->isTestMode() ? 'test' : 'production',
-                    'mode' => $useLocalCheckout ? 'hosted_local' : 'invoice',
+                    'mode' => 'invoice',
                     'invoice_id' => $invoiceId,
                     'moyasar_status' => $body['status'] ?? null,
                     'callback_url' => $callbackUrl,
-                    // No POST form params (simple GET redirect to `url`). Kept null so
-                    // the controllers treat this as a redirect, not an auto-submit form.
                     'payment_params' => null,
-                    'redirect_url' => $paymentUrl,
-                    'hosted_invoice_url' => $hostedInvoiceUrl,
+                    'redirect_url' => $hostedInvoiceUrl,
                     'raw_response' => $body,
-                    'moyasar' => $moyasarConfig,
+                    'moyasar' => [
+                        'methods' => ['creditcard', 'stcpay', 'applepay', 'samsungpay'],
+                        'supported_networks' => ['mada', 'visa', 'mastercard'],
+                    ],
                     'available_methods' => [
                         'credit_card',
                         'visa',
