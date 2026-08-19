@@ -128,11 +128,12 @@
             var config = @json($moyasarConfig);
             var ua = navigator.userAgent || '';
             var isIos = /iP(hone|ad|od)/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            var isSamsung = /SamsungBrowser|SAMSUNG|SM-|GT-/i.test(ua);
+            // Flutter WebView often hides the model ("Android 13; K") so SM-/SAMSUNG
+            // is missing. If the Service ID is present, let Moyasar show/hide the button.
 
             var methods = (config.methods || ['creditcard', 'stcpay']).filter(function (method) {
                 if (method === 'applepay') return isIos;
-                if (method === 'samsungpay') return isSamsung && !!config.samsung_pay;
+                if (method === 'samsungpay') return !!config.samsung_pay;
                 return method !== 'mada';
             });
             if (methods.indexOf('creditcard') === -1 && methods.indexOf('stcpay') === -1) {
