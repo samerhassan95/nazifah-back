@@ -166,8 +166,8 @@ class SendOrderStatusNotification
             'order_picked_up',
         );
         $this->notifyVendorAndAdmins($order,
-            'تم استلام الملابس', 'Clothes Picked Up',
-            "تم استلام ملابس الطلب #{$num}.", "Clothes for order #{$num} have been picked up.",
+            'تم استلام الطلب', 'Clothes Picked Up',
+            "تم استلام الطلب #{$num}.", "Clothes for order #{$num} have been picked up.",
             'order_picked_up',
         );
         $this->notifications->sendToOrderDrivers($order, 'pickup',
@@ -180,14 +180,14 @@ class SendOrderStatusNotification
     private function onDeliveredToBranch(Order $order, string $num): void
     {
         $this->notifications->sendToClient($order,
-            'وصلت ملابسك للمغسلة', 'Clothes at the Laundry',
-            "وصلت ملابس طلبك #{$num} إلى المغسلة وجاري معالجتها.",
+            'وصل طلبك للمغسلة', 'Clothes at the Laundry',
+            "وصل طلبك #{$num} إلى المغسلة وجاري معالجتها.",
             "Clothes for your order #{$num} have arrived at the laundry and are being processed.",
             'delivered_to_branch',
         );
         $this->notifyVendorAndAdmins($order,
-            'تم تسليم الملابس للفرع', 'Clothes Delivered to Branch',
-            "تم تسليم ملابس الطلب #{$num} للفرع.", "Clothes for order #{$num} have been delivered to the branch.",
+            'تم تسليم الطلب للفرع', 'Clothes Delivered to Branch',
+            "تم تسليم الطلب #{$num} للفرع.", "Clothes for order #{$num} have been delivered to the branch.",
             'delivered_to_branch',
         );
         $this->notifications->sendToOrderDrivers($order, 'pickup',

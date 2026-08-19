@@ -8,7 +8,7 @@
 
 | المسار | الغرض | Endpoint | Flag في API |
 |--------|--------|----------|-------------|
-| **تأكيد التسليم الفعلي (Handoff)** | تأكيد أن الملابس **اتسلمت فعلاً** (سلّم أو استلم) | `POST /api/v1/user/orders/{id}/confirm-handoff` | `requires_handoff_confirmation` |
+| **تأكيد التسليم الفعلي (Handoff)** | تأكيد أن الطلب **استُلم فعلاً** (سلّم أو استلم) | `POST /api/v1/user/orders/{id}/confirm-handoff` | `requires_handoff_confirmation` |
 | **رد على الزيارة (Visit)** | تأكيد **الجاهزية** للاستلام/التوصيل، أو **التأجيل** | `POST /api/v1/user/orders/{id}/visit-response` | `requires_visit_response` |
 
 **الأولوية في كارد الإجراءات:** إذا كان كلاهما متاحًا، يُعرض **Handoff أولاً** (التسليم الفعلي أهم من تأكيد الجاهزية).
@@ -22,7 +22,7 @@
 
 ## 1. تأكيد التسليم الفعلي (`confirm-handoff`)
 
-العميل يؤكد **التسليم المادي** للملابس: سلّم للسائق/المغسلة، أو استلم من السائق/المغسلة.
+العميل يؤكد **التسليم المادي** للطلب: سلّم للسائق/المغسلة، أو استلم من السائق/المغسلة.
 
 ### Endpoint
 
@@ -55,7 +55,7 @@ POST /api/v1/user/orders/{orderId}/confirm-handoff
 
 1. تعيين السائق → في الطريق → `on_way_to_pickup`
 2. السائق يعمل pickup complete → الحالة تصبح `picked_up`
-3. العميل يرى **تأكيد التسليم** — «سلّمت الملابس للسائق» (`give_to_driver`)
+3. العميل يرى **تأكيد التسليم** — «سلّمت الطلب للسائق» (`give_to_driver`)
 4. العميل يؤكد → يُحدَّث `client_pickup_handoff_at` (الحالة تبقى `picked_up`)
 
 **مهم:** سائق الاستلام هو من ينقل الحالة إلى `picked_up`. تأكيد العميل بعد ذلك إقرار بالتسليم، وليس هو من ينشئ حالة الاستلام.
@@ -165,7 +165,7 @@ POST /api/v1/user/orders/{orderId}/visit-response
   "handoff": {
     "type": "receive_from_driver",
     "direction": "receive",
-    "confirm_label": "أكّد أنك استلمت الملابس من السائق",
+    "confirm_label": "أكّد أنك استلمت الطلب من السائق",
     "endpoint": "/api/v1/user/orders/417/confirm-handoff",
     "confirm_action": "confirm"
   }
@@ -178,8 +178,8 @@ POST /api/v1/user/orders/{orderId}/visit-response
 
 | الحقل | المعنى |
 |-------|--------|
-| `client_pickup_handoff_at` | العميل **سلّم** الملابس (للسائق أو في الفرع) |
-| `client_delivery_handoff_at` | العميل **استلم** الملابس (من السائق أو من الفرع) |
+| `client_pickup_handoff_at` | العميل **سلّم** الطلب (للسائق أو في الفرع) |
+| `client_delivery_handoff_at` | العميل **استلم** الطلب (من السائق أو من الفرع) |
 | `client_pickup_visit_confirmed_at` | العميل أكد **جاهزيته** لزيارة الاستلام |
 | `client_delivery_visit_confirmed_at` | العميل أكد **جاهزيته** لزيارة التوصيل |
 | `client_visit_confirmed_at` | إقرار زيارة عام (مثل نوع receipt) |
