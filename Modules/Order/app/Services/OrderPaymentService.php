@@ -2094,9 +2094,10 @@ class OrderPaymentService
             'visa' => 'فيزا',
             'mastercard' => 'ماستركارد',
             'mada' => 'مدى',
+            'credit_card' => 'دفع الكتروني',
             'nazefah_wallet' => 'المحفظة',
             'wallet' => 'المحفظة',
-            'card' => 'البطاقة',
+            'card' => 'دفع الكتروني',
             'cash_on_delivery' => 'الدفع عند الاستلام',
         ];
         $methodLabelsEn = [
