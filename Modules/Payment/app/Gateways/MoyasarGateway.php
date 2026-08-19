@@ -156,9 +156,14 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     public function initializePayment(PaymentRequest $request): PaymentResponse
     {
+        // Wallet top-up must stay on Moyasar's hosted invoice (checkout.moyasar.com).
+        // That is the page order checkout already uses in the app WebView, where
+        // Samsung Pay appears. Local moyasar.js hides the button without a Service ID.
+        $isWalletDeposit = $this->isWalletDepositRequest($request);
+
         // Embedded / Hosted Local modes return the client-side form config instead of
         // creating a hosted invoice — no API call, no hosted URL/invoice id.
-        if ($this->mode === 'embedded' || $this->mode === 'hosted_local') {
+        if (! $isWalletDeposit && ($this->mode === 'embedded' || $this->mode === 'hosted_local')) {
             return $this->initializeEmbeddedPayment($request);
         }
 
@@ -204,11 +209,13 @@ class MoyasarGateway extends AbstractPaymentGateway
             // value sent is ignored. Upload the logo in the Moyasar Dashboard account
             // branding settings instead.
 
-            // Restrict only when the user picked a specific method (STC Pay, mada).
-            // credit_card / samsung_pay / empty = omit the field so the hosted invoice
-            // shows every method enabled on the Moyasar account (same as order checkout).
-            $paymentOption = $request->paymentOption
-                ?? ($request->metadata['payment_option'] ?? null);
+            // Restrict only when the user picked a specific method (STC Pay).
+            // Wallet deposits and credit_card / samsung_pay / empty omit the field so
+            // the hosted invoice shows every method enabled on the Moyasar account
+            // (same as order checkout — otherwise Samsung Pay disappears).
+            $paymentOption = $isWalletDeposit
+                ? null
+                : ($request->paymentOption ?? ($request->metadata['payment_option'] ?? null));
             $allowedMethods = $this->mapToMoyasarAllowedMethods($paymentOption);
             if ($allowedMethods !== []) {
                 $payload['allowed_payment_methods'] = $allowedMethods;
@@ -267,6 +274,7 @@ class MoyasarGateway extends AbstractPaymentGateway
                 data: [
                     'gateway' => 'moyasar',
                     'environment' => $this->isTestMode() ? 'test' : 'production',
+                    'mode' => 'invoice',
                     'invoice_id' => $invoiceId,
                     'moyasar_status' => $body['status'] ?? null,
                     'callback_url' => $callbackUrl,
@@ -275,6 +283,20 @@ class MoyasarGateway extends AbstractPaymentGateway
                     'payment_params' => null,
                     'redirect_url' => $hostedInvoiceUrl,
                     'raw_response' => $body,
+                    // Icon/method list for the client (hosted invoice renders the buttons).
+                    'moyasar' => [
+                        'methods' => ['creditcard', 'stcpay', 'applepay', 'samsungpay'],
+                        'supported_networks' => ['mada', 'visa', 'mastercard'],
+                    ],
+                    'available_methods' => [
+                        'credit_card',
+                        'visa',
+                        'mastercard',
+                        'mada',
+                        'stc_pay',
+                        'apple_pay',
+                        'samsung_pay',
+                    ],
                 ]
             );
         } catch (\Throwable $e) {
@@ -868,9 +890,17 @@ class MoyasarGateway extends AbstractPaymentGateway
         return $meta;
     }
 
+    private function isWalletDepositRequest(PaymentRequest $request): bool
+    {
+        $flag = $request->metadata['wallet_deposit'] ?? false;
+
+        return $flag === true || $flag === 1 || $flag === '1' || $flag === 'true';
+    }
+
     private function buildDescription(PaymentRequest $request, string $merchantReference): string
     {
-        $isWallet = $request->metadata['wallet_deposit'] ?? false;
+        $isWallet = $this->isWalletDepositRequest($request);
+
         return $isWallet ? __('payment.moyasar_description_wallet') : __('payment.moyasar_description_order');
     }
 
@@ -890,11 +920,11 @@ class MoyasarGateway extends AbstractPaymentGateway
         }
 
         return match (strtoupper($payfortOption)) {
-            'MADA' => ['mada'],
+            // STC Pay is a distinct hosted method. Everything else (including mada,
+            // which is a card network, not a Moyasar method) stays unrestricted so
+            // Samsung Pay / Apple Pay / STC still appear on the same page.
             'STCPAY' => ['stcpay'],
-            'APPLEPAY' => ['applepay'],
-            // Same unrestricted page as a generic card payment so Samsung Pay still shows.
-            'SAMSUNGPAY', 'VISA', 'MASTERCARD', 'CREDIT_CARD' => [],
+            'MADA', 'APPLEPAY', 'SAMSUNGPAY', 'VISA', 'MASTERCARD', 'CREDIT_CARD', 'GOOGLEPAY' => [],
             default => [],
         };
     }

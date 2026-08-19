@@ -17,6 +17,7 @@ use Modules\Discount\Services\DiscountService;
 use Modules\Payment\DTOs\PaymentRequest;
 use Modules\Payment\Models\PaymentMethod as PaymentMethodRecord;
 use Modules\Payment\Models\PaymentTransaction;
+use Modules\Payment\Services\ActiveGatewayResolver;
 use Modules\Payment\Services\PaymentService;
 use Modules\Payment\Services\WalletDepositCreditor;
 
@@ -168,6 +169,21 @@ class WalletController extends Controller
 
         $user = $request->user();
         $paymentMethod = PaymentMethod::normalize((string) $request->payment_method);
+        if (ActiveGatewayResolver::name() === 'moyasar'
+            && in_array($paymentMethod, [
+                PaymentMethod::VISA->value,
+                PaymentMethod::MASTERCARD->value,
+                PaymentMethod::MADA->value,
+                PaymentMethod::APPLE_PAY->value,
+                PaymentMethod::GOOGLE_PAY->value,
+                PaymentMethod::SAMSUNG_PAY->value,
+                PaymentMethod::CREDIT_CARD->value,
+            ], true)
+        ) {
+            // Same aggregate as order checkout: do not lock the hosted page to mada/visa.
+            $paymentMethod = PaymentMethod::CREDIT_CARD->value;
+            $request->merge(['payment_method' => $paymentMethod]);
+        }
 
         // Validate card belongs to user if payment method is visa/mastercard AND card_id is provided
         if (in_array($paymentMethod, [
@@ -240,12 +256,12 @@ class WalletController extends Controller
                 customerPhone: $customerPhone,
                 returnUrl: $returnUrl,
                 cancelUrl: $cancelUrl,
-                paymentOption: $this->getPayfortPaymentOption($paymentMethod),
+                paymentOption: $gatewayName === 'moyasar' ? null : $this->getPayfortPaymentOption($paymentMethod),
                 metadata: [
                     'wallet_deposit' => true,
                     'client_id' => $user->id,
                     'payment_method' => $paymentMethod,
-                    'payment_option' => $this->getPayfortPaymentOption($paymentMethod),
+                    'payment_option' => $gatewayName === 'moyasar' ? null : $this->getPayfortPaymentOption($paymentMethod),
                     'card_id' => $request->card_id ?? null,
                     'wallet_bonus_discount_id' => $walletPromotion['applied'] ? $walletPromotion['discount']?->id : null,
                     'wallet_bonus_amount' => $walletPromotion['applied'] ? (float) $walletPromotion['bonus_amount'] : 0,
@@ -305,6 +321,9 @@ class WalletController extends Controller
                 // Generate verify URL
                 $verifyUrl = route('user.wallet.deposit.verify', ['transactionId' => $walletReferenceId]);
 
+                $creditCardMethod = collect(PaymentMethodRecord::getActivePayloadForUser(app()->getLocale())['payment_methods'] ?? [])
+                    ->firstWhere('value', PaymentMethod::CREDIT_CARD->value);
+
                 return successResponse([
                     'payment_url' => $redirectUrl,
                     'transaction_id' => $paymentTransaction->transaction_id,
@@ -320,8 +339,28 @@ class WalletController extends Controller
                     ] : null,
                     'verify_url' => $verifyUrl,
                     'payment_params' => $paymentParams,
+                    'payment_method' => $paymentMethod,
                     'payment_method_type' => 'redirect',
                     'redirect_instructions' => $redirectInstructions,
+                    'mode' => $paymentResponse->data['mode'] ?? null,
+                    'moyasar' => $paymentResponse->data['moyasar'] ?? null,
+                    'available_methods' => $paymentResponse->data['available_methods'] ?? [
+                        PaymentMethod::CREDIT_CARD->value,
+                        PaymentMethod::VISA->value,
+                        PaymentMethod::MASTERCARD->value,
+                        PaymentMethod::MADA->value,
+                        PaymentMethod::STC_PAY->value,
+                        PaymentMethod::APPLE_PAY->value,
+                        PaymentMethod::SAMSUNG_PAY->value,
+                    ],
+                    'grouped_method_values' => $creditCardMethod['grouped_method_values'] ?? [
+                        PaymentMethod::VISA->value,
+                        PaymentMethod::MASTERCARD->value,
+                        PaymentMethod::MADA->value,
+                        PaymentMethod::STC_PAY->value,
+                        PaymentMethod::APPLE_PAY->value,
+                        PaymentMethod::SAMSUNG_PAY->value,
+                    ],
                 ], 'Payment initialized. Please complete payment.', 200);
             }
 
