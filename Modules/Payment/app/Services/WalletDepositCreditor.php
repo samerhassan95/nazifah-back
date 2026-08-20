@@ -49,7 +49,7 @@ class WalletDepositCreditor
             // any money moves, so a credit can never be applied twice even if two
             // settlements race on different payment rows mapping to the same reference.
             try {
-                $walletTxnId = DB::table('wallet_transactions')->insertGetId([
+                $row = [
                     'client_id' => $clientId,
                     'type' => 'credit',
                     'amount' => $locked->amount,
@@ -59,7 +59,12 @@ class WalletDepositCreditor
                     'status' => 'completed',
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]);
+                ];
+                if (\Illuminate\Support\Facades\Schema::hasColumn('wallet_transactions', 'card_brand')) {
+                    $row['card_brand'] = $locked->card_brand
+                        ?? ($locked->response_data['card_brand'] ?? null);
+                }
+                $walletTxnId = DB::table('wallet_transactions')->insertGetId($row);
             } catch (UniqueConstraintViolationException $e) {
                 // Lost the race: another path already credited this exact deposit. No
                 // balance was touched (the insert precedes the increment), so report the

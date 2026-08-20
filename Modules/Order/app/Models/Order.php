@@ -77,6 +77,7 @@ class Order extends Model
         'cancelled_reason',
         'cancelled_at',
         'payment_method',
+        'card_brand',
         'payment_methods',
         'pickup_at_vendor',
         'delivery_at_vendor',
@@ -436,13 +437,25 @@ class Order extends Model
     }
 
     /**
-     * @return array{payment_method: ?string, payment_methods: list<string>}
+     * @return array{
+     *     payment_method: ?string,
+     *     payment_method_label: string,
+     *     payment_methods: list<string>,
+     *     card_brand: ?string,
+     *     card_brand_label: string
+     * }
      */
     public function paymentFieldsForApi(): array
     {
+        $method = $this->payment_method;
+        $brand = $this->card_brand;
+
         return [
-            'payment_method' => $this->payment_method,
+            'payment_method' => $method,
+            'payment_method_label' => PaymentMethod::labelFor($method),
             'payment_methods' => $this->resolvedPaymentMethods(),
+            'card_brand' => $brand,
+            'card_brand_label' => PaymentMethod::labelFor($brand),
         ];
     }
 

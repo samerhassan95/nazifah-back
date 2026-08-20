@@ -182,6 +182,24 @@ enum PaymentMethod: string
     }
 
     /**
+     * Wallet method from Moyasar's verified `source.type` (samsungpay / applepay).
+     */
+    public static function resolveWalletFromMoyasarSource(?array $source): ?self
+    {
+        if (! $source) {
+            return null;
+        }
+
+        $type = strtolower((string) ($source['type'] ?? ''));
+
+        return match ($type) {
+            'samsungpay', 'samsung_pay' => self::SAMSUNG_PAY,
+            'applepay', 'apple_pay' => self::APPLE_PAY,
+            default => null,
+        };
+    }
+
+    /**
      * Resolve the actual card brand from Moyasar's verified `source` object, so a
      * generic CREDIT_CARD selection can be corrected to the concrete scheme the
      * customer actually paid with (visa/mastercard/mada) once the gateway confirms it.
@@ -204,5 +222,27 @@ enum PaymentMethod: string
             $company === 'mada' || $type === 'mada' => self::MADA,
             default => null,
         };
+    }
+
+    /**
+     * @return array{wallet_method: ?self, card_brand: ?self}
+     */
+    public static function resolveMoyasarSourceDetails(?array $source): array
+    {
+        return [
+            'wallet_method' => self::resolveWalletFromMoyasarSource($source),
+            'card_brand' => self::resolveBrandFromMoyasarSource($source),
+        ];
+    }
+
+    public static function labelFor(?string $method, ?string $locale = null): string
+    {
+        if ($method === null || trim($method) === '') {
+            return '';
+        }
+
+        $enum = self::tryFrom(self::normalize($method));
+
+        return $enum ? $enum->getDisplayName($locale) : $method;
     }
 }

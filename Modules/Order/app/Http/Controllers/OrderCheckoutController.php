@@ -155,17 +155,14 @@ class OrderCheckoutController extends Controller
 
             $transaction->update($updateData);
 
-            // Moyasar's generic "credit_card" tile only reveals the actual scheme
-            // (visa/mastercard/mada) once the gateway confirms the payment — correct
-            // the stored method now so the order/transaction reflect what was really used.
-            if ($response->isSuccessful() && $transaction->payment_method === \App\Enums\PaymentMethod::CREDIT_CARD->value) {
-                $resolvedBrand = \App\Enums\PaymentMethod::resolveBrandFromMoyasarSource($response->data['source'] ?? null);
-                if ($resolvedBrand) {
-                    $transaction->update(['payment_method' => $resolvedBrand->value]);
-                    if ($order) {
-                        $order->update(['payment_method' => $resolvedBrand->value]);
-                    }
-                }
+            // Persist Moyasar wallet method (samsung_pay / apple_pay) + card network.
+            if ($response->isSuccessful()) {
+                $transaction = app(\Modules\Payment\Services\MoyasarPaymentMethodApplier::class)
+                    ->applyFromVerifiedSource(
+                        $transaction->fresh() ?? $transaction,
+                        $response->data['source'] ?? null,
+                        $order,
+                    );
             }
 
             if ($response->isSuccessful() && ! $order) {
@@ -188,10 +185,16 @@ class OrderCheckoutController extends Controller
 
                                 // The order is built from the pending order's originally-stored
                                 // payment_method (e.g. generic "credit_card"), which predates the
-                                // brand resolution above — sync it now so the order reflects the
-                                // actual gateway-confirmed method (visa/mastercard/mada).
+                                // Moyasar source resolution above — sync wallet method + brand.
+                                $orderSync = [];
                                 if ($transaction->payment_method && $order->payment_method !== $transaction->payment_method) {
-                                    $order->update(['payment_method' => $transaction->payment_method]);
+                                    $orderSync['payment_method'] = $transaction->payment_method;
+                                }
+                                if ($transaction->card_brand && $order->card_brand !== $transaction->card_brand) {
+                                    $orderSync['card_brand'] = $transaction->card_brand;
+                                }
+                                if ($orderSync !== []) {
+                                    $order->update($orderSync);
                                 }
                             });
                         } catch (\Throwable $e) {

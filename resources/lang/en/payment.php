@@ -17,6 +17,8 @@ return [
     'digital_payment' => 'Digital Payment',
     'nazefah_wallet' => 'Wallet',
     'stc_pay' => 'STC Pay',
+    'apple_pay' => 'Apple Pay',
+    'google_pay' => 'Google Pay',
     'samsung_pay' => 'Samsung Pay',
 
     // Error messages

@@ -22,6 +22,7 @@ class PaymentTransaction extends Model
         'currency',
         'status',
         'payment_method',
+        'card_brand',
         'is_additional_charge',
         'authorization_type',
         'customer_email',

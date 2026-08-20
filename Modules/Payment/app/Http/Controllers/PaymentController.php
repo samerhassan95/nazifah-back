@@ -492,21 +492,15 @@ class PaymentController extends Controller
 
             $transaction->update($updateData);
 
-            // Moyasar's generic "credit_card" tile only reveals the actual scheme
-            // (visa/mastercard/mada) once the gateway confirms the payment — correct
-            // the stored method now so the order/transaction/leg reflect what was really used.
-            if ($response->isSuccessful() && $transaction->payment_method === PaymentMethod::CREDIT_CARD->value) {
-                $resolvedBrand = PaymentMethod::resolveBrandFromMoyasarSource($response->data['source'] ?? null);
-                if ($resolvedBrand) {
-                    $transaction->update(['payment_method' => $resolvedBrand->value]);
-
-                    OrderPayment::where('payment_transaction_id', $transaction->id)
-                        ->update(['payment_method' => $resolvedBrand->value]);
-
-                    if ($order && ! $transaction->is_additional_charge) {
-                        $order->update(['payment_method' => $resolvedBrand->value]);
-                    }
-                }
+            // Persist Moyasar wallet method (samsung_pay / apple_pay) + card network
+            // (visa / mastercard / mada). For plain card checkout keep resolving brand.
+            if ($response->isSuccessful()) {
+                $transaction = app(\Modules\Payment\Services\MoyasarPaymentMethodApplier::class)
+                    ->applyFromVerifiedSource(
+                        $transaction->fresh() ?? $transaction,
+                        $response->data['source'] ?? null,
+                        $order,
+                    );
             }
 
             if ($response->isSuccessful() && $tokenName) {
@@ -605,10 +599,16 @@ class PaymentController extends Controller
 
                                 // The order is built from the pending order's originally-stored
                                 // payment_method (e.g. generic "credit_card"), which predates the
-                                // brand resolution above — sync it now so the order reflects the
-                                // actual gateway-confirmed method (visa/mastercard/mada).
+                                // Moyasar source resolution above — sync wallet method + brand.
+                                $orderSync = [];
                                 if ($transaction->payment_method && $order->payment_method !== $transaction->payment_method) {
-                                    $order->update(['payment_method' => $transaction->payment_method]);
+                                    $orderSync['payment_method'] = $transaction->payment_method;
+                                }
+                                if ($transaction->card_brand && $order->card_brand !== $transaction->card_brand) {
+                                    $orderSync['card_brand'] = $transaction->card_brand;
+                                }
+                                if ($orderSync !== []) {
+                                    $order->update($orderSync);
                                 }
 
                                 // Payment status is updated on the transaction above.
@@ -635,6 +635,10 @@ class PaymentController extends Controller
                 'status' => $transaction->status,
                 'amount' => $transaction->amount,
                 'currency' => $transaction->currency,
+                'payment_method' => $transaction->payment_method,
+                'payment_method_label' => PaymentMethod::labelFor($transaction->payment_method),
+                'card_brand' => $transaction->card_brand,
+                'card_brand_label' => PaymentMethod::labelFor($transaction->card_brand),
             ];
 
             if ($isWalletDeposit) {

@@ -546,6 +546,10 @@ class WalletController extends Controller
                         'amount' => (float) $existingWalletTxn->amount,
                         'payment_method' => $existingWalletTxn->payment_method,
                         'payment_method_label' => $this->paymentMethodLabel($existingWalletTxn->payment_method),
+                        'card_brand' => $existingWalletTxn->card_brand ?? $paymentTransaction->card_brand,
+                        'card_brand_label' => $this->paymentMethodLabel(
+                            $existingWalletTxn->card_brand ?? $paymentTransaction->card_brand
+                        ),
                         'status' => 'completed',
                         'date' => $existingWalletTxn->created_at,
                     ],
@@ -620,6 +624,13 @@ class WalletController extends Controller
 
             if ($verificationResponse->isSuccessful() && $verifiedStatus === 'completed') {
                 try {
+                    $paymentTransaction = app(\Modules\Payment\Services\MoyasarPaymentMethodApplier::class)
+                        ->applyFromVerifiedSource(
+                            $paymentTransaction->fresh() ?? $paymentTransaction,
+                            $verificationResponse->data['source'] ?? null,
+                            null,
+                        );
+
                     $settlement = $this->walletDepositCreditor->creditIfNotAlready(
                         $paymentTransaction->fresh(),
                         'Nathefah Wallet deposit - Verified'
@@ -629,6 +640,10 @@ class WalletController extends Controller
                     $newBalance = DB::table('clients')
                         ->where('id', $user->id)
                         ->value('wallet_balance');
+
+                    $resolvedMethod = $paymentTransaction->payment_method ?? $metadata['payment_method'] ?? 'unknown';
+                    $resolvedBrand = $paymentTransaction->card_brand
+                        ?? ($walletTxn->card_brand ?? null);
 
                     return successResponse([
                         'status' => 'completed',
@@ -640,10 +655,10 @@ class WalletController extends Controller
                             'payment_transaction_id' => $paymentTransaction->id,
                             'transaction_id' => $paymentTransaction->transaction_id,
                             'amount' => (float) $paymentTransaction->amount,
-                            'payment_method' => $metadata['payment_method'] ?? $paymentTransaction->payment_method ?? 'unknown',
-                            'payment_method_label' => $this->paymentMethodLabel(
-                                $metadata['payment_method'] ?? $paymentTransaction->payment_method ?? 'unknown'
-                            ),
+                            'payment_method' => $resolvedMethod,
+                            'payment_method_label' => $this->paymentMethodLabel($resolvedMethod),
+                            'card_brand' => $resolvedBrand,
+                            'card_brand_label' => $this->paymentMethodLabel($resolvedBrand),
                             'status' => 'completed',
                             'date' => now()->toISOString(),
                         ],
@@ -708,25 +723,19 @@ class WalletController extends Controller
      */
     private function paymentMethodLabel(?string $method): string
     {
-        if ($method === null || trim($method) === '') {
-            return '';
-        }
-
-        $normalized = PaymentMethod::normalize($method);
-        $enum = PaymentMethod::tryFrom($normalized);
-
-        return $enum ? $enum->getDisplayName() : $method;
+        return PaymentMethod::labelFor($method);
     }
 
     /**
      * Locale-aware wallet transaction row (single description / operation_type).
      *
-     * @param  object{id:int,amount:mixed,type:string,created_at:mixed,payment_method:?string,description:?string}  $txn
+     * @param  object{id:int,amount:mixed,type:string,created_at:mixed,payment_method:?string,card_brand?:?string,description:?string}  $txn
      * @return array<string, mixed>
      */
     private function formatWalletTransactionRow(object $txn): array
     {
         $isAddition = $txn->type === 'credit';
+        $cardBrand = $txn->card_brand ?? null;
 
         return [
             'txn_id' => $txn->id,
@@ -735,6 +744,8 @@ class WalletController extends Controller
             'date' => $txn->created_at,
             'payment_method' => $txn->payment_method,
             'payment_method_label' => $this->paymentMethodLabel($txn->payment_method),
+            'card_brand' => $cardBrand,
+            'card_brand_label' => $this->paymentMethodLabel($cardBrand),
             'description' => $this->localizeWalletTransactionDescription((string) ($txn->description ?? '')),
             'operation_type' => $isAddition
                 ? __('payment.wallet_txn_addition')

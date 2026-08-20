@@ -17,6 +17,8 @@ return [
     'digital_payment' => 'دفع الكتروني',
     'nazefah_wallet' => 'محفظة',
     'stc_pay' => 'STC Pay',
+    'apple_pay' => 'آبل باي',
+    'google_pay' => 'جوجل باي',
     'samsung_pay' => 'سامسونج باي',
 
     // Error messages
