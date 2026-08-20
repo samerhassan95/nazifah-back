@@ -11,6 +11,7 @@ use Modules\Payment\DTOs\PaymentRequest;
 use Modules\Payment\DTOs\PaymentResponse;
 use Modules\Payment\DTOs\RefundRequest;
 use Modules\Payment\DTOs\RefundResponse;
+use Modules\Payment\Services\MoyasarErrorLocalizer;
 
 /**
  * Moyasar payment gateway (https://moyasar.com) — second gateway with full
@@ -1099,16 +1100,21 @@ class MoyasarGateway extends AbstractPaymentGateway
     private function paymentMessage(array $payment, bool $isSuccess): ?string
     {
         $source = $payment['source'] ?? [];
-        $sourceMessage = is_array($source) ? ($source['message'] ?? null) : null;
+        $source = is_array($source) ? $source : [];
+        $sourceMessage = $source['message'] ?? null;
 
         if ($isSuccess) {
-            return $sourceMessage ?? ($payment['message'] ?? 'Payment successful');
+            return $sourceMessage ?? ($payment['message'] ?? __('payment.payment_successful'));
         }
 
-        return $sourceMessage
+        $raw = $sourceMessage
             ?? ($payment['message'] ?? null)
-            ?? $this->extractError($payment)
-            ?? 'فشلت عملية الدفع. يرجى المحاولة مرة أخرى.';
+            ?? $this->extractError($payment);
+
+        return app(MoyasarErrorLocalizer::class)->localize(
+            is_string($raw) ? $raw : null,
+            $source
+        );
     }
 
     /**
