@@ -340,6 +340,7 @@ class WalletController extends Controller
                     'verify_url' => $verifyUrl,
                     'payment_params' => $paymentParams,
                     'payment_method' => $paymentMethod,
+                    'payment_method_label' => $this->paymentMethodLabel($paymentMethod),
                     'payment_method_type' => 'redirect',
                     'redirect_instructions' => $redirectInstructions,
                     'mode' => $paymentResponse->data['mode'] ?? null,
@@ -395,6 +396,7 @@ class WalletController extends Controller
                             'transaction_id' => $paymentTransaction->transaction_id,
                             'amount' => (float) $request->amount,
                             'payment_method' => $paymentMethod,
+                            'payment_method_label' => $this->paymentMethodLabel($paymentMethod),
                             'status' => 'completed',
                             'date' => now()->toISOString(),
                         ],
@@ -484,6 +486,7 @@ class WalletController extends Controller
                     'transaction_id' => $referenceId,
                     'amount' => $amount,
                     'payment_method' => 'direct',
+                    'payment_method_label' => $this->paymentMethodLabel('direct'),
                     'status' => 'completed',
                     'date' => now()->toISOString(),
                 ],
@@ -542,6 +545,7 @@ class WalletController extends Controller
                         'transaction_id' => $paymentTransaction->transaction_id,
                         'amount' => (float) $existingWalletTxn->amount,
                         'payment_method' => $existingWalletTxn->payment_method,
+                        'payment_method_label' => $this->paymentMethodLabel($existingWalletTxn->payment_method),
                         'status' => 'completed',
                         'date' => $existingWalletTxn->created_at,
                     ],
@@ -637,6 +641,9 @@ class WalletController extends Controller
                             'transaction_id' => $paymentTransaction->transaction_id,
                             'amount' => (float) $paymentTransaction->amount,
                             'payment_method' => $metadata['payment_method'] ?? $paymentTransaction->payment_method ?? 'unknown',
+                            'payment_method_label' => $this->paymentMethodLabel(
+                                $metadata['payment_method'] ?? $paymentTransaction->payment_method ?? 'unknown'
+                            ),
                             'status' => 'completed',
                             'date' => now()->toISOString(),
                         ],
@@ -697,6 +704,21 @@ class WalletController extends Controller
     }
 
     /**
+     * Display label only — does not change stored type/value.
+     */
+    private function paymentMethodLabel(?string $method): string
+    {
+        if ($method === null || trim($method) === '') {
+            return '';
+        }
+
+        $normalized = PaymentMethod::normalize($method);
+        $enum = PaymentMethod::tryFrom($normalized);
+
+        return $enum ? $enum->getDisplayName() : $method;
+    }
+
+    /**
      * Locale-aware wallet transaction row (single description / operation_type).
      *
      * @param  object{id:int,amount:mixed,type:string,created_at:mixed,payment_method:?string,description:?string}  $txn
@@ -712,6 +734,7 @@ class WalletController extends Controller
             'type' => $txn->type,
             'date' => $txn->created_at,
             'payment_method' => $txn->payment_method,
+            'payment_method_label' => $this->paymentMethodLabel($txn->payment_method),
             'description' => $this->localizeWalletTransactionDescription((string) ($txn->description ?? '')),
             'operation_type' => $isAddition
                 ? __('payment.wallet_txn_addition')
