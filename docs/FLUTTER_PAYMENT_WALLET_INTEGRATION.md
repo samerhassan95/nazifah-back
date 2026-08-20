@@ -1,45 +1,45 @@
-# دليل تكامل الدفع وشحن المحفظة — للفلاتر
+# Payment & Wallet Top-up Integration Guide — Flutter
 
-> **آخر تحديث:** 2026-08-20  
+> **Last updated:** 2026-08-20  
 > **Branch:** `main`  
-> **Commits ذات الصلة:** `b377bea` (Samsung Pay + card_brand), `fc44feb` (إرجاع wallet deposit لـ invoice URL)
+> **Related commits:** `b377bea` (Samsung Pay + card_brand), `fc44feb` (revert wallet deposit SDK-only response), `64ff76d` (this doc)
 
 ---
 
-## 1. ملخص سريع
+## 1. Quick summary
 
-| الموضوع | السلوك المطلوب في التطبيق |
-|---------|---------------------------|
-| **دفع الطلب** | Moyasar SDK (موجود) — **لا** تفتح WebView على `checkout.moyasar.com` |
-| **شحن المحفظة** | **نفس** مسار دفع الطلب (Moyasar SDK) — **لا** تفتح `payment_url` في WebView |
-| **Samsung Pay / Apple Pay** | بعد الدفع، الـ API يرجع `payment_method = samsung_pay` أو `apple_pay` + `card_brand = visa/mastercard/mada` |
-| **عرض UI** | اعرض طريقة المحفظة (سامسونج باي) + شعار/نص الشبكة (فيزا/مدى) من `card_brand` |
-
----
-
-## 2. مشكلة Samsung Pay في شحن المحفظة (السياق)
-
-### ما كان يحدث
-1. شاشة «إيداع في المحفظة» تعرض لوجوهات (مدى، فيزا، STC، **Samsung Pay**) — من `GET /payment-methods`.
-2. بعد زر **إيداع**، التطبيق كان يفتح `payment_url` في WebView → صفحة Moyasar الجاهزة (`checkout.moyasar.com`).
-3. هذه الصفحة تعرض **STC Pay + البطاقة فقط** — **بدون** زر Samsung Pay.
-
-### السبب
-- **دفع الطلب:** التطبيق يستخدم **Moyasar Flutter SDK** → Samsung Pay يظهر.
-- **شحن المحفظة:** التطبيق كان يفتح **فاتورة Moyasar** (رابط hosted) → Samsung Pay **لا** يظهر على هذه الصفحة.
-
-### الحل المتفق عليه (Backend + Flutter)
-- **Backend:** `POST /wallet/deposit` يرجع `payment_url` (فاتورة Moyasar) للتوافق مع APS/PayFort؛ مع Moyasar يمكن للتطبيق تجاهل `payment_url` واستخدام **`moyasar`** إذا وُجدت لاحقاً، أو — **الأفضل حالياً** — عدم فتح WebView واستخدام **نفس SDK checkout** المستخدم في الطلبات.
-- **Flutter:** عند `gateway === 'moyasar'` لشحن المحفظة، **لا** تفتح `payment_url` في WebView. استخدم **نفس شاشة/Widget الدفع** المستخدمة في checkout الطلب (Moyasar SDK).
-
-> **ملاحظة:** تجربة إرجاع `payment_url: null` + `mode: embedded` من الباكند (`530de4f`) أوقفت التطبيق عند رسالة «Payment initialized» بدون شاشة دفع — تم **التراجع** (`fc44feb`). لذلك مسار الإنتاج الحالي: `payment_url` موجود؛ **التطبيق يختار SDK بدلاً من WebView**.
+| Topic | Required app behavior |
+|-------|----------------------|
+| **Order checkout** | Moyasar SDK (already in place) — **do not** open a WebView to `checkout.moyasar.com` |
+| **Wallet top-up** | **Same** flow as order checkout (Moyasar SDK) — **do not** open `payment_url` in a WebView |
+| **Samsung Pay / Apple Pay** | After payment, API returns `payment_method = samsung_pay` or `apple_pay` plus `card_brand = visa/mastercard/mada` |
+| **UI display** | Show the wallet method (Samsung Pay) + network logo/label (Visa/Mada) from `card_brand` |
 
 ---
 
-## 3. Samsung Pay / Apple Pay + شبكة البطاقة (`card_brand`)
+## 2. Samsung Pay on wallet top-up (context)
 
-### 3.1 الفكرة
-عند الدفع عبر **Samsung Pay** أو **Apple Pay**، Moyasar يرجع في `source`:
+### What was happening
+1. The “Deposit to wallet” screen shows logos (Mada, Visa, STC, **Samsung Pay**) from `GET /payment-methods`.
+2. After tapping **Deposit**, the app opened `payment_url` in a WebView → Moyasar hosted page (`checkout.moyasar.com`).
+3. That page shows **STC Pay + card entry only** — **no** Samsung Pay button.
+
+### Why
+- **Order checkout:** app uses **Moyasar Flutter SDK** → Samsung Pay appears.
+- **Wallet top-up:** app opened **Moyasar hosted invoice** URL → Samsung Pay **does not** appear on that page.
+
+### Agreed fix (Backend + Flutter)
+- **Backend:** `POST /wallet/deposit` still returns `payment_url` (Moyasar invoice) for APS/PayFort compatibility. For Moyasar, the app should **ignore** `payment_url` and use the **same SDK checkout** as orders.
+- **Flutter:** when `gateway === 'moyasar'` for wallet top-up, **do not** open `payment_url` in a WebView. Use the **same payment screen/widget** as order checkout (Moyasar SDK).
+
+> **Note:** Returning `payment_url: null` + `mode: embedded` from the backend (`530de4f`) left the app stuck on “Payment initialized” with no payment UI — **reverted** (`fc44feb`). Current production: `payment_url` is present; **the app must choose SDK over WebView**.
+
+---
+
+## 3. Samsung Pay / Apple Pay + card network (`card_brand`)
+
+### 3.1 Concept
+When paying via **Samsung Pay** or **Apple Pay**, Moyasar returns in `source`:
 
 ```json
 {
@@ -48,15 +48,15 @@
 }
 ```
 
-| حقل Moyasar | معناه | نخزنه في |
-|-------------|--------|----------|
-| `source.type` | طريقة المحفظة | `payment_method` → `samsung_pay` / `apple_pay` |
-| `source.company` | شبكة البطاقة | `card_brand` → `visa` / `mastercard` / `mada` |
+| Moyasar field | Meaning | Stored as |
+|---------------|---------|-----------|
+| `source.type` | Wallet method | `payment_method` → `samsung_pay` / `apple_pay` |
+| `source.company` | Card network | `card_brand` → `visa` / `mastercard` / `mada` |
 
-**قبل التعديل:** كان الباكند يحوّل الدفع إلى `visa` فقط ويفقد معلومة Samsung Pay.  
-**بعد التعديل:** يُحفظ الاثنان معاً.
+**Before:** backend overwrote payment as `visa` only and lost Samsung Pay info.  
+**After:** both fields are stored.
 
-### 3.2 Migration (على السيرفر)
+### 3.2 Migration (server)
 
 ```bash
 cd /www/wwwroot/back.nathefah.com
@@ -65,13 +65,13 @@ php artisan migrate
 php artisan optimize:clear
 ```
 
-يضيف عمود `card_brand` (nullable) إلى:
+Adds nullable `card_brand` to:
 - `payment_transactions`
 - `orders`
 - `wallet_transactions`
 
-### 3.3 متى يُحدَّث `payment_method` و `card_brand`؟
-بعد **تأكيد الدفع** من Moyasar (callback / webhook / verify)، عبر `MoyasarPaymentMethodApplier`:
+### 3.3 When are `payment_method` and `card_brand` updated?
+After **payment confirmation** from Moyasar (callback / webhook / verify), via `MoyasarPaymentMethodApplier`:
 
 | `source.type` | `source.company` | `payment_method` | `card_brand` |
 |---------------|------------------|------------------|--------------|
@@ -80,45 +80,45 @@ php artisan optimize:clear
 | `samsungpay` | `mada` | `samsung_pay` | `mada` |
 | `applepay` | `visa` | `apple_pay` | `visa` |
 | `creditcard` | `visa` | `visa` | `visa` |
-| `credit_card` (اختيار عام) + `company: visa` | — | `visa` | `visa` |
+| generic `credit_card` + `company: visa` | — | `visa` | `visa` |
 
 ---
 
-## 4. شكل الـ API للفلاتر
+## 4. API shapes for Flutter
 
-### 4.1 الطلبات — `paymentFieldsForApi()`
+### 4.1 Orders — `paymentFieldsForApi()`
 
-يُستخدم في: تفاصيل الطلب، التتبع، pending approval، إلخ.
+Used in: order details, tracking, pending approval, etc.
 
 ```json
 {
   "payment_method": "samsung_pay",
-  "payment_method_label": "سامسونج باي",
+  "payment_method_label": "Samsung Pay",
   "payment_methods": ["samsung_pay"],
   "card_brand": "visa",
-  "card_brand_label": "فيزا"
+  "card_brand_label": "Visa"
 }
 ```
 
-| الحقل | النوع | الوصف |
-|-------|------|--------|
-| `payment_method` | string | الطريقة الفعلية بعد تأكيد Moyasar |
-| `payment_method_label` | string | مترجم حسب `Accept-Language` |
-| `payment_methods` | string[] | قائمة طرق الدفع (split / تاريخ) |
-| `card_brand` | string \| null | `visa`, `mastercard`, `mada` — فقط عند الدفع عبر wallet أو عند وجود شبكة |
-| `card_brand_label` | string | تسمية الشبكة للعرض |
+| Field | Type | Description |
+|-------|------|-------------|
+| `payment_method` | string | Actual method after Moyasar confirmation |
+| `payment_method_label` | string | Localized via `Accept-Language` |
+| `payment_methods` | string[] | Payment method list (split / history) |
+| `card_brand` | string \| null | `visa`, `mastercard`, `mada` — when paying via wallet or when network is known |
+| `card_brand_label` | string | Network label for display |
 
-**عرض مقترح في UI:**
+**Suggested UI:**
 ```
-سامسونج باي · فيزا
+Samsung Pay · Visa
 ```
-أو: أيقونة Samsung Pay + أيقونة Visa من `card_brand`.
+Or: Samsung Pay icon + Visa icon from `card_brand`.
 
 ---
 
-### 4.2 شحن المحفظة — `POST /api/v1/user/wallet/deposit`
+### 4.2 Wallet top-up — `POST /api/v1/user/wallet/deposit`
 
-**Request (مثال):**
+**Request (example):**
 ```json
 {
   "amount": 50,
@@ -126,14 +126,14 @@ php artisan optimize:clear
 }
 ```
 
-**Response (Moyasar — بعد التأكيد يظهر `card_brand` في verify/callback):**
+**Response (Moyasar — `card_brand` appears after verify/callback):**
 
 ```json
 {
   "payment_url": "https://checkout.moyasar.com/invoices/...",
   "transaction_id": "WALLET-123-...",
   "payment_method": "credit_card",
-  "payment_method_label": "دفع الكتروني",
+  "payment_method_label": "Digital Payment",
   "payment_method_type": "redirect",
   "mode": "invoice",
   "moyasar": {
@@ -145,17 +145,17 @@ php artisan optimize:clear
 }
 ```
 
-**تعليمات Flutter:**
+**Flutter instructions:**
 
-| الحقل | ماذا تفعل |
-|-------|-----------|
-| `payment_url` | **لا** تفتحه في WebView لـ Moyasar — استخدم SDK |
-| `moyasar.methods` | مرجع للطرق المتاحة (اختياري للـ SDK) |
-| `verify_url` | بعد نجاح SDK، استدعِ verify أو انتظر callback |
+| Field | Action |
+|-------|--------|
+| `payment_url` | **Do not** open in WebView for Moyasar — use SDK |
+| `moyasar.methods` | Reference for available methods (optional for SDK) |
+| `verify_url` | After SDK success, call verify or rely on callback |
 
 ---
 
-### 4.3 معاملات المحفظة — `GET /api/v1/user/wallet`
+### 4.3 Wallet transactions — `GET /api/v1/user/wallet`
 
 ```json
 {
@@ -163,28 +163,28 @@ php artisan optimize:clear
   "amount": 10,
   "type": "credit",
   "payment_method": "samsung_pay",
-  "payment_method_label": "سامسونج باي",
+  "payment_method_label": "Samsung Pay",
   "card_brand": "visa",
-  "card_brand_label": "فيزا",
-  "description": "إيداع في المحفظة",
-  "operation_type": "إضافة"
+  "card_brand_label": "Visa",
+  "description": "Wallet deposit",
+  "operation_type": "Addition"
 }
 ```
 
 ---
 
-### 4.4 Verify إيداع — `GET /api/v1/user/wallet/deposit/verify/{transactionId}`
+### 4.4 Deposit verify — `GET /api/v1/user/wallet/deposit/verify/{transactionId}`
 
-بعد دفع ناجح:
+After successful payment:
 
 ```json
 {
   "status": "completed",
   "transaction": {
     "payment_method": "samsung_pay",
-    "payment_method_label": "سامسونج باي",
+    "payment_method_label": "Samsung Pay",
     "card_brand": "visa",
-    "card_brand_label": "فيزا",
+    "card_brand_label": "Visa",
     "amount": 50
   },
   "balance": 60
@@ -193,83 +193,90 @@ php artisan optimize:clear
 
 ---
 
-## 5. قيم `payment_method` و `card_brand`
+## 5. `payment_method` and `card_brand` values
 
-### payment_method (كاملة)
+### payment_method (full list)
 
-| value | label (ar) |
-|-------|------------|
-| `cash_on_delivery` | الدفع عند الاستلام |
-| `nazefah_wallet` | محفظة |
-| `credit_card` | دفع الكتروني |
-| `visa` | فيزا |
-| `mastercard` | ماستركارد |
-| `mada` | مدى |
-| `stc_pay` | STC Pay |
-| `apple_pay` | آبل باي |
-| `samsung_pay` | سامسونج باي |
-| `google_pay` | جوجل باي |
+| value | label (en) | label (ar) |
+|-------|------------|------------|
+| `cash_on_delivery` | Cash on Delivery | الدفع عند الاستلام |
+| `nazefah_wallet` | Wallet | محفظة |
+| `credit_card` | Digital Payment | دفع الكتروني |
+| `visa` | Visa | فيزا |
+| `mastercard` | MasterCard | ماستركارد |
+| `mada` | MADA | مدى |
+| `stc_pay` | STC Pay | STC Pay |
+| `apple_pay` | Apple Pay | آبل باي |
+| `samsung_pay` | Samsung Pay | سامسونج باي |
+| `google_pay` | Google Pay | جوجل باي |
 
-### card_brand (شبكة البطاقة تحت المحفظة)
+### card_brand (network under wallet payment)
 
-| value | label (ar) |
-|-------|------------|
-| `visa` | فيزا |
-| `mastercard` | ماستركارد |
-| `mada` | مدى |
-| `null` | — (لا تعرض شعار شبكة) |
+| value | label (en) | label (ar) |
+|-------|------------|------------|
+| `visa` | Visa | فيزا |
+| `mastercard` | MasterCard | ماستركارد |
+| `mada` | MADA | مدى |
+| `null` | — (hide network badge) | — |
+
+Labels come from the API (`*_label` fields) based on `Accept-Language`.
 
 ---
 
-## 6. Checklist للفلاتر
+## 6. Flutter checklist
 
-### شحن المحفظة
-- [ ] عند Moyasar: استخدم **Moyasar SDK** (نفس checkout الطلب).
-- [ ] **لا** تفتح `payment_url` في WebView لـ `checkout.moyasar.com`.
-- [ ] بعد نجاح الدفع: استدعِ `verify_url` أو اعتمد على callback + refresh المحفظة.
+### Wallet top-up
+- [ ] For Moyasar: use **Moyasar SDK** (same as order checkout).
+- [ ] **Do not** open `payment_url` in WebView for `checkout.moyasar.com`.
+- [ ] After successful payment: call `verify_url` or rely on callback + refresh wallet.
 
-### عرض طريقة الدفع
-- [ ] اعرض `payment_method_label` كالطريقة الرئيسية.
-- [ ] إذا `card_brand != null`، اعرض `card_brand_label` أو أيقونة الشبكة بجانبها.
-- [ ] لا تعتمد على `credit_card` بعد الدفع — انتظر الـ API بعد التأكيد.
+### Payment method display
+- [ ] Show `payment_method_label` as the primary method.
+- [ ] If `card_brand != null`, show `card_brand_label` or network icon next to it.
+- [ ] Do not rely on `credit_card` after payment — wait for post-confirmation API.
 
 ### Samsung Pay
-- [ ] الزر يظهر من **SDK** على جهاز Samsung (ليس من hosted invoice).
-- [ ] Service ID / إعدادات SDK: **نفس** إعدادات دفع الطلب (لا حقل `.env` إضافي في الباكند للفاتورة).
+- [ ] Button comes from **SDK** on Samsung devices (not hosted invoice).
+- [ ] Service ID / SDK config: **same** as order checkout (no extra backend `.env` for hosted invoice).
 
 ---
 
-## 7. Endpoints مرجعية
+## 7. Reference endpoints
 
-| Method | Path | ملاحظة |
-|--------|------|--------|
-| GET | `/api/v1/user/payment-methods` | طرق الدفع + `grouped_method_values` تحت Moyasar |
-| POST | `/api/v1/user/wallet/deposit` | بدء إيداع |
-| GET | `/api/v1/user/wallet/deposit/verify/{transactionId}` | تأكيد إيداع |
-| GET | `/api/v1/user/wallet` | رصيد + معاملات (فيها `card_brand`) |
-| POST | `/api/v1/user/orders` | إنشاء طلب + gateway payment |
-| GET | `/api/v1/user/orders/{id}` | تفاصيل + `payment_method` + `card_brand` |
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/api/v1/user/payment-methods` | Payment methods + `grouped_method_values` under Moyasar |
+| POST | `/api/v1/user/wallet/deposit` | Start deposit |
+| GET | `/api/v1/user/wallet/deposit/verify/{transactionId}` | Confirm deposit |
+| GET | `/api/v1/user/wallet` | Balance + transactions (includes `card_brand`) |
+| POST | `/api/v1/user/orders` | Create order + gateway payment |
+| GET | `/api/v1/user/orders/{id}` | Details + `payment_method` + `card_brand` |
 
----
-
-## 8. أسئلة شائعة
-
-**س: ليه `payment_url` لسه موجود في deposit؟**  
-ج: للتوافق مع PayFort/APS وfallback. مع Moyasar التطبيق **يتجاهله** ويفتح SDK.
-
-**س: `card_brand` بيظهر قبل ولا بعد الدفع؟**  
-ج: **بعد** تأكيد Moyasar فقط (callback / verify). قبل الدفع قد يكون `null`.
-
-**س: لو دفع بطاقة عادية (مش Samsung Pay)؟**  
-ج: `payment_method = visa|mastercard|mada` و `card_brand` نفس القيمة أو `null` حسب المسار.
-
-**س: Apple Pay؟**  
-ج: نفس المنطق: `payment_method = apple_pay` + `card_brand`.
+Base URL (production): `https://back.nathefah.com/api/v1`
 
 ---
 
-## 9. جهة اتصال Backend
+## 8. FAQ
+
+**Q: Why is `payment_url` still returned on deposit?**  
+A: Compatibility with PayFort/APS and fallback. With Moyasar, the app **ignores** it and uses SDK.
+
+**Q: When does `card_brand` appear — before or after payment?**  
+A: **After** Moyasar confirmation only (callback / verify). Before payment it may be `null`.
+
+**Q: Regular card payment (not Samsung Pay)?**  
+A: `payment_method = visa|mastercard|mada`; `card_brand` may match or be `null` depending on path.
+
+**Q: Apple Pay?**  
+A: Same logic: `payment_method = apple_pay` + `card_brand`.
+
+**Q: Split payments?**  
+A: Use `payment_methods[]` array; each leg may have its own method. Order-level `card_brand` reflects the primary gateway leg after resolution.
+
+---
+
+## 9. Backend contact
 
 - Repo: `samerhassan95/nazifah-back`
 - Production: `https://back.nathefah.com`
-- بعد أي pull: `php artisan migrate && php artisan optimize:clear`
+- After any pull: `php artisan migrate && php artisan optimize:clear`
