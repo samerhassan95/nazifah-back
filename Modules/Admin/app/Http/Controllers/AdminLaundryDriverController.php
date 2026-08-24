@@ -178,6 +178,21 @@ class AdminLaundryDriverController extends Controller
     }
 
     /**
+     * Remove the specified driver.
+     * DELETE /laundries/drivers/{id}
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $deleted = $this->driverService->delete($id);
+
+        if (! $deleted) {
+            return ErrorResponse::make('Driver not found', null, 404);
+        }
+
+        return successResponse(null, 'Driver deleted successfully');
+    }
+
+    /**
      * Format driver data for response
      */
     private function formatDriver($driver): array

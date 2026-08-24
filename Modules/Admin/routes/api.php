@@ -288,12 +288,13 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
     });
 
     // Notification Management
+    // Note: index/show/destroy are intentionally not registered here — they are
+    // shadowed by the identical GET/DELETE routes in Modules/Notification/routes/api.php
+    // (Modules\Notification\Http\Controllers\Api\V1\NotificationController), which is
+    // the controller that actually serves grouped/paginated admin notifications.
     Route::prefix('notifications')->group(function () {
-        Route::get('/', [AdminNotificationController::class, 'index']);
         Route::post('send-bulk', [AdminNotificationController::class, 'sendBulkNotification']);
         Route::get('statistics', [AdminNotificationController::class, 'statistics']);
-        Route::get('{id}', [AdminNotificationController::class, 'show']);
-        Route::delete('{id}', [AdminNotificationController::class, 'destroy']);
     });
 
     // ========================================================================
@@ -425,6 +426,7 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
             Route::post('/', [AdminLaundryBranchController::class, 'store']);
             Route::get('{id}', [AdminLaundryBranchController::class, 'show']);
             Route::put('{id}', [AdminLaundryBranchController::class, 'update']);
+            Route::delete('{id}', [AdminLaundryBranchController::class, 'destroy']);
         });
 
         // Orders
@@ -445,6 +447,7 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
             Route::post('/', [AdminLaundryDriverController::class, 'store']);
             Route::get('{id}', [AdminLaundryDriverController::class, 'show']);
             Route::put('{id}', [AdminLaundryDriverController::class, 'update']);
+            Route::delete('{id}', [AdminLaundryDriverController::class, 'destroy']);
         });
 
         // Categories
