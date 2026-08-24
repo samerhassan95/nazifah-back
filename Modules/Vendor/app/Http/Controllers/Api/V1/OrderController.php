@@ -2125,6 +2125,7 @@ class OrderController extends Controller
             } elseif (
                 in_array($targetStatus, [OrderStatus::COMPLETED, OrderStatus::WAITING_CLIENT_RECEIPT], true)
                 && (bool) $order->delivery_at_vendor
+                && in_array($order->status, [OrderStatus::DELIVERED_TO_BRANCH->value, OrderStatus::CLIENT_POSTPONED_DELIVERY->value], true)
             ) {
                 // Branch pickup: order must actually be delivered_to_branch (and not
                 // already ready/handed off) before it can be marked ready. Reject
@@ -2138,10 +2139,25 @@ class OrderController extends Controller
                 }
                 $order = $handoffService->requestClientDelivery($order, (int) $employee->id, $request->notes);
             } elseif (
+                $targetStatus === OrderStatus::COMPLETED
+                && (bool) $order->delivery_at_vendor
+                && $order->status === OrderStatus::DELIVERED->value
+            ) {
+                // Branch pickup: the client already confirmed receive_from_laundry
+                // themselves (order is delivered) — the vendor now sends their own
+                // closing confirmation ("تم الاستلام") before the order becomes
+                // completed. This is a required second step, not automatic.
+                if (! $handoffService->canConfirmClientPickupReceived($order)) {
+                    return errorResponse(__('order.vendor_handoff_error_not_awaiting_client_pickup'), null, 400);
+                }
+                $order = $handoffService->confirmClientPickupReceived($order, (int) $employee->id, $request->notes);
+            } elseif (
                 $targetStatus === OrderStatus::DELIVERED
                 && (bool) $order->delivery_at_vendor
                 && $handoffService->canConfirmClientPickupReceived($order)
             ) {
+                // Vendor confirms on the client's behalf — client hasn't confirmed
+                // receive_from_laundry themselves yet.
                 $order = $handoffService->confirmClientPickupReceived($order, (int) $employee->id, $request->notes);
             } elseif (
                 $targetStatus === OrderStatus::DELIVERED

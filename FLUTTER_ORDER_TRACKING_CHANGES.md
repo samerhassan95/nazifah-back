@@ -189,6 +189,37 @@ This applies everywhere `status_label` appears — client, vendor, and driver ap
 
 ---
 
+## 6. Branch Pickup Needs a Second, Vendor-Side Confirmation to Close
+
+Following on from §5: the client's `POST /user/orders/{id}/confirm-handoff` (`receive_from_laundry`) only moves the order to `delivered` — it does **not** close it out to `completed` by itself. The vendor must send their own confirmation afterward.
+
+Corrected full flow for `pickup_at_vendor + delivery_at_vendor` both `true`:
+
+```
+waiting_client_receipt (vendor marked ready)
+  → [CLIENT confirm-handoff: receive_from_laundry] → delivered
+  → [VENDOR: PUT /vendor/orders/{id}/status  {"status": "completed"}]  ← required, not automatic
+  → completed
+```
+
+**Vendor app:** once an order is `delivered` (client already confirmed pickup themselves), call `PUT /api/v1/vendor/orders/{id}/status` with `{"status": "completed"}` to send the closing confirmation ("تم الاستلام"). This is the same endpoint/action used to mark an order "ready" earlier in the flow (§5) — the backend now tells the two apart by the order's *current* status (`delivered_to_branch` → marks ready; `delivered` → closes out), so no request-shape change is needed, just call it again at this second point. Returns `400` (`"Order is not awaiting vendor client pickup confirmation"`) if called before the client has confirmed receipt, or if already closed.
+
+**Alternate path (unchanged):** if the client never confirms via the app, the vendor can confirm on the client's behalf earlier — while the order is still `waiting_client_receipt` (or legacy `completed`) — using the same `PUT .../status {"status": "completed"}` call. In that case it goes straight to `delivered` instead (the client-confirmation step is skipped, not the vendor-closing step).
+
+**Client app:** nothing changes here — `receive_from_laundry` still just moves to `delivered`. Don't expect `completed` back from that call; the order will show `delivered` until the vendor sends their closing confirmation.
+
+---
+
+## 7. Push Notification Bug Fix: "Driver Has Arrived" on Orders With No Driver
+
+Backend-only fix, no app changes needed — noted here since it was reported against a real order (walk-in, no driver assigned) that got a push notification saying a driver had arrived.
+
+**Cause:** when an order reaches `waiting_client_receipt`, the notification listener always sent "السائق في موقع التسليم" / "Driver Has Arrived" — written only for the home-delivery case, without checking whether the order actually has a driver. Since §5 now also reaches `waiting_client_receipt` for branch-pickup orders (no driver at all), those clients were getting a nonsensical driver-arrival notification.
+
+**Fix:** the notification now branches on `delivery_at_vendor` — branch-pickup orders get "طلبك جاهز للاستلام" / "Your Order is Ready — pick it up from the branch" instead, matching the `status_label` wording already fixed in §5.
+
+---
+
 ## Migration Notes
 
 Sections 1–4 are purely additive — no breaking changes, safe to integrate incrementally:

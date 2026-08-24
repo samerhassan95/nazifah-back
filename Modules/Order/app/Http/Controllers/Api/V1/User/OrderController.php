@@ -2465,6 +2465,7 @@ class OrderController extends Controller
             OrderStatus::PAYMENT_CONFIRMED->value,
             OrderStatus::PICKED_UP->value,
             OrderStatus::DELIVERED_TO_BRANCH->value,
+            OrderStatus::WAITING_CLIENT_RECEIPT->value,
             OrderStatus::COMPLETED->value,
             OrderStatus::DELIVERED->value,
         ];
@@ -3465,7 +3466,7 @@ class OrderController extends Controller
                     ->orWhere('status', OrderStatus::BRANCH_REVIEW->value)
                     ->orWhere(function ($pendingBranchPickup) {
                         $pendingBranchPickup
-                            ->where('status', OrderStatus::COMPLETED->value)
+                            ->whereIn('status', [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value])
                             ->where('delivery_at_vendor', true)
                             ->whereNull('client_delivery_handoff_at');
                     });

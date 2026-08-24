@@ -227,6 +227,25 @@ class SendOrderStatusNotification
 
     private function onWaitingClientReceipt(Order $order, string $num): void
     {
+        // waiting_client_receipt is reused for branch self-pickup orders too (vendor
+        // marked it ready) — no driver is involved there, so the driver-arrival wording
+        // used for home delivery would be wrong and confusing.
+        if ((bool) $order->delivery_at_vendor) {
+            $this->notifications->sendToClient($order,
+                'طلبك جاهز للاستلام', 'Your Order is Ready',
+                "طلبك #{$num} جاهز، يمكنك استلامه من الفرع.",
+                "Your order #{$num} is ready — you can pick it up from the branch.",
+                'waiting_client_receipt',
+            );
+            $this->notifyVendorAndAdmins($order,
+                'الطلب جاهز للاستلام', 'Order Ready for Pickup',
+                "الطلب #{$num} جاهز لاستلام العميل من الفرع.", "Order #{$num} is ready for the client to pick up from the branch.",
+                'waiting_client_receipt',
+            );
+
+            return;
+        }
+
         $this->notifications->sendToClient($order,
             'السائق في موقع التسليم', 'Driver Has Arrived',
             "وصل السائق لموقع تسليم طلبك #{$num}. يرجى استلام الطلب.",

@@ -225,19 +225,23 @@ class VendorOrderHandoffService
 
     public function confirmClientPickupReceived(Order $order, int $changedBy, ?string $notes = null): Order
     {
-        if (! $this->canConfirmClientPickupReceived($order)) {
+        $context = $this->resolveClientDeliveryHandoffContext($order);
+
+        if (! $context) {
             throw new \LogicException(__('order.vendor_handoff_error_not_awaiting_client_pickup'));
         }
 
-        if (! $this->statusService->canTransition($order, OrderStatus::DELIVERED)) {
+        $target = OrderStatus::from($context['target_status']);
+
+        if (! $this->statusService->canTransition($order, $target)) {
             throw new InvalidStatusTransitionException(
                 OrderStatus::from($order->status),
-                OrderStatus::DELIVERED,
+                $target,
                 $order
             );
         }
 
-        $this->statusService->transitionTo($order, OrderStatus::DELIVERED, [
+        $this->statusService->transitionTo($order, $target, [
             'notes' => $notes ?? __('order.vendor_handoff_log_client_pickup_received'),
             'changed_by' => $changedBy,
         ]);
@@ -462,6 +466,14 @@ class VendorOrderHandoffService
     /**
      * Vendor confirms the client physically picked up the order at the branch.
      *
+     * Two points in the flow this can fire:
+     * - Client hasn't confirmed themselves yet (still waiting_client_receipt/completed):
+     *   vendor confirms on the client's behalf -> delivered.
+     * - Client already confirmed receive_from_laundry themselves (already delivered):
+     *   vendor sends their own closing confirmation ("تم الاستلام") -> completed.
+     *   This is the required second step — a walk-in order does not reach completed
+     *   from the client's confirmation alone.
+     *
      * @return array<string, mixed>|null
      */
     public function resolveClientDeliveryHandoffContext(Order $order): ?array
@@ -470,11 +482,26 @@ class VendorOrderHandoffService
             return null;
         }
 
-        if (! in_array($order->status, [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value], true)) {
+        if ($order->vendor_client_delivery_handoff_at) {
             return null;
         }
 
-        if ($order->vendor_client_delivery_handoff_at) {
+        if ($order->status === OrderStatus::DELIVERED->value) {
+            if (! $this->statusService->canTransition($order, OrderStatus::COMPLETED)) {
+                return null;
+            }
+
+            return [
+                'handoff_type' => 'confirm_client_pickup_received',
+                'target_status' => OrderStatus::COMPLETED->value,
+                'confirm_label' => __('order.vendor_handoff_confirm_client_pickup_received'),
+                'endpoint' => '/api/v1/vendor/orders/'.$order->id.'/status',
+                'method' => 'PUT',
+                'body' => ['status' => OrderStatus::COMPLETED->value],
+            ];
+        }
+
+        if (! in_array($order->status, [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value], true)) {
             return null;
         }
 
