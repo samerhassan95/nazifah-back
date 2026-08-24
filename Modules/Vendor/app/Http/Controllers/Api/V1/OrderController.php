@@ -2114,13 +2114,22 @@ class OrderController extends Controller
         $targetStatus = OrderStatus::from($request->status);
 
         try {
-            if ($targetStatus === OrderStatus::DELIVERED_TO_BRANCH && $handoffService->canConfirmPickupReceived($order)) {
+            if ($targetStatus === OrderStatus::DELIVERED_TO_BRANCH && (bool) $order->pickup_at_vendor) {
+                // Branch drop-off: the client must confirm they handed clothes over
+                // (give_to_laundry) before the vendor can mark pickup received. Reject
+                // instead of silently falling through to a blind status transition.
+                if (! $handoffService->canConfirmPickupReceived($order)) {
+                    return errorResponse(__('order.vendor_handoff_error_not_awaiting_pickup_receipt'), null, 400);
+                }
                 $order = $handoffService->confirmPickupReceived($order, (int) $employee->id, $request->notes);
-            } elseif (
-                $targetStatus === OrderStatus::COMPLETED
-                && (bool) $order->delivery_at_vendor
-                && $handoffService->canRequestClientDelivery($order)
-            ) {
+            } elseif ($targetStatus === OrderStatus::COMPLETED && (bool) $order->delivery_at_vendor) {
+                // Branch pickup: order must actually be delivered_to_branch (and not
+                // already completed/handed off) before it can be marked ready. Reject
+                // instead of silently falling through to a blind status transition,
+                // which would skip setting vendor_delivery_ready_at.
+                if (! $handoffService->canRequestClientDelivery($order)) {
+                    return errorResponse(__('order.vendor_handoff_error_not_ready_client_delivery'), null, 400);
+                }
                 $order = $handoffService->requestClientDelivery($order, (int) $employee->id, $request->notes);
             } elseif (
                 $targetStatus === OrderStatus::DELIVERED
