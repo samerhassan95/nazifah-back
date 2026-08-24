@@ -197,6 +197,8 @@ class OrderTrackingController extends Controller
             $activeDriver = $order->driver;
         }
 
+        $handoffService = app(\App\Services\VendorOrderHandoffService::class);
+
         $branchId = (int) ($order->branch_id ?? 0);
         $imageUrlResolver = fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null;
         $categorized = PendingApprovalItemCategorizer::categorize($order, $lang, $imageUrlResolver);
@@ -359,7 +361,11 @@ class OrderTrackingController extends Controller
                 null,
                 ensure: true
             ),
-        ], $order->clientVisitResponseFields()), __('order.order_tracking_retrieved'));
+        ],
+            $order->clientVisitResponseFields(),
+            $handoffService->vendorConfirmFlags($order),
+            $handoffService->driverDeliveryActionFlags($order)
+        ), __('order.order_tracking_retrieved'));
 
         // Restore original locale
         app()->setLocale($originalLocale);

@@ -116,7 +116,7 @@ Important:
 
 ## Persisted Response Flags
 
-Two boolean flags are now returned in **both** `GET /api/v1/vendor/orders/{id}` and `GET /api/v1/driver/orders/{id}`:
+Two boolean flags are now returned in `GET /api/v1/vendor/orders/{id}`, `GET /api/v1/driver/orders/{id}`, and `GET /api/v1/user/orders/{id}/tracking`:
 
 | Flag                               | Meaning                                                   |
 |------------------------------------|-----------------------------------------------------------|
@@ -242,6 +242,7 @@ Receiving from laundry and marking on-the-way are separate. A driver can hold mu
 | `POST /api/v1/driver/orders/{id}/confirm-qr` response | ✓ | ✓ | ✓ |
 | `POST /api/v1/vendor/orders/{id}/confirm-handoff` response | ✓ | ✓ | |
 | `PUT /api/v1/vendor/orders/{id}/status` response | ✓ | ✓ | |
+| `GET /api/v1/user/orders/{id}/tracking` | ✓ | ✓ | ✓ |
 
 `can_mark_on_the_way` is `true` only when:
 
