@@ -104,6 +104,8 @@ class OrderTrackingController extends Controller
             'pickupDriver',
             'deliveryDriver',
             'discount',
+            'driverRejections' => fn ($q) => $q->orderBy('rejected_at', 'asc'),
+            'driverRejections.driver',
         ])
             ->where('client_id', $user->id)
             ->find($order_id);
@@ -198,6 +200,15 @@ class OrderTrackingController extends Controller
         }
 
         $handoffService = app(\App\Services\VendorOrderHandoffService::class);
+
+        $driverRejections = $order->driverRejections->map(function ($rejection) use ($formatDriver) {
+            return [
+                'trip_type' => $rejection->trip_type,
+                'driver' => $formatDriver($rejection->driver),
+                'reason' => $rejection->reason,
+                'rejected_at' => $rejection->rejected_at?->toISOString(),
+            ];
+        })->values();
 
         $branchId = (int) ($order->branch_id ?? 0);
         $imageUrlResolver = fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null;
@@ -329,6 +340,8 @@ class OrderTrackingController extends Controller
                 'pickup_driver' => $formatDriver($order->pickupDriver),
                 'delivery_driver' => $formatDriver($order->deliveryDriver),
             ],
+            'had_driver_rejection' => $driverRejections->isNotEmpty(),
+            'driver_rejections' => $driverRejections,
             'pickup_time' => $order->pickup_time?->toISOString(),
             'estimated_delivery_time' => $order->estimated_delivery_time?->toISOString(),
             'actual_delivery_time' => $order->actual_delivery_time?->toISOString(),

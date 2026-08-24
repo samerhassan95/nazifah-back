@@ -192,6 +192,11 @@ class Order extends Model
         return $this->hasMany(OrderDriverTrip::class);
     }
 
+    public function driverRejections(): HasMany
+    {
+        return $this->hasMany(OrderDriverRejection::class);
+    }
+
     public function pickupAddress(): BelongsTo
     {
         return $this->belongsTo(Address::class, 'pickup_address_id');
