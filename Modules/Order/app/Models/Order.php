@@ -646,10 +646,19 @@ class Order extends Model
         return $query->where(function ($q) {
             $q->whereIn('status', OrderStatus::vendorCurrentStatusValues())
                 ->orWhere(function ($q2) {
-                    $q2->where('status', OrderStatus::COMPLETED->value)
-                        ->where('delivery_at_vendor', true)
-                        ->whereNull('client_delivery_handoff_at')
-                        ->whereNull('vendor_client_delivery_handoff_at');
+                    // Branch pickup, vendor side not yet closed out: either legacy
+                    // "completed" reused as ready-not-collected (nobody confirmed
+                    // yet), or the client already confirmed receive_from_laundry
+                    // (delivered) and the vendor still owes their own closing
+                    // confirmation. Stay visible in "current" either way.
+                    $q2->where('delivery_at_vendor', true)
+                        ->whereNull('vendor_client_delivery_handoff_at')
+                        ->where(function ($q2sub) {
+                            $q2sub->where(function ($legacy) {
+                                $legacy->where('status', OrderStatus::COMPLETED->value)
+                                    ->whereNull('client_delivery_handoff_at');
+                            })->orWhere('status', OrderStatus::DELIVERED->value);
+                        });
                 })
                 ->orWhere(function ($q3) {
                     $q3->where('status', OrderStatus::PENDING->value)
@@ -668,7 +677,16 @@ class Order extends Model
     public function scopeVendorCompleted($query)
     {
         return $query->where(function ($q) {
-            $q->where('status', OrderStatus::DELIVERED->value)
+            $q->where(function ($q1) {
+                // Branch pickup: delivered only counts as finished once the vendor
+                // has also sent their own closing confirmation — otherwise it still
+                // needs vendor action, so it belongs in "current" (see scopeVendorCurrent).
+                $q1->where('status', OrderStatus::DELIVERED->value)
+                    ->where(function ($q1sub) {
+                        $q1sub->where('delivery_at_vendor', false)
+                            ->orWhereNotNull('vendor_client_delivery_handoff_at');
+                    });
+            })
                 ->orWhere(function ($q2) {
                     $q2->where('status', OrderStatus::COMPLETED->value)
                         ->where(function ($q3) {

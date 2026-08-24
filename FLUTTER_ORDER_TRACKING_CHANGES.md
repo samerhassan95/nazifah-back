@@ -220,6 +220,18 @@ Backend-only fix, no app changes needed — noted here since it was reported aga
 
 ---
 
+## 8. `delivered` Orders Were Disappearing/Miscategorized (Client List + Vendor Tabs)
+
+Backend-only fix. Found while verifying §6 — once a branch-pickup order reaches `delivered` (client confirmed, vendor hasn't closed out yet), three separate places were treating it inconsistently:
+
+- **Client order list** — `GET /user/orders?status=completed` was hardcoded to only match DB status `delivered`, silently excluding orders that had already reached the real `completed` closure. `status=current` also failed to exclude `completed`, so a fully-closed order could still show up in the client's "current" tab. Both now use the existing `completedStatuses()` set (`delivered` + `completed`) consistently — `status=completed` returns either, `status=current` excludes both.
+- **Vendor "current" tab** (`Order::scopeVendorCurrent()`) — only kept a branch-pickup order visible while it sat at `completed`-not-yet-collected (the old flow). It didn't account for the new `delivered`-waiting-for-vendor-close state from §6, so those orders could vanish from the vendor's active list before the vendor had done their part.
+- **Vendor "completed" tab** (`Order::scopeVendorCompleted()`) — treated *any* `delivered` order as finished, including a branch-pickup order still awaiting the vendor's closing confirmation. Now `delivered` only counts as finished there for home-delivery orders, or once `vendor_client_delivery_handoff_at` is actually set.
+
+No field/response shape changes — this only affects which orders show up under `status=current` / `status=completed` (client) and the vendor's current/completed tabs. If either app caches or locally re-derives "is this order done" instead of trusting these endpoints, this is worth double-checking against the corrected filtering.
+
+---
+
 ## Migration Notes
 
 Sections 1–4 are purely additive — no breaking changes, safe to integrate incrementally:
