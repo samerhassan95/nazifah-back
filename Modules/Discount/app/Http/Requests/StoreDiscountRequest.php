@@ -38,6 +38,8 @@ class StoreDiscountRequest extends FormRequest
             'application_scope' => ['nullable', 'string', 'in:order_total,services'],
             'discount_service_ids' => ['nullable', 'array'],
             'discount_service_ids.*' => ['integer', 'exists:services,id'],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer', 'exists:categories,id'],
             'value' => ['required', 'numeric', 'min:0'],
             'min_order_amount' => ['nullable', 'numeric', 'min:0'],
             'min_items_count' => ['nullable', 'integer', 'min:1'],

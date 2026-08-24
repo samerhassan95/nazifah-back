@@ -360,6 +360,7 @@ class CouponController extends Controller
         foreach ([
             'usage_service_ids',
             'discount_service_ids',
+            'category_ids',
             'vendor_ids',
             'zone_ids',
             'client_ids',

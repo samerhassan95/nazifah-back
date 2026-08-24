@@ -27,6 +27,7 @@ class DiscountResource extends JsonResource
             'usage_service_ids' => $this->usage_service_ids ?? [],
             'application_scope' => $this->application_scope ?? 'order_total',
             'discount_service_ids' => $this->discount_service_ids ?? [],
+            'category_ids' => $this->category_ids ?? [],
             'value' => (float) $this->value,
             'min_order_amount' => (float) $this->min_order_amount,
             'min_items_count' => $this->min_items_count,
