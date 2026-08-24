@@ -10,6 +10,7 @@ use App\Exceptions\InvalidStatusTransitionException;
 use Illuminate\Support\Facades\DB;
 use Modules\Driver\Models\Driver;
 use Modules\Order\Models\Order;
+use Modules\Order\Models\OrderDriverRejection;
 use Modules\Order\Models\OrderDriverTrip;
 use Modules\Order\Models\OrderStatusLog;
 
@@ -380,15 +381,18 @@ class OrderStatusService
             $updateData = ['driver_id' => null];
             $notesPrefix = '';
             $newStatus = null;
+            $tripType = null;
 
             if ($currentStatus === OrderStatus::DRIVER_PICKUP_ASSIGNED && (int) $order->pickup_driver_id === (int) $driver->id) {
                 $updateData['pickup_driver_id'] = null;
                 $notesPrefix = __('driver.driver_type_pickup');
+                $tripType = OrderDriverRejection::TYPE_PICKUP;
                 // Revert status so vendor can assign another pickup driver (same as before first assignment)
                 $newStatus = OrderStatus::CONFIRMED;
             } elseif ($currentStatus === OrderStatus::DRIVER_DELIVERY_ASSIGNED && (int) $order->delivery_driver_id === (int) $driver->id) {
                 $updateData['delivery_driver_id'] = null;
                 $notesPrefix = __('driver.driver_type_delivery');
+                $tripType = OrderDriverRejection::TYPE_DELIVERY;
                 // Revert to the status before delivery assignment (completed, delivered_to_branch, etc.)
                 $newStatus = $this->resolveDeliveryRejectionRevertStatus($order);
             } else {
@@ -416,6 +420,14 @@ class OrderStatusService
                         'id' => $driver->id,
                     ]),
                 'changed_by' => $driver->id,
+            ]);
+
+            OrderDriverRejection::create([
+                'order_id' => $order->id,
+                'driver_id' => $driver->id,
+                'trip_type' => $tripType,
+                'reason' => $reason,
+                'rejected_at' => now(),
             ]);
 
             return $order;

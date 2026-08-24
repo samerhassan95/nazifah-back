@@ -340,3 +340,41 @@ Body: {"status":"on_way_to_delivery"}
 - QR success means: "driver finished their part, vendor can now confirm"
 - Vendor delivery confirm success means: "bags handed to driver; status still accepted"
 - Driver on-the-way success means: "driver started the trip for this order"
+
+---
+
+## Driver Rejection Visibility (User Tracking)
+
+When a driver rejects a pickup or delivery assignment (`POST /api/v1/driver/orders/{id}/reject`), the order is unassigned and its status reverts so the vendor can assign another driver. Every rejection is now persisted in `order_driver_rejections` and surfaced to the client on:
+
+```
+GET /api/v1/user/orders/{orderId}/tracking
+```
+
+New response fields:
+
+| Field                   | Type    | Description                                                        |
+|-------------------------|---------|----------------------------------------------------------------------|
+| `had_driver_rejection`  | boolean | `true` if any driver has ever rejected this order (pickup or delivery) |
+| `driver_rejections`     | array   | One entry per rejection, oldest first                               |
+
+Each `driver_rejections` entry:
+
+```json
+{
+  "trip_type": "pickup",
+  "driver": {
+    "id": 12,
+    "name": "Ahmed",
+    "phone": "+9665...",
+    "image": null,
+    "latitude": 24.1,
+    "longitude": 46.2,
+    "rating": 4.8
+  },
+  "reason": "Too far from my location",
+  "rejected_at": "2026-08-24T10:15:00.000000Z"
+}
+```
+
+`trip_type` is `pickup` or `delivery`. `reason` is nullable (driver may reject without a reason).
