@@ -76,13 +76,42 @@ A row is inserted every time `OrderStatusService::handleDriverResponse()` proces
 
 ---
 
+---
+
+## 3. Client Handoff Visibility (Walk-in Drop-off / Pickup)
+
+For orders where `pickup_at_vendor` and `delivery_at_vendor` are both `true` (client drops off and picks up in person at the branch — no drivers involved), the drop-off/pickup steps already existed via `POST /api/v1/user/orders/{orderId}/confirm-handoff` (see [CLIENT_ORDER_CONFIRMATION.md](CLIENT_ORDER_CONFIRMATION.md)), but weren't visible from the tracking screen. The tracking endpoint now surfaces them.
+
+| Field                            | Type          | Description                                                    |
+|-----------------------------------|---------------|------------------------------------------------------------------|
+| `requires_handoff_confirmation`   | boolean       | Show the client a confirm-handoff button                        |
+| `handoff`                         | object \| null| `{ type, direction, confirm_label, endpoint, confirm_action }`  |
+
+Reuses `ClientOrderHandoffService::resolveHandoffContext()` (single source of truth for handoff type/label), covering:
+
+- `give_to_laundry` — client drops clothes off at the branch. **On this endpoint only**, this is surfaced at status `confirmed` — not `payment_confirmed` (a deliberate simplification for the tracking screen; other endpoints using the shared service still honor both).
+- `receive_from_laundry` — order is `completed` (vendor marked it ready via `requestClientDelivery()`, which sets `vendor_delivery_ready_at`); client confirms pickup, status moves to `delivered`.
+- `give_to_driver` / `receive_from_driver` — the home pickup/delivery equivalents, unchanged.
+
+Full walk-in flow (`pickup_at_vendor` + `delivery_at_vendor` both `true`):
+
+```
+confirmed
+  → [CLIENT confirm-handoff: give_to_laundry] → client_pickup_handoff_at set (status unchanged)
+  → [VENDOR marks pickup received] → delivered_to_branch
+  → [VENDOR requestClientDelivery()] → completed, vendor_delivery_ready_at set
+  → [CLIENT confirm-handoff: receive_from_laundry] → delivered
+```
+
+---
+
 ## Files Touched
 
 - `Modules/Order/database/migrations/2026_08_24_000001_create_order_driver_rejections_table.php` — new table
 - `Modules/Order/app/Models/OrderDriverRejection.php` — new model
 - `Modules/Order/app/Models/Order.php` — added `driverRejections()` relation
 - `app/Services/OrderStatusService.php` — logs a rejection row in `handleDriverResponse()`
-- `Modules/Order/app/Http/Controllers/Api/V1/User/OrderTrackingController.php` — eager-loads rejections + handoff flags, adds them to the response
+- `Modules/Order/app/Http/Controllers/Api/V1/User/OrderTrackingController.php` — eager-loads rejections + handoff flags, adds them to the response, plus client handoff visibility (§3)
 - `VENDOR_CONFIRM_HANDOFF.md` — updated flag table + new "Driver Rejection Visibility" section
 
 ## Deployment

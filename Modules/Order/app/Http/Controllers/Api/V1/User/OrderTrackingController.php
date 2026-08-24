@@ -218,6 +218,17 @@ class OrderTrackingController extends Controller
             OrderStatus::DELIVERED_TO_BRANCH->value,
         ], true) && $driverRejections->isNotEmpty();
 
+        // Client give/receive handoff at the branch (walk-in drop-off and pickup), e.g.
+        // pickup_at_vendor + delivery_at_vendor both true. Reuses ClientOrderHandoffService
+        // for the type/label/receive-side logic, but on this endpoint the "drop off at the
+        // laundry" step is only surfaced at status=confirmed — payment_confirmed is not
+        // treated as a trigger here (unlike the shared confirm-handoff/on-the-way endpoints).
+        $clientHandoffService = app(\App\Services\ClientOrderHandoffService::class);
+        $handoffContext = $clientHandoffService->resolveHandoffContext($order);
+        if ($handoffContext && $handoffContext['handoff_type'] === 'give_to_laundry' && $order->status !== OrderStatus::CONFIRMED->value) {
+            $handoffContext = null;
+        }
+
         $branchId = (int) ($order->branch_id ?? 0);
         $imageUrlResolver = fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null;
         $categorized = PendingApprovalItemCategorizer::categorize($order, $lang, $imageUrlResolver);
@@ -350,6 +361,14 @@ class OrderTrackingController extends Controller
             ],
             'had_driver_rejection' => $hadDriverRejection,
             'driver_rejections' => $driverRejections,
+            'requires_handoff_confirmation' => $handoffContext !== null,
+            'handoff' => $handoffContext ? [
+                'type' => $handoffContext['handoff_type'],
+                'direction' => $handoffContext['direction'],
+                'confirm_label' => $handoffContext['confirm_label'],
+                'endpoint' => '/api/v1/user/orders/'.$order->id.'/confirm-handoff',
+                'confirm_action' => 'confirm',
+            ] : null,
             'pickup_time' => $order->pickup_time?->toISOString(),
             'estimated_delivery_time' => $order->estimated_delivery_time?->toISOString(),
             'actual_delivery_time' => $order->actual_delivery_time?->toISOString(),
