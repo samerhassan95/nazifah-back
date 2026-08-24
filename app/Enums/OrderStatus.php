@@ -103,13 +103,20 @@ enum OrderStatus: string
         };
     }
 
-    public function localizedLabel(?string $paymentMethod = null): string
+    public function localizedLabel(?string $paymentMethod = null, bool $awaitingClientReceipt = false): string
     {
         $isAr = app()->getLocale() === 'ar';
 
         if ($this === self::PAYMENT_CONFIRMED
             && $paymentMethod === \App\Enums\PaymentMethod::CASH_ON_DELIVERY->value) {
             return $isAr ? 'تم تأكيد الطلب' : 'Order Confirmed';
+        }
+
+        // COMPLETED means the vendor's side is done — but the client hasn't actually
+        // received the order yet (branch self-pickup not collected, or home delivery
+        // not yet handed over). Show that it's still on them, not "Completed".
+        if ($this === self::COMPLETED && $awaitingClientReceipt) {
+            return $isAr ? 'جاهز - في انتظار استلامك' : 'Ready — Awaiting Your Receipt';
         }
 
         return $isAr ? $this->labelAr() : $this->label();

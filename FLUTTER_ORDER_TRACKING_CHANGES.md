@@ -151,6 +151,28 @@ Not a tracking-endpoint field — a backend fix, but it changes what the app sho
 
 ---
 
+---
+
+## 5. `status_label` Wording Fix: "Completed" → "Ready — Awaiting Your Receipt"
+
+Applies wherever the **client** sees `status_label` for their own order (order list, order details, tracking, on-the-way, payment-completion responses, etc. — `Modules/Order/.../User/*.php`).
+
+**The problem:** `status` (the raw enum value) stays `completed` both when the vendor has finished processing *and the client hasn't picked it up / received it yet*, and after the client has actually received it (used later for invoicing/closure). Previously `status_label` always said **"Completed"** in both cases — which is misleading while the client is still waiting on either a driver delivery or a branch pickup.
+
+**The fix:** `status_label` now reads differently depending on whether the client has actually received the order (`client_delivery_handoff_at` set or not):
+
+| `status` (unchanged) | `client_delivery_handoff_at` | `status_label` (client-facing) |
+|------------------------|-------------------------------|-----------------------------------|
+| `completed`            | not set (still waiting)       | **"Ready — Awaiting Your Receipt"** (ar: "جاهز - في انتظار استلامك") |
+| `completed`            | set (already received)        | "Completed" (unchanged)           |
+| anything else          | —                              | unchanged                         |
+
+**Important:** only the **label** (`status_label`) changed — the underlying `status` field is still literally `"completed"` in both rows above. Don't switch any client-side logic to branch on the label string; keep using `status` for that. This applies whether the client is waiting on a delivery driver or on themselves to come collect it from the branch — same rule either way.
+
+This does **not** affect the vendor or driver apps' status labels — they still show "Completed" as before.
+
+---
+
 ## Nothing to migrate on the app side
 
 - No breaking changes — all fields are new additions to the existing tracking response.

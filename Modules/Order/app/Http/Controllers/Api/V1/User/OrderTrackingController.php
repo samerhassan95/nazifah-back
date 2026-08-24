@@ -229,6 +229,12 @@ class OrderTrackingController extends Controller
             $handoffContext = null;
         }
 
+        // "completed" means the vendor is done, not that the client has the order in
+        // hand yet (branch self-pickup not collected, or home delivery not yet handed
+        // over) — client_delivery_handoff_at is only ever set once they actually confirm
+        // receipt, so its absence here means they're still waiting either way.
+        $awaitingClientReceipt = $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at;
+
         $branchId = (int) ($order->branch_id ?? 0);
         $imageUrlResolver = fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null;
         $categorized = PendingApprovalItemCategorizer::categorize($order, $lang, $imageUrlResolver);
@@ -268,7 +274,7 @@ class OrderTrackingController extends Controller
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'current_status' => $order->status,
-            'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+            'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $awaitingClientReceipt) ?? $order->status,
             'progress_percentage' => $this->getProgressPercentage($order->status),
             'laundry' => $order->vendor ? [
                 'id' => $order->vendor->id,
