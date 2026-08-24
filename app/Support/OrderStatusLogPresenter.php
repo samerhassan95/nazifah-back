@@ -58,7 +58,7 @@ class OrderStatusLogPresenter
         $at = $log->created_at?->copy()->timezone(self::TIMEZONE);
         $isCod = $order->isCashOnDelivery() || in_array('cash_on_delivery', $order->resolvedPaymentMethods(), true);
 
-        $title = self::title($log->status, $order->payment_method);
+        $title = self::title($log->status, $order->payment_method, (bool) $order->delivery_at_vendor);
         $subTitle = self::localizeNote($log->notes);
 
         if ($log->status === OrderStatus::PAYMENT_CONFIRMED->value && $isCod) {
@@ -84,7 +84,7 @@ class OrderStatusLogPresenter
         $at = $log->created_at?->copy()->timezone(self::TIMEZONE);
         $isCod = $order->isCashOnDelivery() || in_array('cash_on_delivery', $order->resolvedPaymentMethods(), true);
 
-        $title = self::title($log->status, $order->payment_method);
+        $title = self::title($log->status, $order->payment_method, (bool) $order->delivery_at_vendor);
         $subTitle = self::localizeNote($log->notes);
 
         if ($log->status === OrderStatus::PAYMENT_CONFIRMED->value && $isCod) {
@@ -102,11 +102,11 @@ class OrderStatusLogPresenter
         ];
     }
 
-    public static function title(string $status, ?string $paymentMethod = null): string
+    public static function title(string $status, ?string $paymentMethod = null, bool $deliveryAtVendor = false): string
     {
         $enum = OrderStatus::tryFrom($status);
 
-        return $enum ? $enum->localizedLabel($paymentMethod) : ucfirst(str_replace('_', ' ', $status));
+        return $enum ? $enum->localizedLabel($paymentMethod, false, $deliveryAtVendor) : ucfirst(str_replace('_', ' ', $status));
     }
 
     public static function localizeNote(?string $notes): string

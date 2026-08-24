@@ -28,7 +28,7 @@ class ClientOrderHandoffService
     {
         return (bool) $order->delivery_at_vendor
             && ! $order->client_delivery_handoff_at
-            && $order->status === OrderStatus::COMPLETED->value;
+            && in_array($order->status, [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value], true);
     }
 
     /**
@@ -144,7 +144,7 @@ class ClientOrderHandoffService
         if (
             $deliveryAtVendor
             && ! $order->client_delivery_handoff_at
-            && $status === OrderStatus::COMPLETED->value
+            && in_array($status, [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value], true)
         ) {
             return [
                 'handoff_type' => 'receive_from_laundry',
@@ -208,7 +208,7 @@ class ClientOrderHandoffService
 
     protected function confirmReceiveFromLaundry(Order $order, int $clientId): Order
     {
-        if ($order->status !== OrderStatus::COMPLETED->value) {
+        if (! in_array($order->status, [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value], true)) {
             throw new \LogicException(__('order.handoff_error_not_ready_laundry_pickup'));
         }
 

@@ -780,7 +780,7 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->status,
-                'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at) ?? $order->status,
+                'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $order->status,
                 'laundry' => $order->vendor ? [
                     'id' => $order->vendor->id,
                     'name' => $order->vendor->getTranslatedName($lang),
@@ -1815,7 +1815,7 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->status,
-                'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at) ?? $order->status,
+                'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $order->status,
                 'can_be_cancelled' => OrderStatus::fromString($order->status)?->canBeCancelled() ?? false,
                 'can_be_rated' => OrderStatus::fromString($order->status)?->canBeRated() ?? false,
                 'laundry' => $order->vendor ? [
@@ -2845,7 +2845,7 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->status,
-                'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at) ?? $order->status,
+                'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $order->status,
                 'title' => $cardTitle,
                 'message' => $cardDescription,
                 ...$cardPayload,
@@ -3021,7 +3021,7 @@ class OrderController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'status' => $order->status,
-                    'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at) ?? $order->status,
+                    'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $order->status,
                     'payment_method' => $paymentMethod,
                     'final_amount' => (float) $order->final_amount,
                 ], $order->clientVisitResponseFields()), __('order.payment_completed_successfully'));
@@ -3084,7 +3084,7 @@ class OrderController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'status' => $order->fresh()->status,
-                    'status_label' => OrderStatus::fromString($order->fresh()->status)?->localizedLabel($order->payment_method, $order->fresh()->status === OrderStatus::COMPLETED->value && ! $order->fresh()->client_delivery_handoff_at) ?? $order->fresh()->status,
+                    'status_label' => OrderStatus::fromString($order->fresh()->status)?->localizedLabel($order->payment_method, $order->fresh()->status === OrderStatus::COMPLETED->value && ! $order->fresh()->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $order->fresh()->status,
                     'payment_method' => $paymentMethod,
                     'final_amount' => (float) $order->final_amount,
                     'wallet_balance' => (float) ($walletBalance - $order->final_amount),
@@ -3513,7 +3513,7 @@ class OrderController extends Controller
                 $orders = collect([$order]);
             } else {
                 $currentStatus = $order->status;
-                $statusLabel = OrderStatus::tryFrom($currentStatus)?->localizedLabel($order->payment_method, $currentStatus === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at) ?? $currentStatus;
+                $statusLabel = OrderStatus::tryFrom($currentStatus)?->localizedLabel($order->payment_method, $currentStatus === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $currentStatus;
 
                 if ($currentStatus === OrderStatus::BRANCH_REVIEW->value) {
                     // Laundry reviewed with changes — client must approve/reject.
@@ -4092,7 +4092,7 @@ class OrderController extends Controller
                 'order_id' => $freshOrder->id,
                 'order_number' => $freshOrder->order_number,
                 'status' => $freshOrder->status,
-                'status_label' => OrderStatus::fromString($freshOrder->status)?->localizedLabel($order->payment_method, $freshOrder->status === OrderStatus::COMPLETED->value && ! $freshOrder->client_delivery_handoff_at) ?? $freshOrder->status,
+                'status_label' => OrderStatus::fromString($freshOrder->status)?->localizedLabel($order->payment_method, $freshOrder->status === OrderStatus::COMPLETED->value && ! $freshOrder->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $freshOrder->status,
             ], $freshOrder->clientVisitResponseFields());
 
             if ($freshOrder->status === OrderStatus::COMPLETED->value) {

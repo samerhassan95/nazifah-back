@@ -103,7 +103,7 @@ enum OrderStatus: string
         };
     }
 
-    public function localizedLabel(?string $paymentMethod = null, bool $awaitingClientReceipt = false): string
+    public function localizedLabel(?string $paymentMethod = null, bool $awaitingClientReceipt = false, bool $deliveryAtVendor = false): string
     {
         $isAr = app()->getLocale() === 'ar';
 
@@ -112,9 +112,15 @@ enum OrderStatus: string
             return $isAr ? 'تم تأكيد الطلب' : 'Order Confirmed';
         }
 
-        // COMPLETED means the vendor's side is done — but the client hasn't actually
-        // received the order yet (branch self-pickup not collected, or home delivery
-        // not yet handed over). Show that it's still on them, not "Completed".
+        // Branch self-pickup: waiting_client_receipt is reused for "vendor finished,
+        // ready for you to collect" — its default wording ("arrived at delivery
+        // location") is written for the home-delivery-driver case, so reword it here.
+        if ($this === self::WAITING_CLIENT_RECEIPT && $deliveryAtVendor) {
+            return $isAr ? 'جاهز للاستلام من الفرع' : 'Ready for Pickup at Branch';
+        }
+
+        // Backward compatibility: orders still sitting at completed from before this
+        // status was introduced, where the client hasn't actually received it yet.
         if ($this === self::COMPLETED && $awaitingClientReceipt) {
             return $isAr ? 'جاهز - في انتظار استلامك' : 'Ready — Awaiting Your Receipt';
         }
@@ -266,8 +272,11 @@ enum OrderStatus: string
                     : [self::COMPLETED, self::DELIVERED])
                 : [self::DELIVERED_TO_BRANCH],
 
+            // Branch self-pickup: waiting_client_receipt is reused here for "vendor
+            // finished, ready for the client to collect" — completed stays reachable
+            // too for backward compatibility with orders already sitting there.
             self::DELIVERED_TO_BRANCH => $deliveryAtVendor
-                ? [self::COMPLETED, self::CLIENT_POSTPONED_DELIVERY]
+                ? [self::WAITING_CLIENT_RECEIPT, self::COMPLETED, self::CLIENT_POSTPONED_DELIVERY]
                 : [self::DRIVER_DELIVERY_ASSIGNED, self::DELIVERED, self::COMPLETED, self::CLIENT_POSTPONED_DELIVERY],
 
             self::DRIVER_DELIVERY_ASSIGNED => [self::DRIVER_DELIVERY_ACCEPTED, self::ON_WAY_TO_DELIVERY, self::CLIENT_POSTPONED_DELIVERY],
@@ -289,7 +298,7 @@ enum OrderStatus: string
                 : [self::DRIVER_PICKUP_ASSIGNED, self::DRIVER_PICKUP_ACCEPTED, self::ON_WAY_TO_PICKUP, self::PAYMENT_CONFIRMED],
 
             self::CLIENT_POSTPONED_DELIVERY => $deliveryAtVendor
-                ? [self::DELIVERED_TO_BRANCH, self::COMPLETED]
+                ? [self::DELIVERED_TO_BRANCH, self::WAITING_CLIENT_RECEIPT, self::COMPLETED]
                 : [self::DRIVER_DELIVERY_ASSIGNED, self::DRIVER_DELIVERY_ACCEPTED, self::ON_WAY_TO_DELIVERY, self::DELIVERED_TO_BRANCH],
 
             self::COMPLETED => $deliveryAtVendor

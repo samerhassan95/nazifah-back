@@ -151,30 +151,50 @@ Not a tracking-endpoint field — a backend fix, but it changes what the app sho
 
 ---
 
+## 5. Branch Pickup "Ready" State: `completed` → `waiting_client_receipt`
+
+**This one changes the actual `status` value, not just the label.** Read this section carefully before touching anything that branches on `status === "completed"` for branch-pickup orders.
+
+**The problem:** for `delivery_at_vendor: true` orders (client collects in person from the branch), the vendor's "mark ready" action used to set `status` to `completed` — the *same* value used later for the order's real final closure (after the client has actually collected it). There was no way to tell "ready, still waiting for the client" apart from "actually done" just by looking at `status`. This also meant such orders dropped out of the vendor's "current/in-progress" list the moment they were marked ready, even though the client hadn't shown up yet.
+
+**The fix:** the vendor's "mark ready" action now sets `status` to `waiting_client_receipt` instead (the same status already used for "driver has arrived at your door" on the home-delivery side — reused here for "ready and waiting for you at the branch"). Full corrected flow for `pickup_at_vendor + delivery_at_vendor` both `true`:
+
+```
+confirmed
+  → [CLIENT confirm-handoff: give_to_laundry] → client_pickup_handoff_at set (status unchanged)
+  → [VENDOR confirms pickup received] → delivered_to_branch
+  → [VENDOR marks ready] → waiting_client_receipt   ← was "completed" before this fix
+  → [CLIENT confirm-handoff: receive_from_laundry] → delivered
+  → [later, administrative closure] → completed
+```
+
+`completed` now only ever means "fully closed" (reached after `delivered`) — never "ready, not yet collected" — for both branch-pickup and home-delivery orders alike.
+
+**`status_label` wording for `waiting_client_receipt`:** this status was previously only ever set when a delivery driver arrived at the client's home, so its default label text says "At Delivery Location — Waiting for Client." For a branch-pickup order that wording would be wrong (nobody drove anywhere), so the label is now context-aware:
+
+| `status`                | Context                          | `status_label`                                                        |
+|--------------------------|-----------------------------------|--------------------------------------------------------------------------|
+| `waiting_client_receipt` | `delivery_at_vendor: true`  (branch pickup) | **"Ready for Pickup at Branch"** (ar: "جاهز للاستلام من الفرع")            |
+| `waiting_client_receipt` | `delivery_at_vendor: false` (driver delivery) | "At Delivery Location - Waiting for Client" (unchanged)                  |
+
+This applies everywhere `status_label` appears — client, vendor, and driver apps alike, since it's just correcting what the status objectively means, not audience-specific wording.
+
+**Backward compatibility:** any order already sitting at `status: "completed"` (not yet collected) from before this deploy keeps working — every consumer (`confirm-handoff`, the vendor's "confirm client received" action, the on-the-way screen, etc.) still recognizes `completed` as an equivalent "ready" state alongside `waiting_client_receipt`. No data migration was run; old and new orders are both handled. `status_label` also has a narrower backward-compat case for these: `completed` + not yet received still shows "Ready — Awaiting Your Receipt" instead of plain "Completed."
+
+**For the vendor app specifically:** `PUT /vendor/orders/{id}/status` still accepts `{"status": "completed"}` for the "mark ready" action (unchanged, no app update required) — the backend now internally sets the real status to `waiting_client_receipt` regardless of which of the two you send. New builds can send `{"status": "waiting_client_receipt"}` directly if you prefer to match what's actually returned.
+
+**Side effect worth knowing about:** the vendor endpoint used to attach a ZATCA invoice summary (`response.invoice`) at the moment an order was marked ready (since that used to *be* `completed`). Since "ready" is no longer `completed`, the invoice now only attaches at the real final-closure step, not at "ready." This is arguably more correct (invoice reflecting an actually-finished transaction), but flagging it in case any report/dashboard was relying on the old premature timing.
+
+**Not touched:** revenue reports, invoice generation, and admin dashboards that filter on `status === "completed"` elsewhere in the backend were left as-is — they should behave correctly since `completed` still means "fully closed" at the same relative point in the flow, just reached via `waiting_client_receipt → delivered → completed` instead of skipping straight there. If any dashboard counts "completed today" and expects branch-pickup orders that are merely *ready* to be included, that count will now (correctly) exclude them until the client actually collects.
+
 ---
 
-## 5. `status_label` Wording Fix: "Completed" → "Ready — Awaiting Your Receipt"
+## Migration Notes
 
-Applies wherever the **client** sees `status_label` for their own order (order list, order details, tracking, on-the-way, payment-completion responses, etc. — `Modules/Order/.../User/*.php`).
+Sections 1–4 are purely additive — no breaking changes, safe to integrate incrementally:
 
-**The problem:** `status` (the raw enum value) stays `completed` both when the vendor has finished processing *and the client hasn't picked it up / received it yet*, and after the client has actually received it (used later for invoicing/closure). Previously `status_label` always said **"Completed"** in both cases — which is misleading while the client is still waiting on either a driver delivery or a branch pickup.
-
-**The fix:** `status_label` now reads differently depending on whether the client has actually received the order (`client_delivery_handoff_at` set or not):
-
-| `status` (unchanged) | `client_delivery_handoff_at` | `status_label` (client-facing) |
-|------------------------|-------------------------------|-----------------------------------|
-| `completed`            | not set (still waiting)       | **"Ready — Awaiting Your Receipt"** (ar: "جاهز - في انتظار استلامك") |
-| `completed`            | set (already received)        | "Completed" (unchanged)           |
-| anything else          | —                              | unchanged                         |
-
-**Important:** only the **label** (`status_label`) changed — the underlying `status` field is still literally `"completed"` in both rows above. Don't switch any client-side logic to branch on the label string; keep using `status` for that. This applies whether the client is waiting on a delivery driver or on themselves to come collect it from the branch — same rule either way.
-
-This does **not** affect the vendor or driver apps' status labels — they still show "Completed" as before.
-
----
-
-## Nothing to migrate on the app side
-
-- No breaking changes — all fields are new additions to the existing tracking response.
+- No breaking changes — all those fields are new additions to the existing tracking response.
 - `driver_rejections` will simply be an empty array `[]` for orders with no rejections.
 - `handoff` will be `null` and `requires_handoff_confirmation` will be `false` when there's nothing for the client to confirm right now.
+
+**Section 5 is the one exception** — it changes an actual `status` value for branch-pickup orders. **If any client code currently checks `status === "completed"` to mean "ready for pickup, not yet collected," update it to check `status === "waiting_client_receipt"` (or accept both, for orders already ready before this deploy).**

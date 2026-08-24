@@ -205,15 +205,15 @@ class VendorOrderHandoffService
             throw new \LogicException(__('order.vendor_handoff_error_not_ready_client_delivery'));
         }
 
-        if (! $this->statusService->canTransition($order, OrderStatus::COMPLETED)) {
+        if (! $this->statusService->canTransition($order, OrderStatus::WAITING_CLIENT_RECEIPT)) {
             throw new InvalidStatusTransitionException(
                 OrderStatus::from($order->status),
-                OrderStatus::COMPLETED,
+                OrderStatus::WAITING_CLIENT_RECEIPT,
                 $order
             );
         }
 
-        $this->statusService->transitionTo($order, OrderStatus::COMPLETED, [
+        $this->statusService->transitionTo($order, OrderStatus::WAITING_CLIENT_RECEIPT, [
             'notes' => $notes ?? __('order.vendor_handoff_log_ready_for_pickup'),
             'changed_by' => $changedBy,
         ]);
@@ -342,11 +342,11 @@ class VendorOrderHandoffService
     public function resolveClientDeliveryContext(Order $order): ?array
     {
         if ((bool) $order->delivery_at_vendor) {
-            if ($order->status === OrderStatus::COMPLETED->value || $order->client_delivery_handoff_at) {
+            if (in_array($order->status, [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value], true) || $order->client_delivery_handoff_at) {
                 return null;
             }
 
-            if (! $this->statusService->canTransition($order, OrderStatus::COMPLETED)) {
+            if (! $this->statusService->canTransition($order, OrderStatus::WAITING_CLIENT_RECEIPT)) {
                 return null;
             }
 
@@ -356,11 +356,11 @@ class VendorOrderHandoffService
 
             return [
                 'handoff_type' => 'request_client_delivery',
-                'target_status' => OrderStatus::COMPLETED->value,
+                'target_status' => OrderStatus::WAITING_CLIENT_RECEIPT->value,
                 'confirm_label' => __('order.vendor_handoff_request_client_delivery'),
                 'endpoint' => '/api/v1/vendor/orders/'.$order->id.'/status',
                 'method' => 'PUT',
-                'body' => ['status' => OrderStatus::COMPLETED->value],
+                'body' => ['status' => OrderStatus::WAITING_CLIENT_RECEIPT->value],
             ];
         }
 
@@ -470,7 +470,7 @@ class VendorOrderHandoffService
             return null;
         }
 
-        if ($order->status !== OrderStatus::COMPLETED->value) {
+        if (! in_array($order->status, [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value], true)) {
             return null;
         }
 
@@ -514,6 +514,7 @@ class VendorOrderHandoffService
                 OrderStatus::PAYMENT_CONFIRMED->value,
                 OrderStatus::WAITING_PAYMENT->value,
                 OrderStatus::DELIVERED_TO_BRANCH->value,
+                OrderStatus::WAITING_CLIENT_RECEIPT->value,
                 OrderStatus::COMPLETED->value,
             ], true);
         }
@@ -533,7 +534,7 @@ class VendorOrderHandoffService
         if (
             (bool) $order->delivery_at_vendor
             && ! $order->client_delivery_handoff_at
-            && $order->status === OrderStatus::COMPLETED->value
+            && in_array($order->status, [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value], true)
         ) {
             return true;
         }
@@ -553,7 +554,7 @@ class VendorOrderHandoffService
 
         $vendorDeliveryReady = $order->vendor_delivery_ready_at !== null
             || ((bool) $order->delivery_at_vendor
-                ? $order->status === OrderStatus::COMPLETED->value
+                ? in_array($order->status, [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value], true)
                 : $order->status === OrderStatus::DELIVERED->value);
 
         $clientPickupConfirmed = $order->client_pickup_handoff_at !== null;

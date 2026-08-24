@@ -128,7 +128,7 @@ class OrderTrackingController extends Controller
             ->map(function ($log) use ($order) {
                 return [
                     'status' => $log->status,
-                    'status_label' => OrderStatus::fromString($log->status)?->localizedLabel($order->payment_method) ?? $log->status,
+                    'status_label' => OrderStatus::fromString($log->status)?->localizedLabel($order->payment_method, false, (bool) $order->delivery_at_vendor) ?? $log->status,
                     'notes' => $log->notes,
                     'date' => $log->created_at->toISOString(),
                 ];
@@ -274,7 +274,7 @@ class OrderTrackingController extends Controller
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'current_status' => $order->status,
-            'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $awaitingClientReceipt) ?? $order->status,
+            'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $awaitingClientReceipt, (bool) $order->delivery_at_vendor) ?? $order->status,
             'progress_percentage' => $this->getProgressPercentage($order->status),
             'laundry' => $order->vendor ? [
                 'id' => $order->vendor->id,

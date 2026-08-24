@@ -2095,7 +2095,7 @@ class OrderController extends Controller
         $branchIds = $branches->pluck('id')->toArray();
 
         $validator = Validator::make($request->all(), [
-            'status' => ['required', 'in:delivered_to_branch,delivered,picked_up,completed,cancelled'],
+            'status' => ['required', 'in:delivered_to_branch,delivered,picked_up,completed,waiting_client_receipt,cancelled'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -2122,11 +2122,17 @@ class OrderController extends Controller
                     return errorResponse(__('order.vendor_handoff_error_not_awaiting_pickup_receipt'), null, 400);
                 }
                 $order = $handoffService->confirmPickupReceived($order, (int) $employee->id, $request->notes);
-            } elseif ($targetStatus === OrderStatus::COMPLETED && (bool) $order->delivery_at_vendor) {
+            } elseif (
+                in_array($targetStatus, [OrderStatus::COMPLETED, OrderStatus::WAITING_CLIENT_RECEIPT], true)
+                && (bool) $order->delivery_at_vendor
+            ) {
                 // Branch pickup: order must actually be delivered_to_branch (and not
-                // already completed/handed off) before it can be marked ready. Reject
+                // already ready/handed off) before it can be marked ready. Reject
                 // instead of silently falling through to a blind status transition,
-                // which would skip setting vendor_delivery_ready_at.
+                // which would skip setting vendor_delivery_ready_at. Accepts either
+                // "completed" (legacy request body) or "waiting_client_receipt" (the
+                // actual status this now sets) as the requested target — both mean
+                // "mark ready for the client to collect".
                 if (! $handoffService->canRequestClientDelivery($order)) {
                     return errorResponse(__('order.vendor_handoff_error_not_ready_client_delivery'), null, 400);
                 }

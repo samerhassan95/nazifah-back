@@ -392,7 +392,13 @@ class Order extends Model
     {
         $status = OrderStatus::tryFrom($this->status);
 
-        return $status ? $status->localizedLabel($this->payment_method) : $this->status;
+        if (! $status) {
+            return $this->status;
+        }
+
+        $awaitingClientReceipt = $status === OrderStatus::COMPLETED && ! $this->client_delivery_handoff_at;
+
+        return $status->localizedLabel($this->payment_method, $awaitingClientReceipt, (bool) $this->delivery_at_vendor);
     }
 
     /**
