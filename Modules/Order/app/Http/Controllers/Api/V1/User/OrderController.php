@@ -703,16 +703,16 @@ class OrderController extends Controller
         if ($status) {
             switch ($status) {
                 case 'current':
-                    $query->whereNotIn('status', array_merge(
-                        [OrderStatus::CANCELLED->value],
-                        array_map(fn ($s) => $s->value, OrderStatus::completedStatuses())
-                    ));
+                    // delivered still counts as "current" — the client has the order,
+                    // but it's not administratively closed until completed. Only
+                    // cancelled/completed leave the current tab.
+                    $query->whereNotIn('status', [
+                        OrderStatus::CANCELLED->value,
+                        OrderStatus::COMPLETED->value,
+                    ]);
                     break;
                 case 'completed':
-                    // From the client's perspective, "completed" means they have (or
-                    // had) the order in hand — delivered — regardless of whether the
-                    // internal administrative closure (completed) has happened yet.
-                    $query->whereIn('status', array_map(fn ($s) => $s->value, OrderStatus::completedStatuses()));
+                    $query->where('status', OrderStatus::COMPLETED->value);
                     break;
                 case 'cancelled':
                     $query->where('status', OrderStatus::CANCELLED->value);
