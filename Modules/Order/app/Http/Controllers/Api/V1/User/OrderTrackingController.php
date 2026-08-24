@@ -210,6 +210,14 @@ class OrderTrackingController extends Controller
             ];
         })->values();
 
+        // Only surface the flag while the order is sitting at the status a rejection
+        // reverts it to (confirmed for pickup, delivered_to_branch for delivery) — once
+        // the order moves past that, the rejection is resolved and no longer relevant.
+        $hadDriverRejection = in_array($order->status, [
+            OrderStatus::CONFIRMED->value,
+            OrderStatus::DELIVERED_TO_BRANCH->value,
+        ], true) && $driverRejections->isNotEmpty();
+
         $branchId = (int) ($order->branch_id ?? 0);
         $imageUrlResolver = fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null;
         $categorized = PendingApprovalItemCategorizer::categorize($order, $lang, $imageUrlResolver);
@@ -340,7 +348,7 @@ class OrderTrackingController extends Controller
                 'pickup_driver' => $formatDriver($order->pickupDriver),
                 'delivery_driver' => $formatDriver($order->deliveryDriver),
             ],
-            'had_driver_rejection' => $driverRejections->isNotEmpty(),
+            'had_driver_rejection' => $hadDriverRejection,
             'driver_rejections' => $driverRejections,
             'pickup_time' => $order->pickup_time?->toISOString(),
             'estimated_delivery_time' => $order->estimated_delivery_time?->toISOString(),

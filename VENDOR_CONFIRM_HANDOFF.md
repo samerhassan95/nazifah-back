@@ -355,8 +355,10 @@ New response fields:
 
 | Field                   | Type    | Description                                                        |
 |-------------------------|---------|----------------------------------------------------------------------|
-| `had_driver_rejection`  | boolean | `true` if any driver has ever rejected this order (pickup or delivery) |
-| `driver_rejections`     | array   | One entry per rejection, oldest first                               |
+| `had_driver_rejection`  | boolean | `true` only while the order sits at `confirmed` or `delivered_to_branch` **and** has at least one recorded rejection (see below) |
+| `driver_rejections`     | array   | Full rejection history, oldest first — not status-gated              |
+
+`had_driver_rejection` is intentionally narrow: `confirmed` is where a pickup rejection reverts the order to, and `delivered_to_branch` is where a delivery rejection reverts it to — both are "waiting for the vendor to assign another driver" states. Once the order moves past that status (a new driver accepted, or it progresses further), the flag goes back to `false` even though `driver_rejections` still has the history. It is **not** `true` just because the order happens to be `confirmed`/`delivered_to_branch` through normal flow with no rejection ever recorded.
 
 Each `driver_rejections` entry:
 
