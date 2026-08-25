@@ -15,6 +15,7 @@ use Modules\Admin\Http\Resources\VendorResource;
 use Modules\Admin\Services\VendorService;
 use Modules\Order\Models\Order;
 use Modules\Order\Models\OrderItem;
+use Modules\Order\Models\OrderStatusLog;
 use Modules\Vendor\Models\Vendor;
 
 class AdminVendorController extends Controller
@@ -194,7 +195,7 @@ class AdminVendorController extends Controller
                 OrderItem::whereIn('order_id', $orderIds)->delete();
 
                 // Delete order status logs
-                OrderStatus->delete();
+                OrderStatusLog::whereIn('order_id', $orderIds)->delete();
 
                 // Delete payment transactions
                 DB::table('payment_transactions')->whereIn('order_id', $orderIds)->delete();
