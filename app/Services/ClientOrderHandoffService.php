@@ -180,25 +180,29 @@ class ClientOrderHandoffService
         if (! in_array($order->status, [
             OrderStatus::WAITING_CLIENT_RECEIPT->value,
             OrderStatus::DELIVERED->value,
+            OrderStatus::COMPLETED->value,
         ], true)) {
             throw new \LogicException(__('order.handoff_error_not_awaiting_delivery_handoff'));
         }
 
-        if (
-            $order->status !== OrderStatus::DELIVERED->value
-            && $this->statusService->canTransition($order, OrderStatus::DELIVERED)
-        ) {
-            $this->statusService->transitionTo($order, OrderStatus::DELIVERED, [
-                'notes' => __('order.handoff_log_receive_from_driver_delivered'),
-                'changed_by' => $clientId,
-            ]);
-            $this->markCashOnDeliveryPaidIfNeeded($order);
-        } elseif ($order->status !== OrderStatus::DELIVERED->value) {
-            throw new InvalidStatusTransitionException(
-                OrderStatus::from($order->status),
-                OrderStatus::DELIVERED,
-                $order
-            );
+        // Home delivery: unlike branch pickup, there's no separate party who still
+        // needs to confirm afterward — the client receiving it from the driver is
+        // the final step, so this closes the order out directly instead of leaving
+        // it at delivered pending a later approval call.
+        if ($order->status !== OrderStatus::COMPLETED->value) {
+            if ($this->statusService->canTransition($order, OrderStatus::COMPLETED)) {
+                $this->statusService->transitionTo($order, OrderStatus::COMPLETED, [
+                    'notes' => __('order.handoff_log_receive_from_driver_delivered'),
+                    'changed_by' => $clientId,
+                ]);
+                $this->markCashOnDeliveryPaidIfNeeded($order);
+            } else {
+                throw new InvalidStatusTransitionException(
+                    OrderStatus::from($order->status),
+                    OrderStatus::COMPLETED,
+                    $order
+                );
+            }
         }
 
         $order->update(['client_delivery_handoff_at' => now()]);

@@ -232,6 +232,26 @@ No field/response shape changes — this only affects which orders show up under
 
 ---
 
+## 9. Home Delivery Now Closes Straight to `completed` on Client Receipt
+
+**Only affects `delivery_at_vendor: false` orders (driver delivers to the client's home).** Branch pickup (§6) is unchanged — that flow still requires the vendor's separate closing confirmation.
+
+**Before:** the client confirming receipt from the driver (either `POST /user/orders/{id}/confirm-handoff` type `receive_from_driver`, or `POST /user/orders/{id}/confirm-delivery` via QR scan) only moved the order to `delivered`. A *separate* action (`PUT /user/orders/{id}` with `status: receipt_accepted`, the client's "approve receipt" call) was needed afterward to reach `completed`.
+
+**Now:** for home delivery, there's no other party who still needs to act — the driver already delivered, and the client confirming receipt *is* the final step. Both `confirm-handoff` (`receive_from_driver`) and `confirm-delivery` (QR scan) now close the order straight to `completed` in the same call. `client_delivery_handoff_at` is still set as before.
+
+```
+waiting_client_receipt (driver arrived)
+  → [CLIENT confirm-handoff: receive_from_driver, OR confirm-delivery via QR]
+  → completed   ← was "delivered" before this fix; no separate approval call needed anymore
+```
+
+**Client app:** expect `status: "completed"` directly back from these two calls now, not `"delivered"`. The separate `receipt_accepted` approval endpoint still exists and still works (harmless no-op if called on an already-`completed` order) but is no longer a required step for home delivery.
+
+**Not affected:** `delivered` is still a real, meaningful intermediate status for branch-pickup orders (§6) — this change is scoped to `delivery_at_vendor: false` only.
+
+---
+
 ## Migration Notes
 
 Sections 1–4 are purely additive — no breaking changes, safe to integrate incrementally:

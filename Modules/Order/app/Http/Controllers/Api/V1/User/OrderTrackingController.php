@@ -477,16 +477,41 @@ class OrderTrackingController extends Controller
 
         $statusService = app(\App\Services\OrderStatusService::class);
 
+        // Home delivery closes straight to completed below — the delivered hop here
+        // is just a transient stepping stone in that case, not a real notify-worthy
+        // event on its own.
+        $willAutoCompleteAfterDelivered = ! (bool) $order->delivery_at_vendor
+            && ! in_array($order->status, [OrderStatus::DELIVERED->value, OrderStatus::COMPLETED->value], true);
+
         try {
             // Update to delivered if not already delivered
-            if ($order->status !== OrderStatus::DELIVERED->value) {
+            if (! in_array($order->status, [OrderStatus::DELIVERED->value, OrderStatus::COMPLETED->value], true)) {
                 $statusService->transitionTo($order, OrderStatus::DELIVERED, [
+                    'notes' => 'Delivery confirmed by client with QR code scan',
+                    'changed_by' => $user->id,
+                    'skip_notifications' => $willAutoCompleteAfterDelivered,
+                ]);
+            }
+
+            // Home delivery: client receiving it is the final step — no separate
+            // party needs to confirm afterward, so close the order out directly
+            // instead of leaving it at delivered pending a later approval call.
+            if (
+                ! (bool) $order->delivery_at_vendor
+                && $order->status !== OrderStatus::COMPLETED->value
+                && $statusService->canTransition($order, OrderStatus::COMPLETED)
+            ) {
+                $statusService->transitionTo($order, OrderStatus::COMPLETED, [
                     'notes' => 'Delivery confirmed by client with QR code scan',
                     'changed_by' => $user->id,
                 ]);
             }
         } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
             return errorResponse($e->userMessage(), null, 400);
+        }
+
+        if (! $order->client_delivery_handoff_at) {
+            $order->update(['client_delivery_handoff_at' => now()]);
         }
 
         // Keep COD unpaid until order is fully completed.
