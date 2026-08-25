@@ -58,12 +58,6 @@ class DiscountResource extends JsonResource
             'clients' => $this->whenLoaded('clients'),
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
-            // Legacy dashboard aliases kept for backward compatibility.
-            'discount_title' => data_get($this->name, app()->getLocale()) ?? data_get($this->name, 'ar') ?? data_get($this->name, 'en'),
-            'discount_code' => $this->code,
-            'discount_amount' => (float) $this->value,
-            'target_category' => $this->discount_type,
-            'status_toggle' => (bool) $this->is_active,
             'discount_expiration' => $this->end_date && $this->end_date->isPast() ? 'expired' : ((bool) $this->is_active ? 'active' : 'inactive'),
         ];
     }
