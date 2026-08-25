@@ -7,12 +7,14 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Address\Models\Address;
+use Modules\Branch\Models\Branch;
 use Modules\Client\Models\Client;
 use Modules\Discount\Interfaces\DiscountRepositoryInterface;
 use Modules\Discount\Models\Discount;
 use Modules\Order\Models\Order;
 use Modules\Order\Support\OrderItemsNormalizer;
 use Modules\Piece\Models\Piece;
+use Modules\Service\Models\Service;
 use Modules\Service\Models\ServiceAddition;
 
 class DiscountService
@@ -605,25 +607,39 @@ class DiscountService
             return round(max(0.0, $deliveryFee), 2);
         }
 
-        $scope = (string) ($discount->application_scope ?? Discount::APPLICATION_SCOPE_ORDER_TOTAL);
-        if ($scope !== Discount::APPLICATION_SCOPE_SERVICES) {
-            return $orderAmount;
-        }
-
         $serviceIds = array_values(array_unique(array_map('intval', (array) ($discount->discount_service_ids ?? []))));
-        if ($serviceIds === []) {
+        $categoryIds = array_values(array_unique(array_map('intval', (array) ($discount->category_ids ?? []))));
+
+        // Item-scoped discounts (services and/or categories) restrict the
+        // base amount to matching line items instead of the whole order.
+        // Inferred directly from which ID lists are populated, rather than
+        // requiring a separate application_scope flag to be set beforehand.
+        if ($serviceIds === [] && $categoryIds === []) {
             return $orderAmount;
         }
 
-        $servicesSubtotal = 0.0;
+        $matchServiceIds = $serviceIds;
+        if ($categoryIds !== []) {
+            $categoryServiceIds = Service::whereIn('category_id', $categoryIds)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $matchServiceIds = array_values(array_unique(array_merge($matchServiceIds, $categoryServiceIds)));
+        }
+
+        if ($matchServiceIds === []) {
+            return $orderAmount;
+        }
+
+        $itemsSubtotal = 0.0;
         foreach ($itemsBreakdown as $line) {
             $lineServiceIds = array_map('intval', (array) ($line['service_ids'] ?? []));
-            if (array_intersect($serviceIds, $lineServiceIds) !== []) {
-                $servicesSubtotal += (float) ($line['total_price'] ?? 0.0);
+            if (array_intersect($matchServiceIds, $lineServiceIds) !== []) {
+                $itemsSubtotal += (float) ($line['total_price'] ?? 0.0);
             }
         }
 
-        return round(max(0.0, min($servicesSubtotal, $orderAmount)), 2);
+        return round(max(0.0, min($itemsSubtotal, $orderAmount)), 2);
     }
 
     /**
@@ -1082,6 +1098,14 @@ class DiscountService
         $city = mb_strtolower(trim((string) ($context['city'] ?? '')));
         if ($cityFilters !== [] && ($city === '' || ! in_array($city, $cityFilters, true))) {
             return ['success' => false, 'message' => $msg['not_for_city'][$lang], 'code' => 400];
+        }
+
+        $zoneIds = array_values(array_unique(array_map('intval', (array) ($discount->zone_ids ?? []))));
+        if ($zoneIds !== []) {
+            $orderZoneId = $branchId ? (int) (Branch::find($branchId)?->zone_id ?? 0) : 0;
+            if (! $orderZoneId || ! in_array($orderZoneId, $zoneIds, true)) {
+                return ['success' => false, 'message' => $msg['not_for_zone'][$lang], 'code' => 400];
+            }
         }
 
         return ['success' => true];
