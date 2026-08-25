@@ -1557,6 +1557,8 @@ class OrderController extends Controller
                 'pickupAddress',
                 'deliveryAddress',
                 'discount',
+                'driverRejections' => fn ($q) => $q->orderBy('rejected_at', 'asc'),
+                'driverRejections.driver',
             ])
             ->first();
 
@@ -1834,6 +1836,31 @@ class OrderController extends Controller
             ];
         }
 
+        $driverRejections = $order->driverRejections->map(function ($rejection) use ($uploadService, $locale) {
+            $driver = $rejection->driver;
+
+            return [
+                'trip_type' => $rejection->trip_type,
+                'driver' => $driver ? [
+                    'id' => $driver->id,
+                    'name' => $driver->getTranslation('full_name', $locale) ?? 'Driver',
+                    'phone_number' => $driver->phone,
+                    'rating' => (float) ($driver->rating ?? 0),
+                    'image' => $uploadService->getFullUrl($driver->image),
+                ] : null,
+                'reason' => $rejection->reason,
+                'rejected_at' => $rejection->rejected_at?->toISOString(),
+            ];
+        })->values();
+
+        // Only surface the flag while the order is sitting at the status a rejection
+        // reverts it to (confirmed for pickup, delivered_to_branch for delivery) — once
+        // the order moves past that, the rejection is resolved and no longer relevant.
+        $hadDriverRejection = in_array($order->status, [
+            OrderStatus::CONFIRMED->value,
+            OrderStatus::DELIVERED_TO_BRANCH->value,
+        ], true) && $driverRejections->isNotEmpty();
+
         // Location GPS
         $locationGps = [
             'latitude' => null,
@@ -1917,6 +1944,8 @@ class OrderController extends Controller
             'accepted_items' => $acceptedItems->values()->toArray(),
             'rejected_items' => $rejectedItems->values()->toArray(),
             'driver_info' => $driverInfo,
+            'had_driver_rejection' => $hadDriverRejection,
+            'driver_rejections' => $driverRejections,
             'pickup_address_id' => $order->pickup_address_id,
             'delivery_address_id' => $order->delivery_address_id,
             'pickup_address' => $pickupAddressInfo,
