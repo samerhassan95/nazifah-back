@@ -23,6 +23,18 @@ class AdminBranchController extends Controller
             $query->where('vendor_id', $request->vendor_id);
         }
 
+        if ($request->filled('zone_id')) {
+            $query->where('zone_id', $request->zone_id);
+        }
+
+        if ($request->filled('zone_name')) {
+            $zoneName = $request->zone_name;
+            $query->whereHas('zone', function ($q) use ($zoneName) {
+                $q->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(name, '$.ar')) = ?", [$zoneName])
+                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(name, '$.en')) = ?", [$zoneName]);
+            });
+        }
+
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
