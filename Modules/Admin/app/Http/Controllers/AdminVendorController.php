@@ -28,6 +28,7 @@ class AdminVendorController extends Controller
     {
         $filters = [
             'is_verified' => $request->is_verified,
+            'verification_status' => $request->input('verification_status'),
             'is_active' => $request->is_active,
             'is_banned' => $request->is_banned,
             'search' => $request->search,
@@ -152,6 +153,16 @@ class AdminVendorController extends Controller
             $validated['logo'] = $request->logo;
         } else {
             unset($validated['logo']);
+        }
+
+        if (array_key_exists('is_verified', $validated)) {
+            if ($validated['is_verified']) {
+                // Approving clears any prior rejection.
+                $validated['rejection_reason'] = null;
+                $validated['rejected_at'] = null;
+            } elseif (! empty($validated['rejection_reason'])) {
+                $validated['rejected_at'] = now();
+            }
         }
 
         $vendor->update($validated);

@@ -61,6 +61,8 @@ class VendorResource extends JsonResource
             'total_reviews' => $totalReviews,
             'is_active' => $this->is_active,
             'is_verified' => $this->is_verified,
+            'rejection_reason' => $this->rejection_reason,
+            'rejected_at' => $this->rejected_at?->toDateTimeString(),
             'is_banned' => $this->is_banned ?? false,
             'ban_reason' => $this->ban_reason,
             'banned_at' => $this->banned_at?->toDateTimeString(),
