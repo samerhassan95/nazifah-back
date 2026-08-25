@@ -24,6 +24,18 @@ class BranchRepository implements BranchRepositoryInterface
                     $query->where('vendor_id', $filters['vendor_id']);
                 }
 
+                if (! empty($filters['zone_id'])) {
+                    $query->where('zone_id', $filters['zone_id']);
+                }
+
+                if (! empty($filters['zone_name'])) {
+                    $zoneName = $filters['zone_name'];
+                    $query->whereHas('zone', function ($q) use ($zoneName) {
+                        $q->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(name, '$.ar')) = ?", [$zoneName])
+                            ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(name, '$.en')) = ?", [$zoneName]);
+                    });
+                }
+
                 if (isset($filters['search'])) {
                     $search = $filters['search'];
                     $query->where(function ($q) use ($search) {

@@ -20,6 +20,20 @@ class VendorRepository implements VendorRepositoryInterface
             $query->where('is_verified', $filters['is_verified']);
         }
 
+        if (! empty($filters['verification_status'])) {
+            switch ($filters['verification_status']) {
+                case 'pending':
+                    $query->where('is_verified', false)->whereNull('rejected_at');
+                    break;
+                case 'approved':
+                    $query->where('is_verified', true);
+                    break;
+                case 'rejected':
+                    $query->where('is_verified', false)->whereNotNull('rejected_at');
+                    break;
+            }
+        }
+
         if (isset($filters['is_banned'])) {
             $query->where('is_banned', $filters['is_banned']);
         }

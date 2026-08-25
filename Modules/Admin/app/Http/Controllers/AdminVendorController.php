@@ -15,6 +15,7 @@ use Modules\Admin\Http\Resources\VendorResource;
 use Modules\Admin\Services\VendorService;
 use Modules\Order\Models\Order;
 use Modules\Order\Models\OrderItem;
+use Modules\Order\Models\OrderStatusLog;
 use Modules\Vendor\Models\Vendor;
 
 class AdminVendorController extends Controller
@@ -28,6 +29,7 @@ class AdminVendorController extends Controller
     {
         $filters = [
             'is_verified' => $request->is_verified,
+            'verification_status' => $request->input('verification_status'),
             'is_active' => $request->is_active,
             'is_banned' => $request->is_banned,
             'search' => $request->search,
@@ -154,6 +156,16 @@ class AdminVendorController extends Controller
             unset($validated['logo']);
         }
 
+        if (array_key_exists('is_verified', $validated)) {
+            if ($validated['is_verified']) {
+                // Approving clears any prior rejection.
+                $validated['rejection_reason'] = null;
+                $validated['rejected_at'] = null;
+            } elseif (! empty($validated['rejection_reason'])) {
+                $validated['rejected_at'] = now();
+            }
+        }
+
         $vendor->update($validated);
 
         return successResponse(
@@ -183,7 +195,7 @@ class AdminVendorController extends Controller
                 OrderItem::whereIn('order_id', $orderIds)->delete();
 
                 // Delete order status logs
-                OrderStatus->delete();
+                OrderStatusLog::whereIn('order_id', $orderIds)->delete();
 
                 // Delete payment transactions
                 DB::table('payment_transactions')->whereIn('order_id', $orderIds)->delete();

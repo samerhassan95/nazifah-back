@@ -28,6 +28,7 @@ class UpdateVendorRequest extends FormRequest
             'phone' => ['nullable', 'string', Rule::unique('vendors', 'phone')->ignore($vendorId)],
             'delivery_price_per_km' => 'nullable|numeric|min:0',
             'is_verified' => 'nullable|boolean',
+            'rejection_reason' => 'nullable|string|max:1000',
             'is_active' => 'nullable|boolean',
             'is_banned' => 'nullable|boolean',
             'rating' => 'nullable|numeric|min:0|max:5',
