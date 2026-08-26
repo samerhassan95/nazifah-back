@@ -66,7 +66,7 @@ class AdminUserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:admins,email'],
             'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', 'unique:admins,phone'],
@@ -134,7 +134,7 @@ class AdminUserController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
             'name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'unique:admins,email,'.$id],
             'phone' => ['nullable', 'string', 'regex:/^\+?[0-9]{10,15}$/', 'unique:admins,phone,'.$id],
