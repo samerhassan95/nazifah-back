@@ -199,6 +199,13 @@ class PendingApprovalItemCategorizer
                 $unitPrice = round($servicesTotal, 2);
                 $totalPrice = round(($unitPrice * $quantity) + $acceptedAdditionsTotal, 2);
 
+                $rejectedServicesList = array_values(array_map(fn ($addition) => [
+                    'id' => $addition['id'] ?? null,
+                    'name' => $addition['name'] ?? '',
+                    'price' => (float) ($addition['price'] ?? 0),
+                    'quantity' => (int) ($addition['quantity'] ?? 1),
+                ], $rejectedAdditions));
+
                 $acceptedItems[] = [
                     'id' => $ids[0],
                     'ids' => $ids,
@@ -213,46 +220,8 @@ class PendingApprovalItemCategorizer
                     'description' => $itemDescription,
                     'image' => $itemImage,
                     'additional_services' => $acceptedAdditions,
+                    'rejected_services' => $rejectedServicesList,
                 ];
-
-                if ($rejectedAdditions !== [] && $byStatus['rejected']->isEmpty()) {
-                    $rejectedAdditionsTotal = (float) collect($rejectedAdditions)->sum('total');
-                    $servicesFromRejectedAdditions = self::uniqueServices(
-                        collect($rejectedAdditions)
-                            ->map(fn (array $addition) => [
-                                'id' => $addition['id'],
-                                'name' => $addition['name'],
-                                'price' => (float) $addition['price'],
-                            ])
-                            ->values()
-                            ->all()
-                    );
-                    $rejectedAdditionNotes = collect($rejectedAdditions)
-                        ->pluck('vendor_notes')
-                        ->filter()
-                        ->unique()
-                        ->values()
-                        ->all();
-
-                    $rejectedAdditionServiceName = collect($servicesFromRejectedAdditions)->pluck('name')->filter()->implode('، ') ?: 'Unknown';
-
-                    $rejectedItems[] = [
-                        'id' => $ids[0],
-                        'ids' => $ids,
-                        'piece_name' => $statusPieceName,
-                        'service_name' => $rejectedAdditionServiceName,
-                        'services' => $servicesFromRejectedAdditions,
-                        'quantity' => $quantity,
-                        'unit_price' => round($rejectedAdditionsTotal, 2),
-                        'total_price' => round($rejectedAdditionsTotal, 2),
-                        'vendor_notes' => $rejectedAdditionNotes !== [] ? implode(' | ', $rejectedAdditionNotes) : null,
-                        'note' => $clientNote,
-                        'description' => $clientNote,
-                        'image' => $itemImage,
-                        'additional_services' => [],
-                        'status' => 'rejected',
-                    ];
-                }
             }
         }
 

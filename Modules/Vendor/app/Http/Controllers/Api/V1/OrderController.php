@@ -352,6 +352,19 @@ class OrderController extends Controller
                             : null
                     );
 
+                    $rejectedServicesForPiece = [];
+                    if (! $isRejectedLine && $rejectedAdditionsSummary !== []) {
+                        $rejectedServicesForPiece = collect($rejectedAdditionsSummary)
+                            ->map(fn (array $addition) => [
+                                'id' => $addition['id'],
+                                'name' => $addition['name'],
+                                'price' => (float) ($addition['price'] ?? 0),
+                                'icon' => $addition['icon'] ?? null,
+                            ])
+                            ->values()
+                            ->all();
+                    }
+
                     $itemsSummary[] = [
                         'piece' => [
                             'id' => $piece->id,
@@ -363,6 +376,7 @@ class OrderController extends Controller
                         'additional_services' => $isRejectedLine
                             ? array_merge($additionalServicesSummary, $rejectedAdditionsSummary)
                             : $additionalServicesSummary,
+                        'rejected_services' => $rejectedServicesForPiece,
                         'additional_services_total' => $isRejectedLine
                             ? $originalLineTotal - $unitPrice
                             : $additionalServicesTotal,
@@ -374,38 +388,6 @@ class OrderController extends Controller
                         'status' => $isRejectedLine ? 'rejected' : $lineStatus,
                         'note' => $item['note'] ?? null,
                     ];
-
-                    // Rejected additions on an otherwise accepted/pending piece become their own rejected line.
-                    if (! $isRejectedLine && $rejectedAdditionsSummary !== []) {
-                        $rejectedServices = collect($rejectedAdditionsSummary)
-                            ->map(fn (array $addition) => [
-                                'id' => $addition['id'],
-                                'name' => $addition['name'],
-                                'price' => (float) ($addition['price'] ?? 0),
-                                'icon' => $addition['icon'] ?? null,
-                            ])
-                            ->values()
-                            ->all();
-
-                        $itemsSummary[] = [
-                            'piece' => [
-                                'id' => $piece->id,
-                                'name' => \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang),
-                                'icon' => $piece->iconRelation?->full_path,
-                            ],
-                            'service' => $rejectedServices[0] ?? null,
-                            'services' => $rejectedServices,
-                            'additional_services' => [],
-                            'additional_services_total' => $rejectedAdditionsTotal,
-                            'quantity' => 1,
-                            'unit_price' => 0.0,
-                            'total_price' => 0.0,
-                            'original_unit_price' => $rejectedAdditionsTotal,
-                            'original_total_price' => $rejectedAdditionsTotal,
-                            'status' => 'rejected',
-                            'note' => $item['note'] ?? null,
-                        ];
-                    }
                 }
             }
 
@@ -954,7 +936,8 @@ class OrderController extends Controller
                 'piece' => $item['piece'] ?? null,
                 'service' => $item['service'] ?? null,
                 'services' => $item['services'] ?? [],
-                'additional_services' => $item['service_additions'] ?? [],
+                'additional_services' => $item['service_additions'] ?? $item['additional_services'] ?? [],
+                'rejected_services' => $item['rejected_services'] ?? [],
                 'additional_services_total' => (float) ($item['additional_services_total'] ?? 0),
                 'quantity' => (int) ($item['quantity'] ?? 1),
                 'unit_price' => (float) ($item['unit_price'] ?? 0),
