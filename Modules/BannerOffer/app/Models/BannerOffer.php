@@ -82,12 +82,19 @@ class BannerOffer extends Model
 
         $locale = $locale ?? app()->getLocale();
 
-        if (method_exists($record, 'getTranslation')) {
-            return $record->getTranslation('name', $locale)
-                ?: $record->getTranslation('title', $locale);
+        if (method_exists($record, 'getDisplayName')) {
+            return $record->getDisplayName($locale);
         }
 
-        return $record->full_name ?? $record->name ?? null;
+        if (method_exists($record, 'getTranslation')) {
+            $trans = $record->getTranslation('name', $locale)
+                ?: $record->getTranslation('title', $locale);
+            if ($trans) {
+                return $trans;
+            }
+        }
+
+        return $record->full_name ?? $record->name ?? $record->title ?? $record->label ?? $record->code ?? null;
     }
 
     /**
