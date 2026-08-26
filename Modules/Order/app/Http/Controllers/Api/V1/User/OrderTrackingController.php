@@ -242,13 +242,44 @@ class OrderTrackingController extends Controller
         $branchId = (int) ($order->branch_id ?? 0);
         $imageUrlResolver = fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null;
         $categorized = PendingApprovalItemCategorizer::categorize($order, $lang, $imageUrlResolver);
-        $rejectedItems = collect($categorized['rejected'])->values();
+
+        // Split "rejected" entries into whole-piece rejections (kept as their own
+        // line in rejected_items) vs a rejection of only an additional service on
+        // an otherwise-accepted item. The latter share their `ids` with an accepted
+        // item — merge those back onto that item as `rejected_services` instead of
+        // showing a confusing duplicate line for the same piece.
+        $acceptedIdSets = collect($categorized['accepted'])
+            ->map(fn (array $item) => collect($item['ids'] ?? [])->sort()->values()->all());
+
+        $rejectedServicesByIds = [];
+        $standaloneRejected = collect();
+
+        foreach ($categorized['rejected'] as $rejected) {
+            $ids = collect($rejected['ids'] ?? [])->sort()->values()->all();
+            $matchesAcceptedItem = $ids !== [] && $acceptedIdSets->contains($ids);
+
+            if ($matchesAcceptedItem) {
+                $rejectedServicesByIds[implode(',', $ids)] = $rejected['services'] ?? [];
+
+                continue;
+            }
+
+            $standaloneRejected->push($rejected);
+        }
+
+        $rejectedItems = $standaloneRejected->values();
         $mappedItems = collect(OrderItemGrouper::toApiLines(
             $order->items,
             $branchId,
             $lang,
             fn ($item) => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null
         ))
+            ->map(function (array $line) use ($rejectedServicesByIds) {
+                $key = implode(',', collect($line['ids'] ?? [])->sort()->values()->all());
+                $line['rejected_services'] = $rejectedServicesByIds[$key] ?? [];
+
+                return $line;
+            })
             ->reject(fn (array $line) => ($line['status'] ?? 'accepted') === 'rejected')
             ->concat($rejectedItems->map(function (array $item) {
                 return [
@@ -267,6 +298,7 @@ class OrderTrackingController extends Controller
                     'total_price' => (float) ($item['total_price'] ?? 0),
                     'additional_services_total' => 0.0,
                     'additional_services' => [],
+                    'rejected_services' => [],
                     'status' => 'rejected',
                     'note' => $item['note'] ?? null,
                     'image' => $item['image'] ?? null,

@@ -252,6 +252,40 @@ waiting_client_receipt (driver arrived)
 
 ---
 
+## 10. `current_driver` is now `null` at `delivered_to_branch`
+
+`delivery_data.current_driver` in the tracking response previously kept showing the pickup driver while the order sat at `delivered_to_branch` — but that driver's leg is already finished at that point, and no delivery driver has started yet, so nobody is actually working the order. `current_driver` is now `null` specifically for that status. `delivery_data.pickup_driver` / `delivery_data.delivery_driver` are unaffected — they still show the respective driver once assigned, regardless of current status.
+
+---
+
+## 11. New `rejected_services` Field — No More Duplicate Item Lines for a Rejected Add-on
+
+**The problem:** when the vendor rejects only an *additional service* (add-on, e.g. "تعليق الملابس"/hanging) on an item while keeping the item's main service(s) accepted, the tracking response showed the item **twice**: once normally in `items` (with only the accepted add-ons), and again as a separate synthetic entry in `rejected_items` — same piece name, just the rejected add-on — which reads as if it were a second, distinct item.
+
+**The fix:** that synthetic duplicate is gone. The item now appears **once**, in `items`, complete — and carries a new field:
+
+```json
+{
+  "id": 123,
+  "ids": [123],
+  "piece": { "name": "فستان" },
+  "services": [ ... accepted main services ... ],
+  "additional_services": [ ... accepted add-ons ... ],
+  "rejected_services": [
+    { "id": 45, "name": "تعليق الملابس", "price": 1.0 }
+  ],
+  "status": "accepted"
+}
+```
+
+`rejected_services` is `[]` when nothing was rejected on that item — always present, never omitted.
+
+**`rejected_items` / `rejected_count` are unaffected in meaning** — they still list only *whole* pieces/services the vendor rejected outright (a full line rejection, not just an add-on). Those didn't change; only the duplicate-add-on-as-fake-item case was removed.
+
+**Scope:** this fix is local to `GET /user/orders/{orderId}/tracking` only (`items`/`rejected_items` in that response) — the vendor's own pending-approval review screen (`GET /user/orders/pending-approval/{orderId}`, used for the قبول/رفض modification-review flow) is untouched.
+
+---
+
 ## Migration Notes
 
 Sections 1–4 are purely additive — no breaking changes, safe to integrate incrementally:
