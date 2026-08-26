@@ -282,16 +282,39 @@ waiting_client_receipt (driver arrived)
 
 **`rejected_items` / `rejected_count` are unaffected in meaning** — they still list only *whole* pieces/services the vendor rejected outright (a full line rejection, not just an add-on). Those didn't change; only the duplicate-add-on-as-fake-item case was removed.
 
-**Scope:** this fix is local to `GET /user/orders/{orderId}/tracking` only (`items`/`rejected_items` in that response) — the vendor's own pending-approval review screen (`GET /user/orders/pending-approval/{orderId}`, used for the قبول/رفض modification-review flow) is untouched.
+**Scope:** this fix applies to `GET /user/orders/{orderId}/tracking` as well as the `calculate` API (`POST /api/v1/vendor/orders/calculate`, `POST /api/v1/user/orders/calculate`, and `PendingApprovalItemCategorizer`).
+
+---
+
+## 12. Conditional `is_free_delivery` Field in `calculate` API Summary
+
+In the `calculate` API response (`POST /api/v1/user/orders/calculate` and `POST /api/v1/vendor/orders/calculate`), when the effective `delivery_fee` is `0` (or `0.00`), the `summary` object includes the boolean flag:
+
+```json
+{
+  "summary": {
+    "subtotal": 100.0,
+    "delivery_fee": 0.0,
+    "final_amount": 100.0,
+    "is_free_delivery": true
+  }
+}
+```
+
+- **When `delivery_fee == 0`**: `"is_free_delivery": true` is present inside `summary`.
+- **When `delivery_fee > 0`**: `is_free_delivery` is omitted completely from the JSON response.
 
 ---
 
 ## Migration Notes
 
-Sections 1–4 are purely additive — no breaking changes, safe to integrate incrementally:
+Sections 1–4, 11, and 12 are purely additive — no breaking changes, safe to integrate incrementally:
 
-- No breaking changes — all those fields are new additions to the existing tracking response.
+- No breaking changes — all those fields are new additions to the existing tracking and calculate responses.
 - `driver_rejections` will simply be an empty array `[]` for orders with no rejections.
 - `handoff` will be `null` and `requires_handoff_confirmation` will be `false` when there's nothing for the client to confirm right now.
+- `is_free_delivery` will be present inside `summary` only when delivery is free (`delivery_fee == 0`).
+- `rejected_services` is always included on items as an array `[]`, listing any rejected additional services for that item.
 
 **Section 5 is the one exception** — it changes an actual `status` value for branch-pickup orders. **If any client code currently checks `status === "completed"` to mean "ready for pickup, not yet collected," update it to check `status === "waiting_client_receipt"` (or accept both, for orders already ready before this deploy).**
+
