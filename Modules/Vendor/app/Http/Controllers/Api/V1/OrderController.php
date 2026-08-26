@@ -526,27 +526,33 @@ class OrderController extends Controller
                     ->all();
             }
 
+            $calculateSummary = [
+                'items' => $itemsSummary,
+                'items_count' => count($itemsSummary),
+                'subtotal' => (float) $pricing['subtotal'],
+                'discount_amount' => (float) $pricing['discount_amount'],
+                'subtotal_after_discount' => (float) $pricing['subtotal_after_discount'],
+                'tax_percentage' => (float) $pricing['tax_percentage'],
+                'tax_amount' => (float) $pricing['tax_amount'],
+                'delivery_fee' => (float) $pricing['delivery_fee'],
+                'pickup_fee' => (float) $deliveryFees['pickup_fee'],
+                'delivery_fee_amount' => (float) $deliveryFees['delivery_fee_amount'],
+                'total_distance_km' => (float) $deliveryFees['total_distance_km'],
+                'distance' => (float) $deliveryFees['distance'],
+                'final_amount' => (float) $pricing['final_amount'],
+                'pickup_at_vendor' => $pickupAtVendor,
+                'delivery_at_vendor' => $deliveryAtVendor,
+            ];
+
+            if ((float) $pricing['delivery_fee'] == 0.0) {
+                $calculateSummary['is_free_delivery'] = true;
+            }
+
             return successResponse([
                 'order_id' => $orderId,
                 'branch_id' => $branchId,
                 'have_coupon' => $appliedDiscount !== null || $discountAmount > 0,
-                'summary' => [
-                    'items' => $itemsSummary,
-                    'items_count' => count($itemsSummary),
-                    'subtotal' => (float) $pricing['subtotal'],
-                    'discount_amount' => (float) $pricing['discount_amount'],
-                    'subtotal_after_discount' => (float) $pricing['subtotal_after_discount'],
-                    'tax_percentage' => (float) $pricing['tax_percentage'],
-                    'tax_amount' => (float) $pricing['tax_amount'],
-                    'delivery_fee' => (float) $pricing['delivery_fee'],
-                    'pickup_fee' => (float) $deliveryFees['pickup_fee'],
-                    'delivery_fee_amount' => (float) $deliveryFees['delivery_fee_amount'],
-                    'total_distance_km' => (float) $deliveryFees['total_distance_km'],
-                    'distance' => (float) $deliveryFees['distance'],
-                    'final_amount' => (float) $pricing['final_amount'],
-                    'pickup_at_vendor' => $pickupAtVendor,
-                    'delivery_at_vendor' => $deliveryAtVendor,
-                ],
+                'summary' => $calculateSummary,
                 'accepted_items' => $acceptedItems,
                 'rejected_items' => $rejectedItems,
                 'discount' => $appliedDiscount ? [

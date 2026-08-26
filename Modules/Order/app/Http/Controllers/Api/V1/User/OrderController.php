@@ -326,7 +326,7 @@ class OrderController extends Controller
             $deliveryDiscountAmount
         );
 
-        return [
+        $summary = [
             'subtotal' => (float) $totals['subtotal'],
             'discount_amount' => (float) $totals['discount_amount'],
             'delivery_discount_amount' => (float) ($totals['delivery_discount_amount'] ?? 0),
@@ -342,6 +342,12 @@ class OrderController extends Controller
             'pickup_at_vendor' => $pickupAtVendor,
             'delivery_at_vendor' => $deliveryAtVendor,
         ];
+
+        if ((float) $totals['delivery_fee'] == 0.0) {
+            $summary['is_free_delivery'] = true;
+        }
+
+        return $summary;
     }
 
     /**
