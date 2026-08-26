@@ -20,6 +20,7 @@ class BranchController extends Controller
         $filters = [
             'vendor_id' => $vendorId,
             'zone_id' => $request->input('zone_id'),
+            'zone_ids' => $request->input('zone_ids'),
             'zone_name' => $request->input('zone_name'),
             'is_active' => $request->input('is_active'),
             'search' => $request->input('search'),

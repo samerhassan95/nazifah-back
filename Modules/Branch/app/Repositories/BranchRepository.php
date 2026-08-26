@@ -28,6 +28,10 @@ class BranchRepository implements BranchRepositoryInterface
                     $query->where('zone_id', $filters['zone_id']);
                 }
 
+                if (! empty($filters['zone_ids']) && is_array($filters['zone_ids'])) {
+                    $query->whereIn('zone_id', array_map('intval', $filters['zone_ids']));
+                }
+
                 if (! empty($filters['zone_name'])) {
                     $zoneName = $filters['zone_name'];
                     $query->whereHas('zone', function ($q) use ($zoneName) {

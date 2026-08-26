@@ -49,6 +49,7 @@ class DiscountResource extends JsonResource
             'is_active' => (bool) $this->is_active,
             'branch_ids' => $this->branch_ids ?? [],
             'city_names' => $this->city_names ?? [],
+            'zone_ids' => $this->zone_ids ?? [],
             'segment_filters' => $this->segment_filters ?? [],
             'required_piece_ids' => $this->required_piece_ids ?? [],
             'bundle_rules' => $this->bundle_rules ?? [],
