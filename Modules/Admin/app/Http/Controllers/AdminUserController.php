@@ -73,7 +73,7 @@ class AdminUserController extends Controller
             'password' => ['required', 'string', 'min:6'],
             'confirm_password' => ['required', 'same:password'],
             'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['string', 'in:readonly,edit,delete'],
+            'permissions.*' => ['string', 'in:show,edit,delete'],
         ]);
 
         if ($validator->fails()) {
@@ -87,6 +87,7 @@ class AdminUserController extends Controller
                 'phone' => $request->phone,
                 'password' => Hash::make($request->password),
                 'is_verified' => true,
+                'permissions' => $request->input('permissions', []),
             ];
 
             // Handle image upload
@@ -95,12 +96,6 @@ class AdminUserController extends Controller
             }
 
             $user = Admin::create($data);
-
-            // Store permissions if provided (you may need to create a permissions table)
-            if ($request->has('permissions')) {
-                // TODO: Implement permissions storage
-                // This would require a separate permissions table/relationship
-            }
 
             return successResponse(
                 new AdminUserResource($user),
@@ -146,7 +141,7 @@ class AdminUserController extends Controller
             'password' => ['nullable', 'string', 'min:6'],
             'confirm_password' => ['nullable', 'required_with:password', 'same:password'],
             'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['string', 'in:readonly,edit,delete'],
+            'permissions.*' => ['string', 'in:show,edit,delete'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
         ]);
 
@@ -184,12 +179,11 @@ class AdminUserController extends Controller
                 $data['is_verified'] = $request->status === 'active';
             }
 
-            $user->update($data);
-
-            // Update permissions if provided
             if ($request->has('permissions')) {
-                // TODO: Implement permissions update
+                $data['permissions'] = $request->input('permissions', []);
             }
+
+            $user->update($data);
 
             return successResponse(
                 new AdminUserResource($user->fresh()),
