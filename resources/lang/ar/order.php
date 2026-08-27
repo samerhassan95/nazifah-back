@@ -210,7 +210,7 @@ return [
 
     // Client visit response (pickup / delivery readiness)
     'visit_response_not_available' => 'لا يمكن الرد على هذا الطلب في حالته الحالية',
-    'visit_confirm_success_pickup' => 'تم تأكيد جاهزيتك لاستلام السائق',
+    'visit_confirm_success_pickup' => 'تم تأكيد جاهزيتك لتسليم الطلب للسائق',
     'visit_confirm_success_delivery' => 'تم تأكيد جاهزيتك لاستلام الطلب من السائق',
     'visit_confirm_success_receipt' => 'تم تأكيد استلام الطلب بنجاح',
     'visit_confirm_success_branch_dropoff' => 'تم تأكيد جاهزيتك لتسليم الطلب في المغسلة',
