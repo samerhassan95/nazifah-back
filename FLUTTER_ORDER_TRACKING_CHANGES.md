@@ -329,6 +329,18 @@ Same field, same rule as §12, now also on the tracking response (top level, alo
 
 ---
 
+## 15. Stale `payment_breakdown` Amount for COD Orders After Vendor Rejection
+
+**Backend-only fix**, same symptom as §14 but a different root cause — this one specifically for **cash_on_delivery** orders whose price dropped because the vendor rejected/modified items during review. `order.final_amount` recalculated correctly, but `payment_breakdown.total_amount` and `payment_breakdown.payments[0].amount` kept showing the old, pre-rejection total.
+
+**Root cause:** `VendorOrderReviewService::clientApproveModifications()` only adjusted the payment record on a price decrease when `$paidUpfront` was true — and `$paidUpfront` is defined as `$order->isPaid() && ! $order->isCashOnDelivery()`, i.e. it's **always false for COD**, regardless of price change. So the existing (and already correct) mechanism that lowers a payment leg's recorded amount on a decrease (`OrderPaymentService::refundDecrease()` → `reduceCodLegAmount()` for COD specifically — it never issues a cash refund, since nothing was charged, it just lowers the amount still to be collected) was simply never invoked for this path. §14's fix doesn't help here since nothing was refunded — the leg's `amount` column itself was just never updated.
+
+**Fix:** broadened the condition to also run this reconciliation for COD: `($paidUpfront || $order->isCashOnDelivery()) && $delta < -0.005`. `refundDecrease()` already branches correctly per payment method — COD legs get their amount reduced (no cash movement), non-COD paid legs still get a real refund to the original payment method. No new code path, just removed the COD exclusion from an existing, already-tested reduction path (the same one the client's own order-edit flow already uses successfully for COD decreases).
+
+**Found via a live order:** cash_on_delivery order, price dropped from 59.28 → 53.58 after a vendor rejection, with `payment_breakdown.payments[0].amount` stuck at 59.28 — the same class of bug §14 fixed for a wallet-paid order (60.42 → 55.86), confirmed live on the server. This fix hasn't been retested on that order yet post-deploy — do that before considering it closed.
+
+---
+
 ## Migration Notes
 
 Sections 1–4, 11, 12, and 13 are purely additive — no breaking changes, safe to integrate incrementally:

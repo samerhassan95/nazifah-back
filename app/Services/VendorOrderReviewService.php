@@ -381,7 +381,12 @@ class VendorOrderReviewService
                 && ! empty($paymentMethods)
                 && ($paidUpfront || $order->isCashOnDelivery());
 
-            if ($paidUpfront && $delta < -0.005) {
+            if (($paidUpfront || $order->isCashOnDelivery()) && $delta < -0.005) {
+                // COD hasn't actually been charged, so refundDecrease() won't issue a
+                // cash refund for it — it lowers the still-uncollected COD leg's
+                // recorded amount instead (reduceCodLegAmount), keeping the payment
+                // breakdown in sync with the reduced final_amount. Paid-upfront orders
+                // still get a real refund to their original payment method.
                 $expectedRefund = round(-$delta, 2);
                 app(OrderPaymentService::class)->refundDecrease(
                     $order,
