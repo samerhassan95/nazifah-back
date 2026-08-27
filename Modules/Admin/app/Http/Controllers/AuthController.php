@@ -58,6 +58,8 @@ class AuthController extends Controller
             // Revoke old tokens
             // $admin->tokens()->delete();
 
+            $admin->update(['last_login_at' => now()]);
+
             // Create new token
             $token = $admin->createToken('admin-token')->plainTextToken;
 
