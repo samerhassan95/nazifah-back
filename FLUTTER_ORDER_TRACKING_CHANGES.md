@@ -355,6 +355,22 @@ Not a bug — a wording change on the client's delivery visit-response card (the
 
 ---
 
+## 17. `on_way_to_delivery` Card Now Always Uses "Approaching" Wording
+
+Following on from §16: the client asked for the card's **title and message** to match the target design too, for every home-delivery order at status `on_way_to_delivery` — not just once the driver is within 10 minutes.
+
+**Before:** two different texts depending on distance/time:
+- Default (driver still far): `title: "التوصيل في الطريق"`, `message: "السائق في الطريق إليك"`
+- Approaching (≤10 min, §7 override): `title: "السائق اقترب منك"`, `message: "السائق الآن اقترب من موقعك، جهّز طلبك للاستلام"`
+
+**Now:** the default text itself (`on_the_way_on_way_delivery_title` / `_message` / `_message_distance`) was changed to the approaching wording, so **every** `on_way_to_delivery` response uses it — `title: "السائق اقترب منك!"`, `message: "السائق الآن اقترب من موقعك، جهّز طلبك للاستلام"` (or the `(:distance كم)` variant when distance is known). The §7 ≤10-minute override still exists in the code and still fires, but is now a no-op for this status since it produces the same text — it's only still meaningfully different for `waiting_client_receipt` (unaffected by this change — that status's own text, "السائق سلّم الطلب" / "أكّد أنك استلمت الطلب لإغلاق الطلب", is untouched).
+
+**Where this shows up:** `title` / `message` in the `GET /user/orders/on-the-way/{id}` response (and the mirrored copy inside `vendor_handoff.title`/`vendor_handoff.message`), whenever `status == "on_way_to_delivery"`.
+
+**Not affected:** `on_way_to_pickup` (home pickup, driver en route to collect from the client) keeps its own distinct wording — this change is delivery-side only, matching what was asked.
+
+---
+
 ## Migration Notes
 
 Sections 1–4, 11, 12, and 13 are purely additive — no breaking changes, safe to integrate incrementally:
