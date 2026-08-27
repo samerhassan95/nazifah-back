@@ -319,6 +319,7 @@ return [
     'on_the_way_default_title' => 'Delivery on its way',
     'on_the_way_default_message' => 'The driver is on the way to you, prepare your order for pickup',
     'on_the_way_driver_approaching_title' => 'Driver is approaching you',
+    'on_the_way_driver_approaching_message' => 'The driver is now near your location — prepare your order for pickup',
 
     'on_the_way_time_less_than_minute' => 'Less than 1 minute',
     'on_the_way_time_minutes' => 'About :minutes minutes',

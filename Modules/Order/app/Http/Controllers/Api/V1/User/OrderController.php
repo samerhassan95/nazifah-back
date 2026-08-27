@@ -3733,6 +3733,7 @@ class OrderController extends Controller
                 && $estimatedTimeMinutes <= 10
             ) {
                 $title = $this->transOrder('on_the_way_driver_approaching_title', $lang);
+                $message = $this->transOrder('on_the_way_driver_approaching_message', $lang);
             }
 
             $clientActions = $requiresHandoff
