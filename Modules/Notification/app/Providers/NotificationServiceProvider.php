@@ -2,8 +2,10 @@
 
 namespace Modules\Notification\Providers;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Modules\Notification\Console\Commands\SendDueMarketingNotifications;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -44,7 +46,9 @@ class NotificationServiceProvider extends ServiceProvider
      */
     protected function registerCommands(): void
     {
-        // $this->commands([]);
+        $this->commands([
+            SendDueMarketingNotifications::class,
+        ]);
     }
 
     /**
@@ -52,10 +56,12 @@ class NotificationServiceProvider extends ServiceProvider
      */
     protected function registerCommandSchedules(): void
     {
-        // $this->app->booted(function () {
-        //     $schedule = $this->app->make(Schedule::class);
-        //     $schedule->command('inspire')->hourly();
-        // });
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
+            $schedule->command('notifications:send-due-marketing')
+                ->everyMinute()
+                ->withoutOverlapping()
+                ->runInBackground();
+        });
     }
 
     /**
