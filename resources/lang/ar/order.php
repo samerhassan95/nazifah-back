@@ -321,6 +321,8 @@ return [
     'on_the_way_default_message' => 'السائق في الطريق إليك، جهّز طلبك للاستلام',
     'on_the_way_driver_approaching_title' => 'السائق اقترب منك',
     'on_the_way_driver_approaching_message' => 'السائق الآن اقترب من موقعك، جهّز طلبك للاستلام',
+    'on_the_way_driver_approaching_confirm_label' => 'تأكيد',
+    'on_the_way_driver_approaching_postpone_label' => 'تأجيل',
 
     'on_the_way_time_less_than_minute' => 'أقل من دقيقة',
     'on_the_way_time_minutes' => 'بعد :minutes دقيقة تقريباً',
