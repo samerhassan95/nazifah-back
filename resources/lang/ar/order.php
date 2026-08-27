@@ -216,7 +216,7 @@ return [
     'visit_confirm_success_branch_dropoff' => 'تم تأكيد جاهزيتك لتسليم الطلب في المغسلة',
     'visit_confirm_success_branch_pickup' => 'تم تأكيد جاهزيتك لاستلام الطلب من المغسلة',
     'visit_confirm_label_pickup' => 'تأكيد جاهزية التسليم',
-    'visit_confirm_label_delivery' => 'تأكيد الجاهزية لاستلام الطلب من السائق',
+    'visit_confirm_label_delivery' => 'تأكيد الجاهزية لتسليم الطلب',
     'visit_confirm_label_branch_dropoff' => 'تأكيد التوجه لتسليم الطلب في المغسلة',
     'visit_confirm_label_branch_pickup' => 'تأكيد التوجه لاستلام الطلب من المغسلة',
     'visit_confirm_label_receipt' => 'تأكيد استلام الطلب',
