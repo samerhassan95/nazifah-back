@@ -582,7 +582,13 @@ class OrderPaymentService
 
         foreach ($legs as $leg) {
             $method = (string) $leg->payment_method;
-            $amount = round((float) $leg->amount, 2);
+            // A partial refund (e.g. vendor rejected items and the difference was
+            // refunded) keeps the leg at status=paid — markLegPartialRefund() only
+            // flips status to refunded once the leg is refunded in full — and never
+            // touches `amount` itself, tracking the refunded portion in
+            // meta.refunded_amount instead. Net it out here so a partially-refunded
+            // leg doesn't keep showing its original, pre-refund amount.
+            $amount = $this->refundableAmountOnLeg($leg);
 
             if ($amount <= 0) {
                 continue;

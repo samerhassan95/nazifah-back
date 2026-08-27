@@ -317,6 +317,18 @@ Same field, same rule as §12, now also on the tracking response (top level, alo
 
 ---
 
+## 14. `payment_breakdown` Showed the Stale Pre-Refund Amount
+
+**Backend-only fix**, found on a real order: originally 60.42 SAR paid in full via wallet, then the vendor rejected 2 services, the order recalculated to 55.86 SAR, and the 4.56 SAR difference was refunded to the wallet. The item-level pricing in the response already reflected the reduction correctly — but `payment_breakdown.payments[].amount` (and `payment_breakdown.total_amount`) still showed **60.42**, the original pre-refund amount.
+
+**Root cause:** a *partial* refund (`OrderPaymentService::markLegPartialRefund()`) never changes the paid leg's `amount` column — it only records the refunded portion in `meta.refunded_amount`, and only flips the leg's `status` to `refunded` once it's refunded **in full**. So a partially-refunded leg stays `status: "paid"` with its original, now-stale `amount`. `buildOrderPaymentBreakdownForApi()` (used by both `Order::paymentBreakdownForApi()` and the tracking endpoint) was summing that raw `amount` column directly, with no awareness of `meta.refunded_amount`.
+
+**Fix:** the breakdown now nets out any partial refund per leg (reusing the same `refundableAmountOnLeg()` helper the refund flow itself already uses internally) before summing, so `payment_breakdown.payments[].amount` and `total_amount` correctly reflect what's actually still paid/owed after a partial refund — 55.86 in this example, not 60.42. A leg refunded to `0` is dropped from `payments` entirely, same as before.
+
+**Not affected:** `final_amount` (the order's own recalculated total) was already correct — only the `payment_breakdown` section was stale. Full refunds (leg status already `refunded`) were also already handled correctly; this only affects *partial* refunds.
+
+---
+
 ## Migration Notes
 
 Sections 1–4, 11, 12, and 13 are purely additive — no breaking changes, safe to integrate incrementally:
