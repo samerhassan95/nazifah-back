@@ -341,6 +341,20 @@ Same field, same rule as §12, now also on the tracking response (top level, alo
 
 ---
 
+## 16. `visit_confirm_label_delivery` / `visit_postpone_label_delivery` Shortened
+
+Not a bug — a wording change on the client's delivery visit-response card (the "driver is on the way" / "driver is approaching" actions card, `GET /user/orders/on-the-way/{id}`).
+
+**Before:** the confirm/postpone buttons carried long labels — "تأكيد الجاهزية لتسليم الطلب" / "تأجيل موعد تسليم السائق" (and in English, "Confirm ready to receive from driver" / "Postpone delivery driver visit").
+
+**Now:** both are short, generic CTAs — "تأكيد" / "تأجيل" ("Confirm" / "Postpone") — matching the target card design. This applies to **every** state of this card, not just the "driver approaching" (≤10 min) one from §7 — that state previously had its own separate short-label override, which is now redundant (removed) since the base labels are short everywhere.
+
+**Where this shows up:** `available_actions.confirm_label` / `available_actions.postpone_label`, and the separate `visit.confirm_label` / `visit.postpone_label` object, both in the `GET /user/orders/on-the-way/{id}` response. The `endpoint`/`confirm_action`/`postpone_action` fields and the actual `POST /user/orders/{id}/visit-response` call are unchanged — only the button text.
+
+**Scoped to the `delivery` visit type only** (this is the only card shown so far) — `visit_confirm_label_pickup`/`visit_postpone_label_pickup` (the home-pickup equivalent) and the branch drop-off/pickup labels are untouched. Ask if those need the same treatment.
+
+---
+
 ## Migration Notes
 
 Sections 1–4, 11, 12, and 13 are purely additive — no breaking changes, safe to integrate incrementally:

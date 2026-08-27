@@ -3734,22 +3734,6 @@ class OrderController extends Controller
             ) {
                 $title = $this->transOrder('on_the_way_driver_approaching_title', $lang);
                 $message = $this->transOrder('on_the_way_driver_approaching_message', $lang);
-
-                // Short, urgent CTA wording for this state — same confirm/postpone
-                // action underneath, just shorter labels than the generic visit-
-                // response ones ("تأكيد الجاهزية لتسليم الطلب" etc).
-                if (isset($visitActions['confirm_label'])) {
-                    $visitActions['confirm_label'] = $this->transOrder('on_the_way_driver_approaching_confirm_label', $lang);
-                }
-                if (! empty($visitActions['postpone_label'])) {
-                    $visitActions['postpone_label'] = $this->transOrder('on_the_way_driver_approaching_postpone_label', $lang);
-                }
-                if (isset($visitApi['visit']['confirm_label'])) {
-                    $visitApi['visit']['confirm_label'] = $this->transOrder('on_the_way_driver_approaching_confirm_label', $lang);
-                }
-                if (! empty($visitApi['visit']['postpone_label'])) {
-                    $visitApi['visit']['postpone_label'] = $this->transOrder('on_the_way_driver_approaching_postpone_label', $lang);
-                }
             }
 
             $clientActions = $requiresHandoff
