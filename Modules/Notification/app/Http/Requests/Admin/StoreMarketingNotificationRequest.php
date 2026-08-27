@@ -3,6 +3,8 @@
 namespace Modules\Notification\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Modules\Notification\Enums\UserTargetType;
 
 class StoreMarketingNotificationRequest extends FormRequest
 {
@@ -22,7 +24,7 @@ class StoreMarketingNotificationRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string'],
-            'target_type' => ['required', 'in:all,specific_users,specific_groups,segment'],
+            'target_type' => ['required', Rule::in(UserTargetType::values())],
             'target_ids' => [
                 'required_if:target_type,specific_users',
                 'required_if:target_type,specific_groups',
