@@ -411,6 +411,7 @@ class OrderTrackingController extends Controller
             ...$order->couponResponseFields($lang),
             'tax_amount' => (float) $order->tax_amount,
             'delivery_fee' => (float) $order->delivery_fee,
+            ...((float) $order->delivery_fee === 0.0 ? ['is_free_delivery' => true] : []),
             'final_amount' => (float) $order->final_amount,
             'distance' => $order->distance !== null ? (float) $order->distance : 0,
             ...$order->paymentFieldsForApi(),
