@@ -383,6 +383,18 @@ Follow-up to §17. The message ended with "جهّز طلبك للاستلام" (
 
 ---
 
+## 19. `rejected_services` Also Added to `GET /vendor/orders/{id}`
+
+Same fix as §11, applied to the vendor's own order-detail endpoint — it had the identical duplicate-line problem §11 fixed for the client tracking endpoint, just in its own separate item-building code (`Modules/Vendor/.../OrderController.php::show()`).
+
+**The problem:** when the vendor rejects only an additional service on an item they otherwise accepted, `accepted_items` showed the item once (correctly, with only the accepted add-ons) — but a **second, synthetic entry** for the same piece also appeared in `rejected_items`, showing just the rejected add-on, as if it were a separate item.
+
+**The fix:** that synthetic duplicate is gone. Each entry in `accepted_items` now carries a `rejected_services` array (same shape as §11 — `{id, name, price}`), and the corresponding fake `rejected_items` line is no longer created. `rejected_items` now only ever contains pieces/services the vendor rejected **outright** (a whole line rejection). Every entry in both `accepted_items` and `rejected_items` now always includes `rejected_services` — `[]` when nothing was rejected on that item.
+
+**Not touched:** the vendor's `calculate` endpoint (`POST /api/v1/vendor/orders/calculate`, the live-preview-while-reviewing screen) has the same duplicate-line pattern in its own code but was left as-is — showing the just-rejected addition as its own line there may be intentional (the vendor is actively deciding what to reject). Ask if that one needs the same treatment.
+
+---
+
 ## Migration Notes
 
 Sections 1–4, 11, 12, and 13 are purely additive — no breaking changes, safe to integrate incrementally:
