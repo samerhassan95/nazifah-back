@@ -282,7 +282,9 @@ waiting_client_receipt (driver arrived)
 
 **`rejected_items` / `rejected_count` are unaffected in meaning** — they still list only *whole* pieces/services the vendor rejected outright (a full line rejection, not just an add-on). Those didn't change; only the duplicate-add-on-as-fake-item case was removed.
 
-**Scope:** this fix applies to `GET /user/orders/{orderId}/tracking` as well as the `calculate` API (`POST /api/v1/vendor/orders/calculate`, `POST /api/v1/user/orders/calculate`, and `PendingApprovalItemCategorizer`).
+**Scope:** local to `GET /user/orders/{orderId}/tracking` only — `items`/`rejected_items` in that one response. Nothing else (the vendor pending-approval review screen, the `calculate` API, the shared `PendingApprovalItemCategorizer`) was touched.
+
+**Follow-up fix:** the first version of this matched a rejected add-on back to its item by comparing `ids` arrays, which turned out to be unreliable — a categorizer helper (`mergeDuplicateRejectedItems`) collapses separate rejected entries that share the same piece name, which can change the `ids` on the merged entry so it no longer exactly matches any single item. `rejected_services` now reads directly off each order line's own `additionalServicesPivot` rows instead (bypassing that merge entirely), and the `rejected_items` split is now decided by checking actual `vendor_status` on the order's items rather than comparing `ids`. If you tested this earlier and saw `rejected_services` always `[]`, that was the bug — retest against the current deploy.
 
 ---
 

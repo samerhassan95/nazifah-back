@@ -243,40 +243,67 @@ class OrderTrackingController extends Controller
         $imageUrlResolver = fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null;
         $categorized = PendingApprovalItemCategorizer::categorize($order, $lang, $imageUrlResolver);
 
-        // Split "rejected" entries into whole-piece rejections (kept as their own
-        // line in rejected_items) vs a rejection of only an additional service on
-        // an otherwise-accepted item. The latter share their `ids` with an accepted
-        // item — merge those back onto that item as `rejected_services` instead of
-        // showing a confusing duplicate line for the same piece.
-        $acceptedIdSets = collect($categorized['accepted'])
-            ->map(fn (array $item) => collect($item['ids'] ?? [])->sort()->values()->all());
+        // A categorizer "rejected" entry represents either a whole piece/main-service
+        // actually rejected (its order_item rows have vendor_status=rejected), or —
+        // for an otherwise-accepted item — only its additional services being
+        // rejected (the main order_item rows stay vendor_status=accepted). Only the
+        // former belongs in rejected_items; the latter is now covered by
+        // rejected_services below and would otherwise show as a confusing duplicate
+        // line for the same piece. Checked against actual order_item vendor_status
+        // (not the categorizer's merged `ids`, which can span multiple items once
+        // mergeDuplicateRejectedItems collapses same-piece-name entries together).
+        $rejectedOrderItemIds = $order->items
+            ->filter(fn ($item) => ($item->vendor_status ?? 'accepted') === 'rejected')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
-        $rejectedServicesByIds = [];
-        $standaloneRejected = collect();
+        $rejectedItems = collect($categorized['rejected'])
+            ->filter(function (array $item) use ($rejectedOrderItemIds) {
+                $ids = collect($item['ids'] ?? [])->map(fn ($id) => (int) $id);
 
-        foreach ($categorized['rejected'] as $rejected) {
-            $ids = collect($rejected['ids'] ?? [])->sort()->values()->all();
-            $matchesAcceptedItem = $ids !== [] && $acceptedIdSets->contains($ids);
+                return $ids->intersect($rejectedOrderItemIds)->isNotEmpty();
+            })
+            ->values();
 
-            if ($matchesAcceptedItem) {
-                $rejectedServicesByIds[implode(',', $ids)] = $rejected['services'] ?? [];
+        // Rejected additional services, read straight off each order_item's own
+        // pivot rows rather than the categorizer's rejected-item list — that list
+        // merges same-piece-name entries together (mergeDuplicateRejectedItems),
+        // which loses the per-order_item id association needed to attribute a
+        // rejected addition back to the specific accepted item it belongs to.
+        $rejectedServicesByItemId = $order->items
+            ->flatMap(function ($item) use ($branchId, $lang) {
+                if (! $item->relationLoaded('additionalServicesPivot')) {
+                    return collect();
+                }
 
-                continue;
-            }
+                return collect($item->additionalServicesPivot)
+                    ->filter(fn ($pivot) => ($pivot->vendor_status ?? 'accepted') === 'rejected' && $pivot->serviceAddition)
+                    ->map(fn ($pivot) => [
+                        'order_item_id' => (int) $item->id,
+                        'id' => $pivot->serviceAddition->id,
+                        'name' => \App\Support\OrderItemDisplayNames::additionalServiceName($pivot->serviceAddition, $branchId, $lang),
+                        'price' => \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot),
+                    ]);
+            })
+            ->groupBy('order_item_id');
 
-            $standaloneRejected->push($rejected);
-        }
-
-        $rejectedItems = $standaloneRejected->values();
         $mappedItems = collect(OrderItemGrouper::toApiLines(
             $order->items,
             $branchId,
             $lang,
             fn ($item) => $item->images ? $this->uploadFilesService->getFullUrl($item->images) : null
         ))
-            ->map(function (array $line) use ($rejectedServicesByIds) {
-                $key = implode(',', collect($line['ids'] ?? [])->sort()->values()->all());
-                $line['rejected_services'] = $rejectedServicesByIds[$key] ?? [];
+            ->map(function (array $line) use ($rejectedServicesByItemId) {
+                $line['rejected_services'] = collect($line['ids'] ?? [])
+                    ->flatMap(fn ($id) => $rejectedServicesByItemId->get($id, collect()))
+                    ->map(fn (array $row) => [
+                        'id' => $row['id'],
+                        'name' => $row['name'],
+                        'price' => $row['price'],
+                    ])
+                    ->values()
+                    ->all();
 
                 return $line;
             })
