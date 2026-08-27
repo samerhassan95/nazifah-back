@@ -371,6 +371,18 @@ Following on from §16: the client asked for the card's **title and message** to
 
 ---
 
+## 18. Delivery "Prepare Order" Wording Corrected
+
+Follow-up to §17. The message ended with "جهّز طلبك للاستلام" (literally "prepare your order for receipt"), which reads oddly — it's the client who receives, not the order. Changed to "جهّز نفسك لاستلام الطلب" ("get yourself ready to receive the order") — but **only** for the messages tied to an actively-tracked driver genuinely en route to the client right now, where "be personally ready" is the correct call to action. The generic fallback keeps the original, more neutral wording since it covers statuses where that presence-specific phrasing wouldn't fit.
+
+| Key | When it's used | Wording |
+|---|---|---|
+| `on_the_way_on_way_delivery_message` / `_distance` | Driver actively en route, `on_way_to_delivery` | **Changed** → جهّز نفسك لاستلام الطلب / get ready to receive your order |
+| `on_the_way_driver_approaching_message` | Driver ≤10 min away | **Changed** → جهّز نفسك لاستلام الطلب / get ready to receive your order |
+| `on_the_way_default_message` | Generic fallback for any unmatched status | **Reverted to original** → جهّز طلبك للاستلام / prepare your order for pickup |
+
+---
+
 ## Migration Notes
 
 Sections 1–4, 11, 12, and 13 are purely additive — no breaking changes, safe to integrate incrementally:
