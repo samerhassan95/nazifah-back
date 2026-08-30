@@ -4,6 +4,7 @@ namespace Modules\Invoice\Services;
 
 use Modules\Invoice\Models\Invoice;
 use Modules\Order\Models\Order;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class InvoicePayloadBuilder
 {
@@ -46,6 +47,11 @@ class InvoicePayloadBuilder
             vatTotal: $taxAmount,
         );
 
+        // Rendered server-side (SVG, no external HTTP dependency) so the QR always
+        // shows up regardless of the viewer's network — a third-party image API
+        // fetched from the browser was unreliable on some mobile networks.
+        $zatcaQrSvg = (string) QrCode::format('svg')->size(160)->margin(0)->generate($zatcaQr);
+
         return [
             'invoice_number' => $invoice->invoice_number,
             'invoice_type' => $invoice->invoice_type,
@@ -75,6 +81,7 @@ class InvoicePayloadBuilder
             'vat_rate' => self::VAT_RATE * 100,
             'line_items' => $lineItems,
             'zatca_qr_base64' => $zatcaQr,
+            'zatca_qr_svg' => $zatcaQrSvg,
         ];
     }
 

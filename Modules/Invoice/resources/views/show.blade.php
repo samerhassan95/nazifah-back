@@ -109,10 +109,16 @@
             color: #1a1a2e;
             margin-bottom: 12px;
         }
+        .table-scroll {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 24px;
+        }
         table {
             width: 100%;
+            min-width: 560px;
             border-collapse: collapse;
-            margin-bottom: 24px;
             font-size: 13px;
         }
         thead th {
@@ -183,9 +189,11 @@
             color: #9ca3af;
             margin-top: 8px;
         }
-        .qr-section img {
+        .qr-section img,
+        .qr-section svg {
             width: 160px;
             height: 160px;
+            max-width: 100%;
         }
 
         /* Footer */
@@ -237,11 +245,14 @@
         }
 
         @media (max-width: 600px) {
+            body { padding: 8px; }
             .info-grid { grid-template-columns: 1fr; }
             .invoice-header { flex-direction: column; text-align: center; gap: 12px; }
             .invoice-header .invoice-number { text-align: center; }
             .totals-card { min-width: 100%; }
-            .invoice-body { padding: 20px 16px; }
+            .invoice-body { padding: 16px 12px; }
+            table { min-width: 480px; font-size: 12px; }
+            thead th, tbody td { padding: 8px 6px; }
         }
     </style>
 </head>
@@ -313,6 +324,7 @@
             {{-- Line Items Table --}}
             <div class="items-section">
                 <h3>تفاصيل الخدمات / Items</h3>
+                <div class="table-scroll">
                 <table>
                     <thead>
                         <tr>
@@ -339,6 +351,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {{-- Totals --}}
@@ -372,7 +385,12 @@
             </div>
 
             {{-- ZATCA QR Code --}}
-            @if(!empty($payload['zatca_qr_base64']))
+            @if(!empty($payload['zatca_qr_svg']))
+            <div class="qr-section">
+                {!! $payload['zatca_qr_svg'] !!}
+                <p>رمز الاستجابة السريعة متوافق مع هيئة الزكاة والضريبة والجمارك (ZATCA Phase 1 TLV)</p>
+            </div>
+            @elseif(!empty($payload['zatca_qr_base64']))
             <div class="qr-section">
                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={{ urlencode($payload['zatca_qr_base64']) }}" alt="ZATCA QR Code">
                 <p>رمز الاستجابة السريعة متوافق مع هيئة الزكاة والضريبة والجمارك (ZATCA Phase 1 TLV)</p>

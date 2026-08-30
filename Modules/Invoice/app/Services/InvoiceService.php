@@ -51,9 +51,9 @@ class InvoiceService
             'customer_phone' => $order->client?->phone,
             'customer_email' => $order->client?->email,
             'seller_name' => $this->resolveSellerName($order),
-            'seller_vat_number' => $order->branch?->vendor?->vat_number ?: $this->invoiceSettings->get('invoice_company_vat_number'),
-            'seller_registration_number' => $order->branch?->vendor?->official_number ?: $this->invoiceSettings->get('invoice_company_registration_number'),
-            'seller_address' => $order->branch?->national_address ?? $this->invoiceSettings->get('invoice_company_address'),
+            'seller_vat_number' => $this->invoiceSettings->get('invoice_company_vat_number') ?: $order->branch?->vendor?->vat_number,
+            'seller_registration_number' => $this->invoiceSettings->get('invoice_company_registration_number') ?: $order->branch?->vendor?->official_number,
+            'seller_address' => $this->invoiceSettings->get('invoice_company_address') ?: $order->branch?->national_address,
             'issued_at' => $invoice->issued_at ?: now(),
             'last_error' => null,
         ]);
@@ -104,9 +104,9 @@ class InvoiceService
             'customer_phone' => $order->client?->phone,
             'customer_email' => $order->client?->email,
             'seller_name' => $this->resolveSellerName($order),
-            'seller_vat_number' => $order->branch?->vendor?->vat_number ?: $this->invoiceSettings->get('invoice_company_vat_number'),
-            'seller_registration_number' => $order->branch?->vendor?->official_number ?: $this->invoiceSettings->get('invoice_company_registration_number'),
-            'seller_address' => $order->branch?->national_address ?? $this->invoiceSettings->get('invoice_company_address'),
+            'seller_vat_number' => $this->invoiceSettings->get('invoice_company_vat_number') ?: $order->branch?->vendor?->vat_number,
+            'seller_registration_number' => $this->invoiceSettings->get('invoice_company_registration_number') ?: $order->branch?->vendor?->official_number,
+            'seller_address' => $this->invoiceSettings->get('invoice_company_address') ?: $order->branch?->national_address,
             'issued_at' => $invoice->issued_at ?: ($transaction?->paid_at ?? now()),
             'last_error' => null,
         ]);
@@ -263,14 +263,14 @@ class InvoiceService
 
     private function resolveSellerName(Order $order): ?string
     {
-        $fallbackName = app()->getLocale() === 'ar'
+        $companyName = app()->getLocale() === 'ar'
             ? $this->invoiceSettings->get('invoice_company_name_ar')
             : $this->invoiceSettings->get('invoice_company_name_en');
 
-        return $order->branch?->vendor?->getTranslatedName()
-            ?: $order->branch?->getTranslation('name', app()->getLocale())
-            ?: $fallbackName
-            ?: $this->invoiceSettings->get('invoice_company_name_en');
+        return $companyName
+            ?: $this->invoiceSettings->get('invoice_company_name_en')
+            ?: $order->branch?->vendor?->getTranslatedName()
+            ?: $order->branch?->getTranslation('name', app()->getLocale());
     }
 
     private function recordAttempt(
