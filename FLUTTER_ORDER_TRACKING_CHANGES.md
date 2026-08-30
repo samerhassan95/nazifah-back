@@ -407,3 +407,17 @@ Sections 1–4, 11, 12, and 13 are purely additive — no breaking changes, safe
 
 **Section 5 is the one exception** — it changes an actual `status` value for branch-pickup orders. **If any client code currently checks `status === "completed"` to mean "ready for pickup, not yet collected," update it to check `status === "waiting_client_receipt"` (or accept both, for orders already ready before this deploy).**
 
+---
+
+## 20. Critical Pricing Fix: Item's Main Service Price Could Silently Drop to 0
+
+**Real money bug**, found on a live order. Affects `Modules/Order/app/Support/OrderItemGrouper.php::mapGroup()` — the shared function behind **both** `GET /user/orders/{orderId}/tracking` (`items`) and `GET /vendor/orders/{id}` (`accepted_items`/`rejected_items`), so both endpoints were exposed.
+
+**The bug:** for a piece's item row, the main service's price only got added to the line's `unit_price`/`total_price` **if the Eloquent `service` relation resolved** (`if ($item->service) { ... }`). If that relation failed to resolve for any reason (observed on a real order — exact trigger not fully pinned down, but the `service_id` column itself was always intact), the row silently contributed **nothing**: no name, no price, `unit_price` and `total_price` collapsed to just the additional-services total, understating what the client actually owes.
+
+Concretely, on the affected order: a "kids pajama" piece — main service ("غسيل ملابس اطفال") priced 14, one accepted addition (3) — should total 17. Instead it showed `unit_price: 0`, `total_price: 3` (only the accepted addition), with the service's `name` blank. The additional-services calculation (a separate, unconditional code path) was unaffected — only the main service vanished.
+
+**Fix:** the price/id are now taken from the row's own stored `service_id`/`service_price` columns unconditionally — those are always present regardless of whether the `service` relation resolves. The relation is still used, opportunistically, for the display `name`/`icon`; if it doesn't resolve, those come back as an empty string / `null` instead of dropping the whole line's money.
+
+**Residual gap:** if the relation genuinely can't resolve for a given row, the client/vendor will now see the *correct price* but a *blank service name* for that line, instead of losing the money entirely. Worth digging into why the relation failed to resolve for that specific service on that order (deleted/deactivated service record? scoping issue?) as a separate follow-up — this fix guarantees correctness of the amount owed either way, but a blank name is still a rough edge worth chasing down.
+

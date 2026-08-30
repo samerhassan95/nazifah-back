@@ -159,16 +159,24 @@ class OrderItemGrouper
 
         foreach ($groupItems as $item) {
             $ids[] = (int) $item->id;
-            if ($item->service) {
+            // Gate on the stored service_id/service_price columns, not the `service`
+            // relation resolving — an orphaned/unresolved relation must not silently
+            // drop the price the client owes from the total while its additions
+            // (mapAdditions below, unconditional) still get counted.
+            if ($item->service_id) {
                 $servicePrice = (float) $item->service_price;
                 $servicesTotal += $servicePrice;
-                $label = OrderItemDisplayNames::serviceName($item->service, $branchId, $lang);
+                $label = $item->service
+                    ? OrderItemDisplayNames::serviceName($item->service, $branchId, $lang)
+                    : '';
                 $services[] = [
-                    'id' => $item->service->id,
-                    'service_id' => $item->service->id,
+                    'id' => $item->service_id,
+                    'service_id' => $item->service_id,
                     'name' => $label,
                     'service_name' => $label,
-                    'icon' => OrderItemDisplayNames::serviceIconUrl($item->service, $branchId),
+                    'icon' => $item->service
+                        ? OrderItemDisplayNames::serviceIconUrl($item->service, $branchId)
+                        : null,
                     'price' => $servicePrice,
                 ];
             }
