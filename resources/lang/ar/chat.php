@@ -15,4 +15,6 @@ return [
     'client_not_on_order' => 'target_id لا يطابق عميل هذا الطلب',
     'driver_not_on_order' => 'target_id ليس سائقاً معيناً على هذا الطلب',
     'client_not_found' => 'العميل غير موجود',
+    'notification_image_placeholder' => 'صورة',
+    'notification_file_placeholder' => 'ملف',
 ];

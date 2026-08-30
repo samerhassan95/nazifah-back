@@ -15,4 +15,6 @@ return [
     'client_not_on_order' => 'target_id does not match the client on this order',
     'driver_not_on_order' => 'target_id is not assigned as driver on this order',
     'client_not_found' => 'Client not found',
+    'notification_image_placeholder' => 'Image',
+    'notification_file_placeholder' => 'File',
 ];
