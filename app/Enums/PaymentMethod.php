@@ -182,7 +182,7 @@ enum PaymentMethod: string
     }
 
     /**
-     * Wallet method from Moyasar's verified `source.type` (samsungpay / applepay).
+     * Wallet method from Moyasar's verified `source.type` (samsungpay / applepay / stcpay).
      */
     public static function resolveWalletFromMoyasarSource(?array $source): ?self
     {
@@ -195,6 +195,7 @@ enum PaymentMethod: string
         return match ($type) {
             'samsungpay', 'samsung_pay' => self::SAMSUNG_PAY,
             'applepay', 'apple_pay' => self::APPLE_PAY,
+            'stcpay', 'stc_pay' => self::STC_PAY,
             default => null,
         };
     }

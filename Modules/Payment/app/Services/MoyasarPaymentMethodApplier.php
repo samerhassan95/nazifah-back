@@ -9,7 +9,7 @@ use Modules\Payment\Models\PaymentTransaction;
 
 /**
  * After Moyasar confirms a payment, persist the real wallet method (samsung_pay /
- * apple_pay) and the underlying card network (visa / mastercard / mada).
+ * apple_pay / stc_pay) and the underlying card network (visa / mastercard / mada).
  */
 class MoyasarPaymentMethodApplier
 {
