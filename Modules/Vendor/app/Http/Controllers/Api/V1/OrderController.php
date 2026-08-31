@@ -1720,6 +1720,52 @@ class OrderController extends Controller
             return $item;
         })->values();
 
+        // Add a compact rejected_items line for accepted items that had one or more
+        // additions declined (piece + just the declined addition(s) + their price) —
+        // this feeds both the top-level accepted_items/rejected_items pair below and
+        // price_breakdown.rejected_items (via $toBreakdownLine further down).
+        $partiallyRejectedItems = $acceptedItems
+            ->filter(fn (array $item) => ($item['rejected_services'] ?? []) !== [])
+            ->map(function (array $item) {
+                $rejectedServices = collect($item['rejected_services']);
+                $servicesFromRejected = $rejectedServices->map(fn (array $row) => [
+                    'id' => $row['id'] ?? null,
+                    'name' => $row['name'] ?? '',
+                    'price' => (float) ($row['price'] ?? 0),
+                ])->values()->all();
+                $total = round($rejectedServices->sum('price'), 2);
+
+                return [
+                    'item_id' => $item['item_id'] ?? null,
+                    'item_ids' => $item['item_ids'] ?? [],
+                    'piece_id' => $item['piece_id'] ?? null,
+                    'item_name' => $item['item_name'] ?? 'Item',
+                    'service_price' => 0.0,
+                    'additional_services_total' => $total,
+                    'quantity' => $item['quantity'] ?? 1,
+                    'unit_price' => 0.0,
+                    'total_price' => $total,
+                    'status' => 'rejected',
+                    'original_quantity' => $item['quantity'] ?? 1,
+                    'original_unit_price' => $total,
+                    'original_total_price' => $total,
+                    'modified_quantity' => null,
+                    'modified_unit_price' => null,
+                    'modified_total_price' => null,
+                    'vendor_notes' => null,
+                    'note' => $item['note'] ?? null,
+                    'image' => $item['image'] ?? null,
+                    'modifiers' => [],
+                    'service_additions' => [],
+                    'service' => $servicesFromRejected[0] ?? null,
+                    'services' => $servicesFromRejected,
+                    'piece' => $item['piece'] ?? null,
+                ];
+            })
+            ->values();
+
+        $rejectedItems = $rejectedItems->concat($partiallyRejectedItems)->values();
+
         $subtotal = (float) $order->total_amount;
         $deliveryFee = (float) $order->delivery_fee;
         $discount = (float) $order->discount_amount;
@@ -1754,27 +1800,9 @@ class OrderController extends Controller
             ];
         };
 
-        $partiallyRejectedBreakdownItems = $acceptedItems
-            ->filter(fn (array $item) => ($item['rejected_services'] ?? []) !== [])
-            ->map(function (array $item) {
-                $rejectedServices = collect($item['rejected_services']);
-
-                return [
-                    'Item_name' => $item['item_name'],
-                    'name_operation' => $rejectedServices->pluck('name')->filter()->implode('، '),
-                    'Quantity' => $item['quantity'],
-                    'unit_price' => 0.0,
-                    'total_price' => (float) $rejectedServices->sum('price'),
-                    'status' => 'rejected',
-                    'service_additions' => [],
-                    'services' => $rejectedServices->values()->all(),
-                ];
-            })
-            ->values();
-
         $priceBreakdown = [
             'accepted_items' => $acceptedItems->map($toBreakdownLine)->values(),
-            'rejected_items' => $rejectedItems->map($toBreakdownLine)->concat($partiallyRejectedBreakdownItems)->values(),
+            'rejected_items' => $rejectedItems->map($toBreakdownLine)->values(),
             'subtotal' => $subtotal,
             'delivery_fee' => $deliveryFee,
             'discount' => $discount,
