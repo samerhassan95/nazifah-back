@@ -2447,11 +2447,54 @@ class OrderController extends Controller
      */
     private function categorizePendingApprovalItems(Order $order, string $lang): array
     {
-        return \Modules\Order\Support\PendingApprovalItemCategorizer::categorize(
+        $categorized = \Modules\Order\Support\PendingApprovalItemCategorizer::categorize(
             $order,
             $lang,
             fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null
         );
+
+        // An otherwise-accepted item can still have one or more of its additional
+        // services rejected — categorize() already attaches those as
+        // `rejected_services` on the accepted entry, but its `rejected` bucket only
+        // covers whole-item rejections. The client's rejected list is expected to
+        // surface every rejection, so add a compact entry per such item here too:
+        // piece + just the declined addition(s) + their price (the item itself
+        // stays in `accepted` at its correct, accepted-only price).
+        $partiallyRejected = collect($categorized['accepted'])
+            ->filter(fn (array $item) => ($item['rejected_services'] ?? []) !== [])
+            ->map(function (array $item) {
+                $rejectedServices = collect($item['rejected_services']);
+
+                return [
+                    'id' => $item['id'] ?? null,
+                    'ids' => $item['ids'] ?? [],
+                    'piece_name' => $item['piece_name'] ?? 'Unknown',
+                    'service_name' => $rejectedServices->pluck('name')->filter()->implode('، '),
+                    'services' => $rejectedServices->map(fn (array $row) => [
+                        'id' => $row['id'] ?? null,
+                        'name' => $row['name'] ?? '',
+                        'price' => (float) ($row['price'] ?? 0),
+                    ])->values()->all(),
+                    'quantity' => $item['quantity'] ?? 1,
+                    'unit_price' => 0.0,
+                    'total_price' => round(
+                        $rejectedServices->sum(fn (array $row) => (float) ($row['price'] ?? 0) * (int) ($row['quantity'] ?? 1)),
+                        2
+                    ),
+                    'vendor_notes' => null,
+                    'note' => $item['note'] ?? null,
+                    'description' => $item['description'] ?? null,
+                    'image' => $item['image'] ?? null,
+                    'additional_services' => [],
+                    'status' => 'rejected',
+                ];
+            })
+            ->values()
+            ->all();
+
+        $categorized['rejected'] = array_values(array_merge($categorized['rejected'], $partiallyRejected));
+
+        return $categorized;
     }
 
     /**
