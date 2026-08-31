@@ -1687,9 +1687,11 @@ class OrderController extends Controller
         $rejectedItems = $rejectedItems->map(fn (array $item) => $this->foldAdditionsIntoServicesForDisplay($item))->values();
 
         // Split each accepted item's additions into accepted (kept as service_additions)
-        // vs rejected (moved to a new rejected_services field) instead of also emitting a
-        // separate synthetic rejected_items entry for the same piece — that duplicated the
-        // piece as if it were a second, distinct item.
+        // vs rejected (moved to a new rejected_services field on the accepted line, so it
+        // isn't duplicated as a second full-price item there) — but the rejected addition(s)
+        // are still added to rejected_items below as their own compact line (piece + just
+        // the declined addition + its price), since the "Rejected Requests" section is
+        // expected to list every rejection, not only whole-item ones.
         $acceptedItems = $acceptedItems->map(function (array $item) {
             $acceptedAdditions = collect($item['service_additions'] ?? [])
                 ->filter(fn ($addition) => (($addition['vendor_status'] ?? $addition['status'] ?? 'accepted') !== 'rejected'))
@@ -1752,9 +1754,27 @@ class OrderController extends Controller
             ];
         };
 
+        $partiallyRejectedBreakdownItems = $acceptedItems
+            ->filter(fn (array $item) => ($item['rejected_services'] ?? []) !== [])
+            ->map(function (array $item) {
+                $rejectedServices = collect($item['rejected_services']);
+
+                return [
+                    'Item_name' => $item['item_name'],
+                    'name_operation' => $rejectedServices->pluck('name')->filter()->implode('، '),
+                    'Quantity' => $item['quantity'],
+                    'unit_price' => 0.0,
+                    'total_price' => (float) $rejectedServices->sum('price'),
+                    'status' => 'rejected',
+                    'service_additions' => [],
+                    'services' => $rejectedServices->values()->all(),
+                ];
+            })
+            ->values();
+
         $priceBreakdown = [
             'accepted_items' => $acceptedItems->map($toBreakdownLine)->values(),
-            'rejected_items' => $rejectedItems->map($toBreakdownLine)->values(),
+            'rejected_items' => $rejectedItems->map($toBreakdownLine)->concat($partiallyRejectedBreakdownItems)->values(),
             'subtotal' => $subtotal,
             'delivery_fee' => $deliveryFee,
             'discount' => $discount,

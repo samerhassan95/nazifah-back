@@ -243,15 +243,15 @@ class OrderTrackingController extends Controller
         $imageUrlResolver = fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null;
         $categorized = PendingApprovalItemCategorizer::categorize($order, $lang, $imageUrlResolver);
 
-        // A categorizer "rejected" entry represents either a whole piece/main-service
-        // actually rejected (its order_item rows have vendor_status=rejected), or —
-        // for an otherwise-accepted item — only its additional services being
-        // rejected (the main order_item rows stay vendor_status=accepted). Only the
-        // former belongs in rejected_items; the latter is now covered by
-        // rejected_services below and would otherwise show as a confusing duplicate
-        // line for the same piece. Checked against actual order_item vendor_status
+        // Whole items actually rejected (their order_item rows have
+        // vendor_status=rejected) — these are removed from the normal `items` list
+        // below and shown only here. Checked against actual order_item vendor_status
         // (not the categorizer's merged `ids`, which can span multiple items once
         // mergeDuplicateRejectedItems collapses same-piece-name entries together).
+        // Items with only a rejected *addition* are handled separately below
+        // ($partiallyRejectedItems) — they stay in the normal `items` list at their
+        // correct accepted price, and are added into rejected_items too so the
+        // "Rejected Requests" section still surfaces what got declined.
         $rejectedOrderItemIds = $order->items
             ->filter(fn ($item) => ($item->vendor_status ?? 'accepted') === 'rejected')
             ->pluck('id')
@@ -279,14 +279,61 @@ class OrderTrackingController extends Controller
 
                 return collect($item->additionalServicesPivot)
                     ->filter(fn ($pivot) => ($pivot->vendor_status ?? 'accepted') === 'rejected' && $pivot->serviceAddition)
-                    ->map(fn ($pivot) => [
-                        'order_item_id' => (int) $item->id,
-                        'id' => $pivot->serviceAddition->id,
-                        'name' => \App\Support\OrderItemDisplayNames::additionalServiceName($pivot->serviceAddition, $branchId, $lang),
-                        'price' => \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot),
-                    ]);
+                    ->map(function ($pivot) use ($item, $branchId, $lang) {
+                        $qty = (int) ($pivot->quantity ?? 1);
+                        $unitPrice = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
+
+                        return [
+                            'order_item_id' => (int) $item->id,
+                            'id' => $pivot->serviceAddition->id,
+                            'name' => \App\Support\OrderItemDisplayNames::additionalServiceName($pivot->serviceAddition, $branchId, $lang),
+                            'price' => $unitPrice,
+                            'quantity' => $qty,
+                            'total' => round($unitPrice * $qty, 2),
+                        ];
+                    });
             })
             ->groupBy('order_item_id');
+
+        // An otherwise-accepted item can still have one or more of its additional
+        // services rejected. Those don't belong in $rejectedItems above (the item
+        // itself is not rejected — it still shows normally in `items` with
+        // `rejected_services` noting what was declined), but the client's
+        // "Rejected Requests" section is expected to surface every rejection, not
+        // just whole-item ones, so add one compact entry per affected item here —
+        // piece + just the declined addition(s) + their price, not the item's full
+        // price (that stays in the normal `items` line, unaffected).
+        $partiallyRejectedItems = $order->items
+            ->filter(fn ($item) => ! in_array((int) $item->id, $rejectedOrderItemIds, true))
+            ->filter(fn ($item) => $rejectedServicesByItemId->has((int) $item->id))
+            ->map(function ($item) use ($rejectedServicesByItemId, $branchId, $lang, $imageUrlResolver) {
+                $rejectedServices = $rejectedServicesByItemId->get((int) $item->id, collect());
+                $pieceName = $item->piece
+                    ? \App\Support\OrderItemDisplayNames::pieceName($item->piece, $branchId, $lang)
+                    : 'Unknown';
+
+                return [
+                    'id' => (int) $item->id,
+                    'ids' => [(int) $item->id],
+                    'piece_name' => $pieceName,
+                    'service_name' => $rejectedServices->pluck('name')->filter()->implode('، '),
+                    'services' => $rejectedServices->map(fn (array $row) => [
+                        'id' => $row['id'],
+                        'name' => $row['name'],
+                        'price' => $row['price'],
+                    ])->values()->all(),
+                    'quantity' => (int) $item->quantity,
+                    'unit_price' => 0.0,
+                    'total_price' => round($rejectedServices->sum('total'), 2),
+                    'vendor_notes' => null,
+                    'note' => $item->notes ?? null,
+                    'description' => $item->notes ?? null,
+                    'image' => $imageUrlResolver($item->images),
+                    'additional_services' => [],
+                    'status' => 'rejected',
+                ];
+            })
+            ->values();
 
         $mappedItems = collect(OrderItemGrouper::toApiLines(
             $order->items,
@@ -333,6 +380,12 @@ class OrderTrackingController extends Controller
             }))
             ->values();
 
+        // Everything the "Rejected Requests" section should list: whole rejected
+        // items plus otherwise-accepted items that had one or more additions
+        // declined (those stay in `items` above at their correct, accepted price;
+        // this is just the summary of what got turned down and for how much).
+        $allRejectedItems = $rejectedItems->concat($partiallyRejectedItems)->values();
+
         return successResponse(array_merge([
             'order_id' => $order->id,
             'order_number' => $order->order_number,
@@ -376,8 +429,8 @@ class OrderTrackingController extends Controller
                 'is_default' => (bool) $clientDefaultAddress->is_default,
             ] : null,
             'items' => $mappedItems,
-            'rejected_items' => $rejectedItems,
-            'rejected_count' => $rejectedItems->count(),
+            'rejected_items' => $allRejectedItems,
+            'rejected_count' => $allRejectedItems->count(),
             'pickup_address' => ($order->pickup_at_vendor || ! $order->pickup_address_id) ? null : ($order->pickupAddress ? [
                 'id' => $order->pickupAddress->id,
                 'title' => $order->pickupAddress->title,
