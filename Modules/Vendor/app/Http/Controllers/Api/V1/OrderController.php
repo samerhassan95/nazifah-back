@@ -502,7 +502,7 @@ class OrderController extends Controller
                         $mapped['original_total_price'] = $mapped['total_price'];
                         $mapped['status'] = 'rejected';
 
-                        return $this->foldAdditionsIntoServicesForDisplay($mapped);
+                        return $mapped;
                     })
                     ->values()
                     ->all();
@@ -774,8 +774,6 @@ class OrderController extends Controller
 
         $acceptedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') !== 'rejected')->values();
         $rejectedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') === 'rejected')->values();
-        // Fully rejected pieces: fold additions into services so mobile shows them on one line.
-        $rejectedItems = $rejectedItems->map(fn (array $item) => $this->foldAdditionsIntoServicesForDisplay($item))->values();
 
         $rejectedAdditionItems = $acceptedItems
             ->map(function (array $item) {
@@ -851,39 +849,6 @@ class OrderController extends Controller
     }
 
     /**
-     * Mobile renders services as the parenthetical label; fold additions into services
-     * for fully rejected pieces so the line is not missing extra services.
-     *
-     * @param  array<string,mixed>  $item
-     * @return array<string,mixed>
-     */
-    private function foldAdditionsIntoServicesForDisplay(array $item): array
-    {
-        $additions = collect($item['service_additions'] ?? [])->values();
-        if ($additions->isEmpty()) {
-            return $item;
-        }
-
-        $additionServices = $additions
-            ->map(fn (array $addition) => [
-                'id' => $addition['id'],
-                'name' => $addition['name'],
-                'price' => (float) ($addition['price'] ?? 0),
-                'icon' => $addition['icon'] ?? null,
-            ])
-            ->all();
-
-        $item['services'] = array_values(array_merge($item['services'] ?? [], $additionServices));
-        if (($item['service'] ?? null) === null && $item['services'] !== []) {
-            $item['service'] = $item['services'][0];
-        }
-        // Avoid double rendering: mobile expands service_additions as separate sub-rows.
-        $item['service_additions'] = [];
-
-        return $item;
-    }
-
-    /**
      * Map calculate summary rows into the vendor item shape used by accepted/rejected lists.
      *
      * @param  array<string,mixed>  $item
@@ -950,8 +915,6 @@ class OrderController extends Controller
         });
 
         $rejected = collect($rejectedItems)->map(function (array $item) {
-            $item = $this->foldAdditionsIntoServicesForDisplay($item);
-
             return [
                 'piece' => $item['piece'] ?? null,
                 'service' => $item['service'] ?? null,
@@ -1683,8 +1646,6 @@ class OrderController extends Controller
 
         $acceptedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') !== 'rejected')->values();
         $rejectedItems = $items->filter(fn ($i) => ($i['status'] ?? 'accepted') === 'rejected')->values();
-        // Fully rejected pieces: fold additions into services so mobile shows them on one line.
-        $rejectedItems = $rejectedItems->map(fn (array $item) => $this->foldAdditionsIntoServicesForDisplay($item))->values();
 
         // Split each accepted item's additions into accepted (kept as service_additions)
         // vs rejected (moved to a new rejected_services field on the accepted line, so it
