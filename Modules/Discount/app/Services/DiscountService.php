@@ -925,7 +925,9 @@ class DiscountService
         $discountAmount = 0.0;
         $deliveryDiscountAmount = 0.0;
         if ($this->isDeliveryDiscount($discount)) {
-            $deliveryDiscountAmount = $this->calculateDiscountAmount($discount, $discountBaseAmount);
+            $deliveryDiscountAmount = $this->isFullyFreeDelivery($discount)
+                ? $discountBaseAmount
+                : $this->calculateDiscountAmount($discount, $discountBaseAmount);
         } else {
             $discountAmount = $this->calculateDiscountAmount($discount, $discountBaseAmount);
         }
@@ -1225,6 +1227,18 @@ class DiscountService
         return $discount->discount_type === Discount::DISCOUNT_TYPE_DELIVERY_FREE
             || $discount->normalizedPromotionKind() === Discount::KIND_DELIVERY_DISCOUNT
             || (bool) $discount->applies_to_delivery;
+    }
+
+    /**
+     * "توصيل مجاني" (free delivery) is its own discount_type in the admin UI, distinct
+     * from "نسبة مئوية" (percentage) / "مبلغ ثابت" (fixed) — the admin form has no value
+     * field for it (delivery is fully waived by definition), so `value` is unreliable
+     * here and often ends up 0. Delivery-percentage discounts using the generic
+     * applies_to_delivery/KIND_DELIVERY_DISCOUNT flag still use `value` normally.
+     */
+    private function isFullyFreeDelivery(Discount $discount): bool
+    {
+        return $discount->discount_type === Discount::DISCOUNT_TYPE_DELIVERY_FREE;
     }
 
     /**
