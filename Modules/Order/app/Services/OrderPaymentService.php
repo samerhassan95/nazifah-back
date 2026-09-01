@@ -564,7 +564,8 @@ class OrderPaymentService
         $usePaidLegsOnly = ($order->payment_status ?? 'pending') === 'paid';
         $locale = app()->getLocale();
 
-        $query = OrderPayment::where('order_id', $order->id)
+        $query = OrderPayment::with('paymentTransaction')
+            ->where('order_id', $order->id)
             ->orderBy('sequence');
 
         if ($usePaidLegsOnly) {
@@ -612,6 +613,9 @@ class OrderPaymentService
                     'payment_method_label' => $this->paymentMethodLabel($method, $locale),
                     'amount' => 0.0,
                     'status' => (string) $leg->status,
+                    'refunded_amount' => 0.0,
+                    'refunded_to' => null,
+                    'refunded_to_label' => null,
                 ];
             }
 
@@ -623,6 +627,25 @@ class OrderPaymentService
                 $paymentsByMethod[$method]['status'],
                 (string) $leg->status
             );
+
+            // Surface what actually got refunded off this leg, and where it went —
+            // a card refund that the gateway rejected falls back to crediting the
+            // client's wallet instead of the card (see refundGatewayOrWalletFallback()),
+            // so the destination isn't always the leg's own payment_method.
+            $refundedOnLeg = (float) ($leg->meta['refunded_amount'] ?? 0);
+            if ($refundedOnLeg > 0) {
+                $walletRouted = (bool) ($leg->paymentTransaction?->response_data['wallet_routed_refund'] ?? false);
+                $destination = ($walletRouted || $this->isWalletMethod($method))
+                    ? PaymentMethod::Nathefah_WALLET->value
+                    : $method;
+
+                $paymentsByMethod[$method]['refunded_amount'] = round(
+                    $paymentsByMethod[$method]['refunded_amount'] + $refundedOnLeg,
+                    2
+                );
+                $paymentsByMethod[$method]['refunded_to'] = $destination;
+                $paymentsByMethod[$method]['refunded_to_label'] = $this->paymentMethodLabel($destination, $locale);
+            }
         }
 
         if ($paymentsByMethod === []) {
@@ -637,6 +660,9 @@ class OrderPaymentService
                     'payment_method_label' => $this->paymentMethodLabel($method, $locale),
                     'amount' => $finalAmount,
                     'status' => $status,
+                    'refunded_amount' => 0.0,
+                    'refunded_to' => null,
+                    'refunded_to_label' => null,
                 ];
             }
         }
