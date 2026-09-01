@@ -157,11 +157,11 @@ class AdminOrderController extends Controller
 
         try {
             if ($onDeliveryLeg && $order->needsDeliveryDriver()) {
-                $statusService->assignDeliveryDriver($order, $driver, $changedBy);
+                $statusService->assignDeliveryDriver($order, $driver, $changedBy, 'admin');
             } elseif ($order->needsPickupDriver()) {
-                $statusService->assignPickupDriver($order, $driver, $changedBy);
+                $statusService->assignPickupDriver($order, $driver, $changedBy, 'admin');
             } elseif ($order->needsDeliveryDriver()) {
-                $statusService->assignDeliveryDriver($order, $driver, $changedBy);
+                $statusService->assignDeliveryDriver($order, $driver, $changedBy, 'admin');
             } else {
                 return ErrorResponse::make('Order does not need a driver (both legs handled at vendor)', null, 400);
             }
@@ -262,6 +262,8 @@ class AdminOrderController extends Controller
             'reason' => 'Cancelled by admin',
             'notes' => 'Cancelled by admin',
             'changed_by' => optional(auth()->user())->id,
+            'actor_type' => 'admin',
+            'actor_id' => optional(auth()->user())->id,
         ];
 
         // Route through the state machine so the cancellation listeners fire — most

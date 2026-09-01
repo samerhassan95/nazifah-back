@@ -1086,9 +1086,9 @@ class HomeController extends Controller
 
         try {
             if ($assignmentType === 'pickup') {
-                $statusService->assignPickupDriver($order, $driver, $employee->id);
+                $statusService->assignPickupDriver($order, $driver, $employee->id, 'vendor');
             } else {
-                $statusService->assignDeliveryDriver($order, $driver, $employee->id);
+                $statusService->assignDeliveryDriver($order, $driver, $employee->id, 'vendor');
             }
         } catch (\Throwable $e) {
             return errorResponse($e->getMessage() ?: __('driver.driver_assignment_failed'), null, 400);

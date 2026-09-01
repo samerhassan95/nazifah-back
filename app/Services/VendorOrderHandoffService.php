@@ -190,6 +190,8 @@ class VendorOrderHandoffService
         $this->statusService->transitionTo($order, OrderStatus::DELIVERED_TO_BRANCH, [
             'notes' => $notes ?? __('order.vendor_handoff_log_pickup_received'),
             'changed_by' => $changedBy,
+            'actor_type' => 'vendor',
+            'actor_id' => $changedBy,
         ]);
 
         $order->update(['vendor_pickup_received_at' => now()]);
@@ -216,6 +218,8 @@ class VendorOrderHandoffService
         $this->statusService->transitionTo($order, OrderStatus::WAITING_CLIENT_RECEIPT, [
             'notes' => $notes ?? __('order.vendor_handoff_log_ready_for_pickup'),
             'changed_by' => $changedBy,
+            'actor_type' => 'vendor',
+            'actor_id' => $changedBy,
         ]);
 
         $order->update(['vendor_delivery_ready_at' => now()]);
@@ -244,6 +248,8 @@ class VendorOrderHandoffService
         $this->statusService->transitionTo($order, $target, [
             'notes' => $notes ?? __('order.vendor_handoff_log_client_pickup_received'),
             'changed_by' => $changedBy,
+            'actor_type' => 'vendor',
+            'actor_id' => $changedBy,
         ]);
 
         $order->update(['vendor_client_delivery_handoff_at' => now()]);
@@ -269,6 +275,8 @@ class VendorOrderHandoffService
         $this->statusService->transitionTo($order, OrderStatus::DELIVERED_TO_BRANCH, [
             'notes' => $notes ?? __('order.vendor_handoff_log_pickup_from_driver_confirmed'),
             'changed_by' => $changedBy,
+            'actor_type' => 'vendor',
+            'actor_id' => $changedBy,
         ]);
 
         $order->refresh();

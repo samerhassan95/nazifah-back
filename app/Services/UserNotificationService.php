@@ -6,7 +6,6 @@ use App\Support\NotificationLocale;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Modules\Notification\Models\Notification;
-use Modules\Vendor\Models\VendorEmployee;
 
 class UserNotificationService
 {
@@ -44,13 +43,6 @@ class UserNotificationService
         array $data = [],
         ?string $image = null,
     ): void {
-        // Vendor notifications are disabled entirely (in-app row, push, and SMS) —
-        // product decision, not a bug. Covers every call site that routes through
-        // here (order status changes, new orders, driver rejections, review flow).
-        if ($userType === 'vendor') {
-            return;
-        }
-
         $notificationId = null;
 
         try {
@@ -112,13 +104,6 @@ class UserNotificationService
         string $bodyEn,
         array $data = []
     ): void {
-        // Vendor notifications are disabled entirely — this method is also called
-        // directly (bypassing notify()/$userType) by some push-only call sites, so
-        // guard here too by recipient model.
-        if ($user instanceof VendorEmployee) {
-            return;
-        }
-
         if (method_exists($user, 'fcmTokens')) {
             $user->loadMissing('fcmTokens');
 

@@ -194,6 +194,8 @@ class ClientOrderHandoffService
                 $this->statusService->transitionTo($order, OrderStatus::COMPLETED, [
                     'notes' => __('order.handoff_log_receive_from_driver_delivered'),
                     'changed_by' => $clientId,
+                    'actor_type' => 'client',
+                    'actor_id' => $clientId,
                 ]);
                 $this->markCashOnDeliveryPaidIfNeeded($order);
             } else {
@@ -220,6 +222,8 @@ class ClientOrderHandoffService
             $this->statusService->transitionTo($order, OrderStatus::DELIVERED, [
                 'notes' => __('order.handoff_log_receive_from_laundry'),
                 'changed_by' => $clientId,
+                'actor_type' => 'client',
+                'actor_id' => $clientId,
             ]);
             $this->markCashOnDeliveryPaidIfNeeded($order);
         } else {

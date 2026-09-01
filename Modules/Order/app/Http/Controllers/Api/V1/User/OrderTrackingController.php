@@ -606,6 +606,8 @@ class OrderTrackingController extends Controller
                 $statusService->transitionTo($order, OrderStatus::DELIVERED, [
                     'notes' => 'Delivery confirmed by client with QR code scan',
                     'changed_by' => $user->id,
+                    'actor_type' => 'client',
+                    'actor_id' => $user->id,
                     'skip_notifications' => $willAutoCompleteAfterDelivered,
                 ]);
             }
@@ -621,6 +623,8 @@ class OrderTrackingController extends Controller
                 $statusService->transitionTo($order, OrderStatus::COMPLETED, [
                     'notes' => 'Delivery confirmed by client with QR code scan',
                     'changed_by' => $user->id,
+                    'actor_type' => 'client',
+                    'actor_id' => $user->id,
                 ]);
             }
         } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
@@ -717,6 +721,8 @@ class OrderTrackingController extends Controller
             'notes' => $request->reason,
             'reason' => $request->reason,
             'changed_by' => $user->id,
+            'actor_type' => 'client',
+            'actor_id' => $user->id,
         ]);
 
         app()->setLocale($originalLocale);

@@ -147,6 +147,8 @@ class ClientOrderVisitService
                 'time' => $rescheduledAt->toDateTimeString(),
             ]),
             'changed_by' => $clientId,
+            'actor_type' => 'client',
+            'actor_id' => $clientId,
         ]);
 
         $this->notificationService->notifyPostponed(

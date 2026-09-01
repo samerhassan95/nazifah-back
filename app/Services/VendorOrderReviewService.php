@@ -279,6 +279,8 @@ class VendorOrderReviewService
                     $statusService->transitionTo($order, OrderStatus::BRANCH_REVIEW, [
                         'notes' => 'Vendor reviewed order with modifications. Waiting for client approval.',
                         'changed_by' => auth('sanctum')->id() ?? null,
+                        'actor_type' => 'vendor',
+                        'actor_id' => auth('sanctum')->id() ?? null,
                     ]);
                 }
             } else {
@@ -291,6 +293,8 @@ class VendorOrderReviewService
                     $statusService->transitionTo($order, OrderStatus::BRANCH_REVIEW, [
                         'notes' => 'Vendor accepted all items.',
                         'changed_by' => auth('sanctum')->id() ?? null,
+                        'actor_type' => 'vendor',
+                        'actor_id' => auth('sanctum')->id() ?? null,
                         // Internal hop before auto-confirm — do not notify "order reviewed".
                         'skip_notifications' => true,
                     ]);
@@ -298,6 +302,8 @@ class VendorOrderReviewService
                 $statusService->transitionTo($order, OrderStatus::CONFIRMED, [
                     'notes' => 'All items accepted — auto-confirmed.',
                     'changed_by' => auth('sanctum')->id() ?? null,
+                    'actor_type' => 'vendor',
+                    'actor_id' => auth('sanctum')->id() ?? null,
                     'auto_confirmed' => true,
                 ]);
             }
@@ -482,6 +488,8 @@ class VendorOrderReviewService
         $statusService->transitionTo($order, OrderStatus::CONFIRMED, [
             'notes' => $notes,
             'changed_by' => $order->client_id,
+            'actor_type' => 'client',
+            'actor_id' => $order->client_id,
         ]);
     }
 
@@ -602,6 +610,8 @@ class VendorOrderReviewService
                 'notes' => 'Client rejected vendor modifications',
                 'reason' => $reason ?? 'Client rejected vendor modifications',
                 'changed_by' => $order->client_id,
+                'actor_type' => 'client',
+                'actor_id' => $order->client_id,
             ]);
 
             DB::commit();

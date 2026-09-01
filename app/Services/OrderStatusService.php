@@ -193,7 +193,7 @@ class OrderStatusService
      * First assignment transitions CONFIRMED → DRIVER_PICKUP_ASSIGNED.
      * Re-assignment after rejection stays at DRIVER_PICKUP_ASSIGNED.
      */
-    public function assignPickupDriver(Order $order, Driver $driver, ?int $changedBy = null): Order
+    public function assignPickupDriver(Order $order, Driver $driver, ?int $changedBy = null, ?string $actorType = null): Order
     {
         if ((bool) $order->pickup_at_vendor) {
             throw new \LogicException(__('driver.driver_assign_error_branch_dropoff'));
@@ -241,6 +241,8 @@ class OrderStatusService
             $this->transitionTo($order, OrderStatus::DRIVER_PICKUP_ASSIGNED, [
                 'notes' => $pickupNotes,
                 'changed_by' => $changedBy,
+                'actor_type' => $actorType,
+                'actor_id' => $changedBy,
             ]);
         } else {
             OrderStatusLog::create([
@@ -270,7 +272,7 @@ class OrderStatusService
      * First assignment transitions DELIVERED_TO_BRANCH or COMPLETED → DRIVER_DELIVERY_ASSIGNED.
      * Re-assignment while still at DRIVER_DELIVERY_ASSIGNED logs a new assignment without changing status.
      */
-    public function assignDeliveryDriver(Order $order, Driver $driver, ?int $changedBy = null): Order
+    public function assignDeliveryDriver(Order $order, Driver $driver, ?int $changedBy = null, ?string $actorType = null): Order
     {
         if ((bool) $order->delivery_at_vendor) {
             throw new \LogicException(__('driver.driver_assign_error_branch_pickup'));
@@ -321,6 +323,8 @@ class OrderStatusService
             $this->transitionTo($order, OrderStatus::DRIVER_DELIVERY_ASSIGNED, [
                 'notes' => $deliveryNotes,
                 'changed_by' => $changedBy,
+                'actor_type' => $actorType,
+                'actor_id' => $changedBy,
             ]);
         } else {
             OrderStatusLog::create([
@@ -361,6 +365,8 @@ class OrderStatusService
                 return $this->transitionTo($order, OrderStatus::DRIVER_PICKUP_ACCEPTED, [
                     'notes' => __('order.status_log_pickup_driver_accepted', ['id' => $driver->id]),
                     'changed_by' => $driver->id,
+                    'actor_type' => 'driver',
+                    'actor_id' => $driver->id,
                 ]);
             }
 
@@ -368,6 +374,8 @@ class OrderStatusService
                 return $this->transitionTo($order, OrderStatus::DRIVER_DELIVERY_ACCEPTED, [
                     'notes' => __('order.status_log_delivery_driver_accepted', ['id' => $driver->id]),
                     'changed_by' => $driver->id,
+                    'actor_type' => 'driver',
+                    'actor_id' => $driver->id,
                 ]);
             }
 
@@ -523,6 +531,8 @@ class OrderStatusService
         $this->transitionTo($order, OrderStatus::WAITING_PAYMENT, [
             'notes' => __('order.status_log_auto_proceeding_payment', ['reason' => $reason]),
             'changed_by' => $context['changed_by'] ?? null,
+            'actor_type' => $context['actor_type'] ?? null,
+            'actor_id' => $context['actor_id'] ?? null,
         ]);
     }
 
@@ -542,6 +552,8 @@ class OrderStatusService
         $payload = [
             'notes' => $notes,
             'changed_by' => $context['changed_by'] ?? null,
+            'actor_type' => $context['actor_type'] ?? null,
+            'actor_id' => $context['actor_id'] ?? null,
             'skip_notifications' => (bool) ($context['skip_notifications'] ?? false),
         ];
 

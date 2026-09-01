@@ -3066,6 +3066,8 @@ class OrderController extends Controller
                 $statusService->transitionTo($order, OrderStatus::PAYMENT_CONFIRMED, [
                     'notes' => 'Payment method set to cash on delivery',
                     'changed_by' => $client->id,
+                    'actor_type' => 'client',
+                    'actor_id' => $client->id,
                 ]);
 
                 DB::commit();
@@ -3129,6 +3131,8 @@ class OrderController extends Controller
                 $statusService->transitionTo($order, OrderStatus::PAYMENT_CONFIRMED, [
                     'notes' => 'Payment completed via wallet',
                     'changed_by' => $client->id,
+                    'actor_type' => 'client',
+                    'actor_id' => $client->id,
                 ]);
 
                 DB::commit();
@@ -3478,6 +3482,8 @@ class OrderController extends Controller
             'notes' => 'Deleted by user',
             'reason' => 'Deleted by user',
             'changed_by' => $user->id,
+            'actor_type' => 'client',
+            'actor_id' => $user->id,
         ]);
 
         app()->setLocale($originalLocale);
@@ -4131,6 +4137,8 @@ class OrderController extends Controller
                 $statusService->transitionTo($order, OrderStatus::COMPLETED, [
                     'notes' => 'Receipt accepted by client',
                     'changed_by' => $user->id,
+                    'actor_type' => 'client',
+                    'actor_id' => $user->id,
                 ]);
                 $isCashOnDelivery = ($order->payment_method ?? null) === PaymentMethod::CASH_ON_DELIVERY->value;
                 if ($isCashOnDelivery && ! $order->isPaid()) {

@@ -469,6 +469,8 @@ class OrderController extends Controller
             $statusService->transitionTo($order, $newStatus, [
                 'notes' => $request->notes,
                 'changed_by' => $driver->id,
+                'actor_type' => 'driver',
+                'actor_id' => $driver->id,
             ]);
         } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
             return errorResponse($e->userMessage(), null, 400);
@@ -1137,6 +1139,8 @@ class OrderController extends Controller
                 $statusService->transitionTo($order, OrderStatus::WAITING_CLIENT_RECEIPT, [
                     'notes' => 'Driver arrived at delivery location, waiting for client handoff confirmation',
                     'changed_by' => $driver->id,
+                    'actor_type' => 'driver',
+                    'actor_id' => $driver->id,
                 ]);
             } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
                 return errorResponse($e->userMessage(), null, 400);
@@ -1181,6 +1185,8 @@ class OrderController extends Controller
                 $statusService->transitionTo($order, OrderStatus::ON_WAY_TO_DELIVERY, [
                     'notes' => 'Driver started delivery trip to client',
                     'changed_by' => $driver->id,
+                    'actor_type' => 'driver',
+                    'actor_id' => $driver->id,
                 ]);
             } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
                 return errorResponse($e->userMessage(), null, 400);
@@ -1201,6 +1207,8 @@ class OrderController extends Controller
             $statusService->transitionTo($order, OrderStatus::PICKED_UP, [
                 'notes' => 'Order picked up from client by driver',
                 'changed_by' => $driver->id,
+                'actor_type' => 'driver',
+                'actor_id' => $driver->id,
             ]);
         } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
             return errorResponse($e->userMessage(), null, 400);

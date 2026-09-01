@@ -2159,6 +2159,8 @@ class OrderController extends Controller
                 $statusService->transitionTo($order, $targetStatus, [
                     'notes' => $request->notes,
                     'changed_by' => $employee->id,
+                    'actor_type' => 'vendor',
+                    'actor_id' => $employee->id,
                 ]);
             }
         } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
@@ -2268,6 +2270,8 @@ class OrderController extends Controller
             $statusService->transitionTo($order, OrderStatus::CANCELLED, [
                 'notes' => __('order.vendor_log_order_rejected', ['reason' => $request->reason]),
                 'changed_by' => $employee->id,
+                'actor_type' => 'vendor',
+                'actor_id' => $employee->id,
             ]);
         } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
             return errorResponse(__('order.order_cannot_be_rejected_current_status'), null, 400);
