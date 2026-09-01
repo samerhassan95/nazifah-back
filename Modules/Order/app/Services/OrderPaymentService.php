@@ -570,10 +570,14 @@ class OrderPaymentService
         if ($usePaidLegsOnly) {
             $query->where('status', OrderPayment::STATUS_PAID);
         } else {
+            // A fully-refunded leg (e.g. a split-payment order where one method got
+            // reversed and another is still kept) is left in here on purpose once the
+            // order itself is no longer simply "paid" — the client should see what
+            // was refunded (which method, how much), not just what's left. Only
+            // failed/cancelled attempts (never real money) stay excluded.
             $query->whereNotIn('status', [
                 OrderPayment::STATUS_FAILED,
                 OrderPayment::STATUS_CANCELLED,
-                OrderPayment::STATUS_REFUNDED,
             ]);
         }
 
@@ -582,13 +586,21 @@ class OrderPaymentService
 
         foreach ($legs as $leg) {
             $method = (string) $leg->payment_method;
-            // A partial refund (e.g. vendor rejected items and the difference was
-            // refunded) keeps the leg at status=paid — markLegPartialRefund() only
-            // flips status to refunded once the leg is refunded in full — and never
-            // touches `amount` itself, tracking the refunded portion in
-            // meta.refunded_amount instead. Net it out here so a partially-refunded
-            // leg doesn't keep showing its original, pre-refund amount.
-            $amount = $this->refundableAmountOnLeg($leg);
+            $isFullyRefundedLeg = $leg->status === OrderPayment::STATUS_REFUNDED;
+
+            if ($isFullyRefundedLeg) {
+                // Show what was actually refunded, not the (now netted-to-zero)
+                // remaining balance on the leg.
+                $amount = (float) $leg->amount;
+            } else {
+                // A partial refund (e.g. vendor rejected items and the difference was
+                // refunded) keeps the leg at status=paid — markLegPartialRefund() only
+                // flips status to refunded once the leg is refunded in full — and never
+                // touches `amount` itself, tracking the refunded portion in
+                // meta.refunded_amount instead. Net it out here so a partially-refunded
+                // leg doesn't keep showing its original, pre-refund amount.
+                $amount = $this->refundableAmountOnLeg($leg);
+            }
 
             if ($amount <= 0) {
                 continue;
