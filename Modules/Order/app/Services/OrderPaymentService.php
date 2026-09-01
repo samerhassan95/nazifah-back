@@ -1666,57 +1666,90 @@ class OrderPaymentService
         $refundedNow = 0.0;
         $refundLines = [];
 
-        // Prefer refunding card legs first (try gateway → wallet fallback).
-        foreach ($gatewayLegs as $leg) {
-            if ($remaining <= 0.005) {
-                break;
-            }
-            $portion = min($remaining, $this->refundableAmountOnLeg($leg));
-            if ($portion <= 0) {
-                continue;
-            }
+        // Order paid through more than one real-money method (e.g. wallet + card):
+        // the whole refund goes to the wallet instead of splitting it back across each
+        // method — simpler for the client to track than a partial card refund plus a
+        // partial wallet credit, and skips gateway refund friction/fees for what's
+        // usually a small adjustment. A single-method order still refunds through that
+        // same method below (unchanged), and cancellation refunds always go back per
+        // original method regardless of split (see refundOrderOnCancellation()).
+        $isSplitPayment = $gatewayLegs->isNotEmpty() && $walletLegs->isNotEmpty();
 
-            $tx = $leg->paymentTransaction;
-            if (! $tx || ! in_array($tx->status, ['completed', 'authorized'], true)) {
-                continue;
-            }
-            // Authorized: leave for capture/void on decrease unless cancelling — skip here
-            // for price-edit decreases (capture listener handles hold).
-            if ($tx->status === 'authorized') {
-                continue;
-            }
-
-            $result = $this->refundGatewayOrWalletFallback($order, $tx, $portion, $reason);
-            if ($result['amount'] > 0) {
-                // Fallback path already marks the leg; gateway success needs markLegPartialRefund.
-                if (($result['method'] ?? '') === 'gateway' && ! ($result['gateway_failed'] ?? false)) {
-                    $this->markLegPartialRefund($leg, $result['amount']);
+        if ($isSplitPayment) {
+            foreach ($gatewayLegs->concat($walletLegs) as $leg) {
+                if ($remaining <= 0.005) {
+                    break;
                 }
-                $remaining = round($remaining - $result['amount'], 2);
-                $refundedNow += $result['amount'];
-                $refundLines[] = $result;
-            }
-        }
+                $portion = min($remaining, $this->refundableAmountOnLeg($leg));
+                if ($portion <= 0) {
+                    continue;
+                }
 
-        foreach ($walletLegs as $leg) {
-            if ($remaining <= 0.005) {
-                break;
+                $this->creditWalletRefund($order, $portion, $reason, $leg);
+                $remaining = round($remaining - $portion, 2);
+                $refundedNow += $portion;
+                $refundLines[] = [
+                    'amount' => $portion,
+                    'method' => 'wallet',
+                    'payment_method' => PaymentMethod::Nathefah_WALLET->value,
+                    'gateway_attempted' => false,
+                    'gateway_failed' => false,
+                    'gateway_failure_message' => null,
+                ];
             }
-            $portion = min($remaining, $this->refundableAmountOnLeg($leg));
-            if ($portion <= 0) {
-                continue;
+        } else {
+            // Prefer refunding card legs first (try gateway → wallet fallback).
+            foreach ($gatewayLegs as $leg) {
+                if ($remaining <= 0.005) {
+                    break;
+                }
+                $portion = min($remaining, $this->refundableAmountOnLeg($leg));
+                if ($portion <= 0) {
+                    continue;
+                }
+
+                $tx = $leg->paymentTransaction;
+                if (! $tx || ! in_array($tx->status, ['completed', 'authorized'], true)) {
+                    continue;
+                }
+                // Authorized: leave for capture/void on decrease unless cancelling — skip here
+                // for price-edit decreases (capture listener handles hold).
+                if ($tx->status === 'authorized') {
+                    continue;
+                }
+
+                $result = $this->refundGatewayOrWalletFallback($order, $tx, $portion, $reason);
+                if ($result['amount'] > 0) {
+                    // Fallback path already marks the leg; gateway success needs markLegPartialRefund.
+                    if (($result['method'] ?? '') === 'gateway' && ! ($result['gateway_failed'] ?? false)) {
+                        $this->markLegPartialRefund($leg, $result['amount']);
+                    }
+                    $remaining = round($remaining - $result['amount'], 2);
+                    $refundedNow += $result['amount'];
+                    $refundLines[] = $result;
+                }
             }
-            $this->creditWalletRefund($order, $portion, $reason, $leg);
-            $remaining = round($remaining - $portion, 2);
-            $refundedNow += $portion;
-            $refundLines[] = [
-                'amount' => $portion,
-                'method' => 'wallet',
-                'payment_method' => PaymentMethod::Nathefah_WALLET->value,
-                'gateway_attempted' => false,
-                'gateway_failed' => false,
-                'gateway_failure_message' => null,
-            ];
+
+            foreach ($walletLegs as $leg) {
+                if ($remaining <= 0.005) {
+                    break;
+                }
+                $portion = min($remaining, $this->refundableAmountOnLeg($leg));
+                if ($portion <= 0) {
+                    continue;
+                }
+                $this->creditWalletRefund($order, $portion, $reason, $leg);
+                $remaining = round($remaining - $portion, 2);
+                $refundedNow += $portion;
+                $refundLines[] = [
+                    'amount' => $portion,
+                    'method' => 'wallet',
+                    'payment_method' => PaymentMethod::Nathefah_WALLET->value,
+                    'gateway_attempted' => false,
+                    'gateway_failed' => false,
+                    'gateway_failure_message' => null,
+                ];
+            }
         }
 
         // Pure COD / leftover COD coverage: never refund cash; reduce amount to collect.
@@ -2371,11 +2404,24 @@ class OrderPaymentService
         if ($leg->paymentTransaction) {
             $tx = $leg->paymentTransaction->fresh();
             $newRefundTotal = round((float) $tx->refund_amount + $amount, 2);
-            $tx->update([
+            $updates = [
                 'refund_amount' => $newRefundTotal,
                 'status' => $newRefundTotal >= (float) $tx->amount ? 'refunded' : 'partially_refunded',
                 'refunded_at' => now(),
-            ]);
+            ];
+
+            // This leg's own method isn't wallet, yet its refund landed in the wallet
+            // (split-payment consolidation, or a gateway-failure fallback elsewhere) —
+            // record that so payment_breakdown reports the true destination instead of
+            // assuming a refund always returns to its own leg's payment_method.
+            if (! $this->isWalletMethod($leg->payment_method)) {
+                $updates['response_data'] = array_merge($tx->response_data ?? [], [
+                    'wallet_routed_refund' => true,
+                    'wallet_routed_reason' => $reason,
+                ]);
+            }
+
+            $tx->update($updates);
         }
     }
 
