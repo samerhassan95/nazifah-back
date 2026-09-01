@@ -421,3 +421,97 @@ Concretely, on the affected order: a "kids pajama" piece — main service ("غس
 
 **Residual gap:** if the relation genuinely can't resolve for a given row, the client/vendor will now see the *correct price* but a *blank service name* for that line, instead of losing the money entirely. Worth digging into why the relation failed to resolve for that specific service on that order (deleted/deactivated service record? scoping issue?) as a separate follow-up — this fix guarantees correctness of the amount owed either way, but a blank name is still a rough edge worth chasing down.
 
+---
+
+## 21. Chat Message Push Notifications Were Never Actually Sent
+
+`ChatService` (the module behind `POST /vendor/orders/chat`, the client chat endpoints, and the driver chat endpoints) only synced a new message to Firebase Realtime Database and broadcast it over websockets — both only reach a device that has the chat screen open and connected *right now*. There was no FCM push notification at all, so a message sent while the recipient's app was backgrounded or closed produced nothing on their end.
+
+**The fix:** every message-send path (`sendMessage`, `sendMessageFromVendor`, `sendMessageFromDriver`, `sendMessageFromAdmin`, and the shared `vendorSend`/`driverSend`/`adminSend` flow) now also pushes an FCM notification to the other side(s) of the conversation — sender's name as the title, message text as the body — using `App\Services\FirebaseService::sendChatNotification()`, an already-built method that had no caller anywhere before this. Push failures are swallowed so they never break sending the message itself.
+
+**Not affected by the vendor-notification changes in §28**: this goes through a separate, FCM-only code path (not `UserNotificationService`), so vendor employees always received chat pushes even during the period vendor notifications were blocked elsewhere.
+
+---
+
+## 22. Tax Invoice: Responsive Layout, Self-Hosted QR, Correct Seller Identity
+
+Three separate fixes to the simplified tax invoice page (`GET /api/v1/invoice/{id}` share link, `Modules/Invoice/resources/views/show.blade.php`):
+
+- **Items table wasn't responsive.** Its 7 columns got cut off on narrow phone screens with no way to scroll. Wrapped it in a horizontally-scrollable container and tightened padding/font-size under 600px.
+- **ZATCA QR code wasn't rendering reliably.** It was fetched from a third-party image API (`api.qrserver.com`) at page-view time — unreliable depending on the viewer's network. Now generated server-side as inline SVG at invoice-issue time (no runtime network call). Invoices issued before this deploy still use the old external-API image (their cached payload has no SVG), everything issued after gets the inline version.
+- **Seller name/VAT number/registration number/address showed the individual vendor's (laundry's) info first**, falling back to the platform's own company settings only if the vendor had none configured. Flipped the priority — the platform's configured identity ("نظيفة" / "Nathefah") is used first now, vendor data is only a fallback. **Only affects invoices issued after this deploy** — an already-issued invoice keeps whatever seller identity was snapshotted onto it at the time.
+
+---
+
+## 23. `rejected_items` Now Also Includes Partial (Addition-Only) Rejections
+
+Follow-up to §11/§19. Those sections correctly stopped `rejected_items` from showing a duplicate line for a piece that stayed accepted but had one of its *additional services* rejected — that info moved to `rejected_services` on the accepted line instead. That was right for the duplication problem, but it also meant a purely-addition-level rejection **stopped showing up in `rejected_items` at all** — and the client/vendor apps render their "Rejected Requests" section from `rejected_items`, not `rejected_services`, so those partial rejections silently disappeared from that section.
+
+**The fix:** `rejected_items` now gets one compact entry for this case too — piece name + just the declined addition(s) + their price (not the item's full price, which correctly stays in the normal/accepted list). The item itself is **not** duplicated or removed from the accepted list; this is purely an additional summary entry so the "Rejected Requests" UI has something to show. Applied to all three places that build this list:
+
+- `GET /user/orders/{orderId}/tracking` — `rejected_items` / `rejected_count`.
+- `GET /vendor/orders/{id}` — both the top-level `rejected_items` and the nested `price_breakdown.rejected_items`.
+- `GET /user/orders/pending-approval/{orderId}` (and the order-details / on-the-way card responses that share the same builder) — `rejected_items`.
+
+**Shape:** these synthetic entries reuse each endpoint's existing item shape (so no new fields to parse) — `unit_price: 0`, `total_price` = sum of the rejected addition(s), `status: "rejected"`, and `services`/`service_additions` (depending on endpoint) listing just the declined addition(s).
+
+---
+
+## 24. Vendor Order Detail: Additions on a Fully-Rejected Item No Longer Folded Into `services`
+
+When a **whole piece** was rejected (not just one of its additions — see §23 for that case), its additional services used to get merged into the `services` array and `service_additions` cleared to `[]`, so the rejected addition and the rejected main service were indistinguishable in the response.
+
+**The fix:** `service_additions` now stays populated for fully-rejected items too, same as it already was for accepted ones — the app can tell the base service apart from its additions again. Applies to `GET /vendor/orders/{id}` (`rejected_items`) and `POST /vendor/orders/calculate` (`rejected_items`).
+
+---
+
+## 25. Free-Delivery Discount Codes Now Actually Waive Delivery
+
+The discount admin panel has a dedicated "توصيل مجاني" (free delivery) discount type, separate from percentage/fixed — its form has no value field, because a free-delivery discount is 100% off by definition. But the backend was still computing the discount as `delivery_fee × (value / 100)`, and since no value gets submitted for that type, it silently computed to **0** — a "FreeDelievery" coupon discounted nothing.
+
+**The fix:** a discount with `discount_type: "delivery_free"` now waives the delivery fee outright, ignoring `value` entirely. Discounts that apply to delivery via the generic "applies to delivery" flag (a percentage/fixed discount that happens to also cover delivery, as opposed to a dedicated free-delivery code) are unaffected and still use their configured value normally.
+
+**Where this shows up:** `delivery_discount_amount` in the discount-evaluation response (`calculate`, coupon-apply endpoints) for any coupon of this specific type.
+
+---
+
+## 26. `payment_breakdown.payments`: Refunded Legs No Longer Disappear, Plus Refund Detail
+
+Two related fixes to `payment_breakdown` (present on `GET /vendor/orders/{id}`, and anywhere else `Order::paymentBreakdownForApi()` is used):
+
+- **A fully-refunded payment leg used to vanish from `payments` entirely** once the order's overall payment status was no longer simply "paid" (e.g. a split-payment order where one method was refunded in full and another partially kept) — the client only saw the surviving method, with no indication a second method was ever charged or refunded. It's now included, showing the amount that was actually refunded off it.
+- **Every entry in `payments` now also carries `refunded_amount`, `refunded_to`, and `refunded_to_label`** — how much came back off that specific method, and where it actually went. Destination isn't always the same as the original method: if a card refund is rejected by the gateway, the system falls back to crediting the client's Nazifah wallet instead (the leg itself stays tagged with its original method, e.g. "visa", even though the money went to the wallet) — these fields reflect the real destination, not just the leg's own `payment_method`.
+
+**Shape (new fields on each `payments[]` entry):**
+
+```json
+{
+  "payment_method": "visa",
+  "payment_method_label": "فيزا",
+  "amount": 3.68,
+  "status": "refunded",
+  "refunded_amount": 3.68,
+  "refunded_to": "visa",
+  "refunded_to_label": "فيزا"
+}
+```
+
+`refunded_amount` is `0.0` and `refunded_to`/`refunded_to_label` are `null` when nothing was refunded off that method.
+
+---
+
+## 27. Order Status Notifications: Actor Is Excluded, Vendor Notifications Re-enabled
+
+Previously every order-status change notified client + vendor/admins + drivers uniformly by role, regardless of who actually caused the transition — a client approving their own modifications still got "order confirmed" pushed back at them; a driver marking a pickup complete still got "pickup completed" pushed to themselves. Separately, vendor employees had been blocked from **all** notifications at a single chokepoint as a blanket product decision, unrelated to who acted.
+
+**The fix — one consistent rule:** whoever performed the action that caused a status change does not get notified about it; the other parties still do.
+
+- Vendor and admin are excluded **independently** — a vendor action still reaches admin, and an admin action still reaches the vendor branch.
+- For drivers, only the **specific acting driver's own id** is skipped — a pickup driver and delivery driver can be different people, so if one of them causes a transition, the other leg's driver still hears about it normally.
+- **Payment-confirmation transitions are treated as receipts, not actions to exclude** — checkout completing (COD selection, wallet payment) and a payment-gateway webhook callback still notify everyone, including the client who just paid, since those are confirmations of a result rather than an echo of something the client already saw happen on their own screen.
+- **The vendor notification blackout is lifted.** Vendor employees now receive notifications like every other role (new orders, review updates, driver assignments, etc.), gated by the same actor-exclusion instead of a role-wide block.
+
+**Scope:** this covers everything that goes through the order-status-change event (`OrderStatusChanged` → `SendOrderStatusNotification`) — which is the large majority of order notifications. A few separate notification paths that don't go through that event (e.g. the dedicated driver-assignment ping, the visit-postponed notice) were **not** touched by this change and keep their previous behavior.
+
+**Nothing to change on the client side** — this doesn't add or rename any API field, it only changes who receives which push/in-app notification for a given event.
+
