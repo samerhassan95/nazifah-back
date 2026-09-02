@@ -564,8 +564,7 @@ class OrderPaymentService
         $usePaidLegsOnly = ($order->payment_status ?? 'pending') === 'paid';
         $locale = app()->getLocale();
 
-        $query = OrderPayment::with('paymentTransaction')
-            ->where('order_id', $order->id)
+        $query = OrderPayment::where('order_id', $order->id)
             ->orderBy('sequence');
 
         if ($usePaidLegsOnly) {
@@ -613,9 +612,8 @@ class OrderPaymentService
                     'payment_method_label' => $this->paymentMethodLabel($method, $locale),
                     'amount' => 0.0,
                     'status' => (string) $leg->status,
-                    'refunded_amount' => 0.0,
-                    'refunded_to' => null,
-                    'refunded_to_label' => null,
+                    'amount_before' => 0.0,
+                    'amount_after' => 0.0,
                 ];
             }
 
@@ -628,24 +626,17 @@ class OrderPaymentService
                 (string) $leg->status
             );
 
-            // Surface what actually got refunded off this leg, and where it went —
-            // a card refund that the gateway rejected falls back to crediting the
-            // client's wallet instead of the card (see refundGatewayOrWalletFallback()),
-            // so the destination isn't always the leg's own payment_method.
-            $refundedOnLeg = (float) ($leg->meta['refunded_amount'] ?? 0);
-            if ($refundedOnLeg > 0) {
-                $walletRouted = (bool) ($leg->paymentTransaction?->response_data['wallet_routed_refund'] ?? false);
-                $destination = ($walletRouted || $this->isWalletMethod($method))
-                    ? PaymentMethod::Nathefah_WALLET->value
-                    : $method;
-
-                $paymentsByMethod[$method]['refunded_amount'] = round(
-                    $paymentsByMethod[$method]['refunded_amount'] + $refundedOnLeg,
-                    2
-                );
-                $paymentsByMethod[$method]['refunded_to'] = $destination;
-                $paymentsByMethod[$method]['refunded_to_label'] = $this->paymentMethodLabel($destination, $locale);
-            }
+            // Price before/after any refund on this leg — e.g. a leg originally
+            // charged 55.00 that had 22.32 refunded off it shows amount_before: 55.00,
+            // amount_after: 32.68.
+            $paymentsByMethod[$method]['amount_before'] = round(
+                $paymentsByMethod[$method]['amount_before'] + (float) $leg->amount,
+                2
+            );
+            $paymentsByMethod[$method]['amount_after'] = round(
+                $paymentsByMethod[$method]['amount_after'] + $this->refundableAmountOnLeg($leg),
+                2
+            );
         }
 
         if ($paymentsByMethod === []) {
@@ -660,9 +651,8 @@ class OrderPaymentService
                     'payment_method_label' => $this->paymentMethodLabel($method, $locale),
                     'amount' => $finalAmount,
                     'status' => $status,
-                    'refunded_amount' => 0.0,
-                    'refunded_to' => null,
-                    'refunded_to_label' => null,
+                    'amount_before' => $finalAmount,
+                    'amount_after' => $finalAmount,
                 ];
             }
         }
