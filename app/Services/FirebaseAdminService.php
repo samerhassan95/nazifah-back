@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\FcmToken;
 use Google\Auth\Credentials\ServiceAccountCredentials;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use Illuminate\Support\Facades\Log;
 
 class FirebaseAdminService
@@ -122,6 +124,18 @@ class FirebaseAdminService
             return $response->getStatusCode() === 200;
         } catch (\Throwable $e) {
             $this->logFailure('sendToDevice', $e, $deviceToken);
+
+            // FCM v1 answers 404 specifically when the token is unregistered (app
+            // uninstalled, token rotated, etc.) — that token will never succeed again,
+            // so without cleanup it just fails silently on every future notification,
+            // forever. Confirmed live: the same handful of tokens logged this exact
+            // 404 dozens of times over more than a week straight.
+            if ($e instanceof ClientException && $e->getResponse()?->getStatusCode() === 404) {
+                try {
+                    FcmToken::where('token', $deviceToken)->delete();
+                } catch (\Throwable) {
+                }
+            }
 
             return false;
         }
