@@ -264,6 +264,25 @@ class OrderTrackingController extends Controller
 
                 return $ids->intersect($rejectedOrderItemIds)->isNotEmpty();
             })
+            ->map(function (array $item) use ($order, $branchId, $lang) {
+                // The categorizer's rejected entries carry only piece_name (a plain
+                // string), never the piece's own id/icon — the client's "Rejected
+                // Requests" section renders these with a generic placeholder icon
+                // instead of the actual piece icon shown everywhere else. Look the
+                // piece back up from the first matching order_item.
+                $firstId = collect($item['ids'] ?? [])->first();
+                $sourceItem = $firstId ? $order->items->firstWhere('id', $firstId) : null;
+
+                $item['piece'] = [
+                    'id' => $sourceItem?->piece_id,
+                    'name' => $sourceItem?->piece
+                        ? \App\Support\OrderItemDisplayNames::pieceName($sourceItem->piece, $branchId, $lang)
+                        : ($item['piece_name'] ?? 'Unknown'),
+                    'icon' => \App\Support\OrderItemDisplayNames::pieceIconUrl($sourceItem?->piece),
+                ];
+
+                return $item;
+            })
             ->values();
 
         // Rejected additional services, read straight off each order_item's own
@@ -315,6 +334,11 @@ class OrderTrackingController extends Controller
                 return [
                     'id' => (int) $item->id,
                     'ids' => [(int) $item->id],
+                    'piece' => [
+                        'id' => $item->piece_id,
+                        'name' => $pieceName,
+                        'icon' => \App\Support\OrderItemDisplayNames::pieceIconUrl($item->piece),
+                    ],
                     'piece_name' => $pieceName,
                     'service_name' => $rejectedServices->pluck('name')->filter()->implode('، '),
                     'services' => $rejectedServices->map(fn (array $row) => [

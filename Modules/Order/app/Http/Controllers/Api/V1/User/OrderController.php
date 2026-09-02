@@ -2453,6 +2453,31 @@ class OrderController extends Controller
             fn ($path) => $path ? $this->uploadFilesService->getFullUrl($path) : null
         );
 
+        // The categorizer's entries carry only piece_name (a plain string), never the
+        // piece's own id/icon, so any rejected-list entry rendered a generic
+        // placeholder icon instead of the actual piece icon shown everywhere else.
+        // Look the piece back up from the first order_item id in each entry.
+        $branchId = (int) ($order->branch_id ?? 0);
+        $pieceForIds = function (array $ids) use ($order) {
+            $firstId = collect($ids)->first();
+
+            return $firstId ? $order->items->firstWhere('id', $firstId)?->piece : null;
+        };
+        $withPiece = function (array $item) use ($pieceForIds, $branchId, $lang) {
+            $piece = $pieceForIds($item['ids'] ?? []);
+            $item['piece'] = [
+                'id' => $piece?->id,
+                'name' => $piece
+                    ? \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang)
+                    : ($item['piece_name'] ?? 'Unknown'),
+                'icon' => \App\Support\OrderItemDisplayNames::pieceIconUrl($piece),
+            ];
+
+            return $item;
+        };
+
+        $categorized['rejected'] = collect($categorized['rejected'])->map($withPiece)->values()->all();
+
         // An otherwise-accepted item can still have one or more of its additional
         // services rejected — categorize() already attaches those as
         // `rejected_services` on the accepted entry, but its `rejected` bucket only
@@ -2462,10 +2487,10 @@ class OrderController extends Controller
         // stays in `accepted` at its correct, accepted-only price).
         $partiallyRejected = collect($categorized['accepted'])
             ->filter(fn (array $item) => ($item['rejected_services'] ?? []) !== [])
-            ->map(function (array $item) {
+            ->map(function (array $item) use ($withPiece) {
                 $rejectedServices = collect($item['rejected_services']);
 
-                return [
+                return $withPiece([
                     'id' => $item['id'] ?? null,
                     'ids' => $item['ids'] ?? [],
                     'piece_name' => $item['piece_name'] ?? 'Unknown',
@@ -2487,7 +2512,7 @@ class OrderController extends Controller
                     'image' => $item['image'] ?? null,
                     'additional_services' => [],
                     'status' => 'rejected',
-                ];
+                ]);
             })
             ->values()
             ->all();
