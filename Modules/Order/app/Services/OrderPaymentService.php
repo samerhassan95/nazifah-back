@@ -1804,7 +1804,10 @@ class OrderPaymentService
             'type' => 'credit',
             'amount' => $amount,
             'payment_method' => PaymentMethod::Nathefah_WALLET->value,
-            'description' => 'Order #'.$order->order_number.' - '.$reason,
+            // See the matching note in creditWalletRefund() — stamp a stable "Refund:"
+            // marker rather than relying on the caller's free-text $reason to happen
+            // to contain a recognizable keyword.
+            'description' => 'Order #'.$order->order_number.' - Refund: '.$reason,
             'order_id' => $order->id,
             'transaction_id' => 'WALLET-REFUND-'.$order->id.'-'.uniqid(),
             'status' => 'completed',
@@ -2391,7 +2394,12 @@ class OrderPaymentService
             'type' => 'credit',
             'amount' => $amount,
             'payment_method' => PaymentMethod::Nathefah_WALLET->value,
-            'description' => 'Order #'.$order->order_number.' - '.$reason,
+            // Stamp a stable "Refund:" marker regardless of the caller's free-text
+            // $reason (e.g. "Vendor review reduced order total" contains neither
+            // "refund" nor "cancelled") — WalletController::localizeWalletTransactionDescription()
+            // keyword-matches this raw string to build the client-facing label, and
+            // needs a reliable anchor rather than guessing from arbitrary reason text.
+            'description' => 'Order #'.$order->order_number.' - Refund: '.$reason,
             'order_id' => $order->id,
             'transaction_id' => $reference,
             'status' => 'completed',

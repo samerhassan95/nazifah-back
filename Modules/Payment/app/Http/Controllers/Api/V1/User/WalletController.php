@@ -772,19 +772,22 @@ class WalletController extends Controller
                 return __('payment.wallet_txn_order_deleted', ['order' => $orderNumber, 'amount' => $formattedAmount]);
             }
 
-            if (str_contains($lower, 'additional charge') || str_contains($lower, 'order update')) {
-                return __('payment.wallet_txn_order_update_charge', ['order' => $orderNumber]);
-            }
-
-            // Cancellation refunds are credited with reason "... - Order cancelled" (or the
-            // order's own cancelled_reason), which doesn't contain "refund" — check for it
-            // explicitly so these still show as a clear refund, not the generic fallback.
+            // Refund/cancellation checks must come before "order update" below — every
+            // refund credit is now stamped "... - Refund: <reason>" at the source
+            // (creditWalletRefund()/creditClientWallet()), but the free-text <reason>
+            // itself can still contain "order update" (e.g. a price-decrease refund's
+            // reason is "Refund for order update") and would otherwise be mislabeled
+            // as an update *charge* instead of a refund.
             if (str_contains($lower, 'cancelled') || str_contains($lower, 'canceled') || str_contains($raw, 'ملغ')) {
                 return __('payment.wallet_txn_order_cancelled_refund', ['order' => $orderNumber, 'amount' => $formattedAmount]);
             }
 
             if (str_contains($lower, 'refund') || str_contains($raw, 'استرداد')) {
                 return __('payment.wallet_txn_order_refund', ['order' => $orderNumber, 'amount' => $formattedAmount]);
+            }
+
+            if (str_contains($lower, 'additional charge') || str_contains($lower, 'order update')) {
+                return __('payment.wallet_txn_order_update_charge', ['order' => $orderNumber]);
             }
 
             if (str_contains($lower, 'surcharge')) {
