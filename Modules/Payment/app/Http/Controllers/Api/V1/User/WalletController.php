@@ -746,7 +746,7 @@ class WalletController extends Controller
             'payment_method_label' => $this->paymentMethodLabel($txn->payment_method),
             'card_brand' => $cardBrand,
             'card_brand_label' => $this->paymentMethodLabel($cardBrand),
-            'description' => $this->localizeWalletTransactionDescription((string) ($txn->description ?? '')),
+            'description' => $this->localizeWalletTransactionDescription((string) ($txn->description ?? ''), (float) $txn->amount),
             'operation_type' => $isAddition
                 ? __('payment.wallet_txn_addition')
                 : __('payment.wallet_txn_deduction'),
@@ -757,10 +757,11 @@ class WalletController extends Controller
     /**
      * Build a fully localized description from the stored English (or mixed) wallet note.
      */
-    private function localizeWalletTransactionDescription(string $raw): string
+    private function localizeWalletTransactionDescription(string $raw, float $amount = 0.0): string
     {
         $lower = strtolower($raw);
         $orderNumber = $this->extractOrderNumberFromWalletDescription($raw);
+        $formattedAmount = number_format($amount, 2);
 
         if (str_contains($lower, 'deposit') || str_contains($raw, 'إيداع')) {
             return __('payment.wallet_txn_deposit');
@@ -768,15 +769,22 @@ class WalletController extends Controller
 
         if ($orderNumber) {
             if (str_contains($lower, 'deleted')) {
-                return __('payment.wallet_txn_order_deleted', ['order' => $orderNumber]);
+                return __('payment.wallet_txn_order_deleted', ['order' => $orderNumber, 'amount' => $formattedAmount]);
             }
 
             if (str_contains($lower, 'additional charge') || str_contains($lower, 'order update')) {
                 return __('payment.wallet_txn_order_update_charge', ['order' => $orderNumber]);
             }
 
+            // Cancellation refunds are credited with reason "... - Order cancelled" (or the
+            // order's own cancelled_reason), which doesn't contain "refund" — check for it
+            // explicitly so these still show as a clear refund, not the generic fallback.
+            if (str_contains($lower, 'cancelled') || str_contains($lower, 'canceled') || str_contains($raw, 'ملغ')) {
+                return __('payment.wallet_txn_order_cancelled_refund', ['order' => $orderNumber, 'amount' => $formattedAmount]);
+            }
+
             if (str_contains($lower, 'refund') || str_contains($raw, 'استرداد')) {
-                return __('payment.wallet_txn_order_refund', ['order' => $orderNumber]);
+                return __('payment.wallet_txn_order_refund', ['order' => $orderNumber, 'amount' => $formattedAmount]);
             }
 
             if (str_contains($lower, 'surcharge')) {
