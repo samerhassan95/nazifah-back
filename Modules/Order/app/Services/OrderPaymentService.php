@@ -564,7 +564,8 @@ class OrderPaymentService
         $usePaidLegsOnly = ($order->payment_status ?? 'pending') === 'paid';
         $locale = app()->getLocale();
 
-        $query = OrderPayment::where('order_id', $order->id)
+        $query = OrderPayment::with('paymentTransaction')
+            ->where('order_id', $order->id)
             ->orderBy('sequence');
 
         if ($usePaidLegsOnly) {
@@ -637,6 +638,37 @@ class OrderPaymentService
                 $paymentsByMethod[$method]['amount_after'] + $this->refundableAmountOnLeg($leg),
                 2
             );
+
+            // A split-payment order's decrease refund is credited entirely to the
+            // wallet (see refundDecrease()), even for the portion notionally taken
+            // off a card leg — creditWalletRefund() marks that reduction on the card
+            // leg itself (so its own amount_after correctly drops) but the actual
+            // money lands in the wallet, which this leg's own bookkeeping can't show.
+            // Move that credited amount into the wallet method's own row here so the
+            // breakdown reflects where the money actually ended up, not just where it
+            // was taken from.
+            $refundedOnLeg = (float) ($leg->meta['refunded_amount'] ?? 0);
+            $walletRouted = $refundedOnLeg > 0
+                && ! $this->isWalletMethod($method)
+                && (bool) ($leg->paymentTransaction?->response_data['wallet_routed_refund'] ?? false);
+
+            if ($walletRouted) {
+                $walletMethod = PaymentMethod::Nathefah_WALLET->value;
+
+                if (! isset($paymentsByMethod[$walletMethod])) {
+                    $paymentsByMethod[$walletMethod] = [
+                        'payment_method' => $walletMethod,
+                        'payment_method_label' => $this->paymentMethodLabel($walletMethod, $locale),
+                        'amount' => 0.0,
+                        'status' => OrderPayment::STATUS_PAID,
+                        'amount_before' => 0.0,
+                        'amount_after' => 0.0,
+                    ];
+                }
+
+                $paymentsByMethod[$walletMethod]['amount'] = round($paymentsByMethod[$walletMethod]['amount'] + $refundedOnLeg, 2);
+                $paymentsByMethod[$walletMethod]['amount_after'] = round($paymentsByMethod[$walletMethod]['amount_after'] + $refundedOnLeg, 2);
+            }
         }
 
         if ($paymentsByMethod === []) {
