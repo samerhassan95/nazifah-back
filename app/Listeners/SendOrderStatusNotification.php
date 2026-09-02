@@ -15,52 +15,62 @@ class SendOrderStatusNotification
 
     public function handle(OrderStatusChanged $event): void
     {
-        try {
-            // Internal auto-transitions (e.g. paid/COD → payment_confirmed after
-            // driver accept) must not spam clients/vendors/admins.
-            if (! empty($event->context['skip_notifications'])) {
-                return;
-            }
-
-            $order = $event->order->fresh(['client', 'branch', 'vendor']);
-            $status = $event->newStatus;
-            $num = $order->order_number;
-            $context = $event->context;
-            $actorType = $context['actor_type'] ?? null;
-            $actorId = isset($context['actor_id']) ? (int) $context['actor_id'] : null;
-
-            match ($status) {
-                OrderStatus::PENDING => $this->onPending($order, $num),
-                OrderStatus::BRANCH_REVIEW => $this->onBranchReview($order, $num, $actorType),
-                OrderStatus::CONFIRMED => $this->onConfirmed($order, $num, $context, $actorType),
-                OrderStatus::WAITING_PAYMENT => $this->onWaitingPayment($order, $num, $actorType),
-                OrderStatus::PAYMENT_CONFIRMED => $this->onPaymentConfirmed($order, $num, $actorType),
-                OrderStatus::DRIVER_PICKUP_ASSIGNED => $this->onDriverPickupAssigned($order, $num, $actorType),
-                OrderStatus::DRIVER_PICKUP_ACCEPTED => $this->onDriverPickupAccepted($order, $num, $actorType),
-                OrderStatus::ON_WAY_TO_PICKUP => $this->onDriverOnTheWayToClient($order, 'pickup', $actorType, $actorId),
-                OrderStatus::PICKED_UP => $this->onPickedUp($order, $num, $actorType, $actorId),
-                OrderStatus::DELIVERED_TO_BRANCH => $this->onDeliveredToBranch($order, $num, $actorType, $actorId),
-                OrderStatus::DRIVER_DELIVERY_ASSIGNED => $this->onDriverDeliveryAssigned($order, $num, $actorType),
-                OrderStatus::DRIVER_DELIVERY_ACCEPTED => $this->onDriverDeliveryAccepted($order, $num, $actorType),
-                OrderStatus::ON_WAY_TO_DELIVERY => $this->onDriverOnTheWayToClient($order, 'delivery', $actorType, $actorId),
-                OrderStatus::WAITING_CLIENT_RECEIPT => $this->onWaitingClientReceipt($order, $num, $actorType, $actorId),
-                OrderStatus::DELIVERED => $this->onDelivered($order, $num, $actorType, $actorId),
-                OrderStatus::CLIENT_POSTPONED_PICKUP => $this->onClientPostponedPickup($order, $num, $actorType, $actorId),
-                OrderStatus::CLIENT_POSTPONED_DELIVERY => $this->onClientPostponedDelivery($order, $num, $actorType, $actorId),
-                OrderStatus::COMPLETED => $this->onCompleted($order, $num, $actorType),
-                OrderStatus::CANCELLED => $this->onCancelled($order, $num, $actorType, $actorId),
-                default => null,
-            };
-        } catch (\Throwable $e) {
-            try {
-                Log::warning('Order status notification failed', [
-                    'order_id' => $event->order->id ?? null,
-                    'status' => $event->newStatus->value ?? null,
-                    'error' => $e->getMessage(),
-                ]);
-            } catch (\Throwable) {
-            }
+        // Internal auto-transitions (e.g. paid/COD → payment_confirmed after
+        // driver accept) must not spam clients/vendors/admins.
+        if (! empty($event->context['skip_notifications'])) {
+            return;
         }
+
+        // Sending inline here (event listeners run synchronously by default) meant a
+        // push could reach the client's device WHILE the triggering request was still
+        // doing further work — the client would tap the notification, hit the API
+        // again, and see a response built before the original request finished.
+        // dispatch()->afterResponse() defers this closure until after the HTTP
+        // response is flushed to the browser, without needing an actual queue worker
+        // (it still runs synchronously in this same process, just later) — see
+        // https://laravel.com/docs/queues#dispatching-after-the-response-is-sent-to-browser
+        dispatch(function () use ($event) {
+            try {
+                $order = $event->order->fresh(['client', 'branch', 'vendor']);
+                $status = $event->newStatus;
+                $num = $order->order_number;
+                $context = $event->context;
+                $actorType = $context['actor_type'] ?? null;
+                $actorId = isset($context['actor_id']) ? (int) $context['actor_id'] : null;
+
+                match ($status) {
+                    OrderStatus::PENDING => $this->onPending($order, $num),
+                    OrderStatus::BRANCH_REVIEW => $this->onBranchReview($order, $num, $actorType),
+                    OrderStatus::CONFIRMED => $this->onConfirmed($order, $num, $context, $actorType),
+                    OrderStatus::WAITING_PAYMENT => $this->onWaitingPayment($order, $num, $actorType),
+                    OrderStatus::PAYMENT_CONFIRMED => $this->onPaymentConfirmed($order, $num, $actorType),
+                    OrderStatus::DRIVER_PICKUP_ASSIGNED => $this->onDriverPickupAssigned($order, $num, $actorType),
+                    OrderStatus::DRIVER_PICKUP_ACCEPTED => $this->onDriverPickupAccepted($order, $num, $actorType),
+                    OrderStatus::ON_WAY_TO_PICKUP => $this->onDriverOnTheWayToClient($order, 'pickup', $actorType, $actorId),
+                    OrderStatus::PICKED_UP => $this->onPickedUp($order, $num, $actorType, $actorId),
+                    OrderStatus::DELIVERED_TO_BRANCH => $this->onDeliveredToBranch($order, $num, $actorType, $actorId),
+                    OrderStatus::DRIVER_DELIVERY_ASSIGNED => $this->onDriverDeliveryAssigned($order, $num, $actorType),
+                    OrderStatus::DRIVER_DELIVERY_ACCEPTED => $this->onDriverDeliveryAccepted($order, $num, $actorType),
+                    OrderStatus::ON_WAY_TO_DELIVERY => $this->onDriverOnTheWayToClient($order, 'delivery', $actorType, $actorId),
+                    OrderStatus::WAITING_CLIENT_RECEIPT => $this->onWaitingClientReceipt($order, $num, $actorType, $actorId),
+                    OrderStatus::DELIVERED => $this->onDelivered($order, $num, $actorType, $actorId),
+                    OrderStatus::CLIENT_POSTPONED_PICKUP => $this->onClientPostponedPickup($order, $num, $actorType, $actorId),
+                    OrderStatus::CLIENT_POSTPONED_DELIVERY => $this->onClientPostponedDelivery($order, $num, $actorType, $actorId),
+                    OrderStatus::COMPLETED => $this->onCompleted($order, $num, $actorType),
+                    OrderStatus::CANCELLED => $this->onCancelled($order, $num, $actorType, $actorId),
+                    default => null,
+                };
+            } catch (\Throwable $e) {
+                try {
+                    Log::warning('Order status notification failed', [
+                        'order_id' => $event->order->id ?? null,
+                        'status' => $event->newStatus->value ?? null,
+                        'error' => $e->getMessage(),
+                    ]);
+                } catch (\Throwable) {
+                }
+            }
+        })->afterResponse();
     }
 
     private function onPending(Order $order, string $num): void
