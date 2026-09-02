@@ -1663,10 +1663,15 @@ class OrderPaymentService
         // usually a small adjustment. A single-method order still refunds through that
         // same method below (unchanged), and cancellation refunds always go back per
         // original method regardless of split (see refundOrderOnCancellation()).
+        //
+        // The wallet leg absorbs the refund first (drained toward 0), and only once
+        // it's fully drained does the remainder eat into the card leg's kept amount —
+        // so payment_breakdown reads as "wallet: fully consumed, card: what's still
+        // kept" rather than the other way around.
         $isSplitPayment = $gatewayLegs->isNotEmpty() && $walletLegs->isNotEmpty();
 
         if ($isSplitPayment) {
-            foreach ($gatewayLegs->concat($walletLegs) as $leg) {
+            foreach ($walletLegs->concat($gatewayLegs) as $leg) {
                 if ($remaining <= 0.005) {
                     break;
                 }
