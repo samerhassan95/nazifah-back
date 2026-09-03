@@ -818,8 +818,19 @@ class OrderTrackingController extends Controller
             return validationErrorResponse($validator->errors());
         }
 
-        // Store old final amount for wallet calculation
-        $oldFinalAmount = (float) $order->final_amount;
+        // Store old final amount for wallet calculation.
+        // While the order sits in BRANCH_REVIEW, final_amount is a PROVISIONAL value the
+        // vendor's review already wrote in (e.g. a rejected item's price was subtracted)
+        // — nothing has actually been refunded/charged for that yet; the client is meant
+        // to settle it via the dedicated "approve vendor review" flow first. If they edit
+        // the order directly instead (allowed — BRANCH_REVIEW is client-editable), anchor
+        // the delta on original_final_amount (what was actually paid) rather than the
+        // provisional final_amount, so this edit reconciles the pending vendor change in
+        // the same step instead of silently losing it (over/under-charging the client).
+        $resolvesPendingVendorReview = $order->status === OrderStatus::BRANCH_REVIEW->value && $order->original_final_amount !== null;
+        $oldFinalAmount = $resolvesPendingVendorReview
+            ? (float) $order->original_final_amount
+            : (float) $order->final_amount;
 
         // Up-front payment evidence: gateway/wallet transactions OR settled OrderPayment legs.
         // (Some wallet/COD paths mark OrderPayment paid without a PaymentTransaction row.)
@@ -1416,6 +1427,15 @@ class OrderTrackingController extends Controller
 
             if ($request->has('notes')) {
                 $updateData['notes'] = $request->notes;
+            }
+
+            // This edit's new item list supersedes whatever the vendor's still-pending
+            // review had proposed — clear the pending-review markers so a later edit
+            // doesn't re-anchor on the now-stale original_final_amount snapshot.
+            if ($resolvesPendingVendorReview) {
+                $updateData['vendor_reviewed'] = false;
+                $updateData['client_approved'] = false;
+                $updateData['original_final_amount'] = null;
             }
 
             // A wallet-only surcharge settles in-request: applyModificationIntent has
