@@ -2009,6 +2009,7 @@ class OrderController extends Controller
             }
         })->values()->map(function ($discount) use ($hasOrderContext, $request, $user, $vendorId, $lang, $orderCity) {
             $isValid = true;
+            $invalidReason = null;
             if ($hasOrderContext) {
                 // Reuses the exact same validation the client hits when actually
                 // typing this code in at checkout — a code only shows as valid here
@@ -2024,6 +2025,9 @@ class OrderController extends Controller
                     $orderCity
                 );
                 $isValid = (bool) ($result['success'] ?? false);
+                if (! $isValid) {
+                    $invalidReason = $result['message'] ?? null;
+                }
             }
 
             return [
@@ -2039,6 +2043,7 @@ class OrderController extends Controller
                 'start_date' => $discount->start_date?->toISOString(),
                 'end_date' => $discount->end_date?->toISOString(),
                 'is_valid' => $isValid,
+                'invalid_reason' => $invalidReason,
             ];
         });
 
