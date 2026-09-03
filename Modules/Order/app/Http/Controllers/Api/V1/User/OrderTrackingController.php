@@ -1230,7 +1230,8 @@ class OrderTrackingController extends Controller
                     (float) $deliveryFee,
                     $discountCity,
                     false,
-                    $lang
+                    $lang,
+                    ! ($pickupAtVendor && $deliveryAtVendor)
                 );
                 $discountAmount = (float) $rechecked['discount_amount'];
                 $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);

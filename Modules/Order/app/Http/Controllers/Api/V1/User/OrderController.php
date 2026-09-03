@@ -623,7 +623,8 @@ class OrderController extends Controller
                     (float) $deliveryFees['delivery_fee'],
                     $discountCity,
                     false,
-                    $lang
+                    $lang,
+                    ! ($pickupAtVendor && $deliveryAtVendor)
                 );
                 $discountAmount = (float) $rechecked['discount_amount'];
                 $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);
@@ -1246,7 +1247,8 @@ class OrderController extends Controller
                     (float) $deliveryFee,
                     $discountCity,
                     false,
-                    $lang
+                    $lang,
+                    ! ($pickupAtVendor && $deliveryAtVendor)
                 );
                 $discountAmount = (float) $rechecked['discount_amount'];
                 $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);
@@ -2252,7 +2254,8 @@ class OrderController extends Controller
                     (float) $deliveryFees['delivery_fee'],
                     $deliveryAddress?->city ?? $pickupAddress?->city,
                     false,
-                    $lang
+                    $lang,
+                    ! ($pickupAtVendor && $deliveryAtVendor)
                 );
                 $discountAmount = (float) $rechecked['discount_amount'];
                 $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);

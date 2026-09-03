@@ -241,7 +241,8 @@ class DiscountService
         float $deliveryFee = 0.0,
         ?string $city = null,
         bool $alreadyAppliedOnOrder = false,
-        string $lang = 'ar'
+        string $lang = 'ar',
+        bool $hasDelivery = true
     ): array {
         $context = $this->buildOrderContext(
             $itemsBreakdown,
@@ -250,7 +251,8 @@ class DiscountService
             $userId,
             $branchId,
             $deliveryFee,
-            $city
+            $city,
+            $hasDelivery
         );
         $evaluation = $this->evaluateOrderDiscount($discount, $context, $lang, $alreadyAppliedOnOrder);
 

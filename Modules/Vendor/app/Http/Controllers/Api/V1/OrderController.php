@@ -451,7 +451,9 @@ class OrderController extends Controller
                     (int) $branchId,
                     (float) $deliveryFees['delivery_fee'],
                     null,
-                    true
+                    true,
+                    $lang,
+                    ! ($pickupAtVendor && $deliveryAtVendor)
                 );
                 $discountAmount = (float) $known['discount_amount'];
                 $deliveryDiscountAmount = (float) ($known['delivery_discount_amount'] ?? 0);
