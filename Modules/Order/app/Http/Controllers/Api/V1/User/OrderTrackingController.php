@@ -488,7 +488,7 @@ class OrderTrackingController extends Controller
             ...$order->couponResponseFields($lang),
             'tax_amount' => (float) $order->tax_amount,
             'delivery_fee' => (float) $order->delivery_fee,
-            ...((float) $order->delivery_fee === 0.0 ? ['is_free_delivery' => true] : []),
+            ...$this->freeDeliveryFields($order),
             'final_amount' => (float) $order->final_amount,
             'distance' => $order->distance !== null ? (float) $order->distance : 0,
             ...$order->paymentFieldsForApi(),
@@ -1612,6 +1612,43 @@ class OrderTrackingController extends Controller
     private function postEditStatus(Order $order): OrderStatus
     {
         return OrderStatus::PENDING;
+    }
+
+    /**
+     * When delivery is free (waived by a discount), also surface what it would have
+     * cost so the client UI can show that amount struck through. The order only
+     * persists the net (post-discount) delivery_fee, so the pre-discount amount is
+     * recomputed the same way checkout computed it (distance × per-km rate) — this
+     * only differs from what was actually charged if the vendor's per-km rate has
+     * since changed.
+     *
+     * @return array{is_free_delivery?: true, original_delivery_fee?: float}
+     */
+    private function freeDeliveryFields(Order $order): array
+    {
+        if ((float) $order->delivery_fee !== 0.0) {
+            return [];
+        }
+
+        $fields = ['is_free_delivery' => true];
+
+        $distance = (float) ($order->distance ?? 0);
+        if ($distance <= 0) {
+            return $fields;
+        }
+
+        $deliveryPricePerKm = (float) (
+            $order->branch?->vendor?->delivery_price_per_km
+            ?? $order->vendor?->delivery_price_per_km
+            ?? AdminSetting::getValue('delivery_price_per_km', 5)
+        );
+
+        $originalDeliveryFee = round($distance * $deliveryPricePerKm, 2);
+        if ($originalDeliveryFee > 0) {
+            $fields['original_delivery_fee'] = $originalDeliveryFee;
+        }
+
+        return $fields;
     }
 
     /**

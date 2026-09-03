@@ -345,6 +345,11 @@ class OrderController extends Controller
 
         if ((float) $totals['delivery_fee'] == 0.0) {
             $summary['is_free_delivery'] = true;
+            // Surface what delivery would have cost before the discount waived it, so
+            // the client UI can show that amount struck through.
+            if ((float) $deliveryFees['delivery_fee'] > 0.0) {
+                $summary['original_delivery_fee'] = (float) $deliveryFees['delivery_fee'];
+            }
         }
 
         return $summary;

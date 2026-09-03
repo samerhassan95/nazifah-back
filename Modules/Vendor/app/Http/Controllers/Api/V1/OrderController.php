@@ -528,6 +528,20 @@ class OrderController extends Controller
 
             if ((float) $pricing['delivery_fee'] == 0.0) {
                 $calculateSummary['is_free_delivery'] = true;
+                // deliveryFees['delivery_fee'] here is the order's already-stored (net)
+                // delivery_fee, not the pre-discount amount, so recompute what delivery
+                // would have cost the same way checkout did (distance × per-km rate) —
+                // lets the client UI show that amount struck through.
+                $distance = (float) ($existingOrder->distance ?? 0);
+                if ($distance > 0) {
+                    $vendorForRate = $branch->vendor ?? $existingOrder->branch?->vendor;
+                    $deliveryPricePerKm = (float) ($vendorForRate?->delivery_price_per_km
+                        ?? \Modules\Admin\Models\AdminSetting::getValue('delivery_price_per_km', 5));
+                    $originalDeliveryFee = round($distance * $deliveryPricePerKm, 2);
+                    if ($originalDeliveryFee > 0) {
+                        $calculateSummary['original_delivery_fee'] = $originalDeliveryFee;
+                    }
+                }
             }
 
             return successResponse([
