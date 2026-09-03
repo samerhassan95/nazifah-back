@@ -1929,8 +1929,22 @@ class OrderController extends Controller
      */
     public function getDiscounts(Request $request): JsonResponse
     {
+        if ($request->has('items')) {
+            $request->merge([
+                'items' => OrderItemsNormalizer::normalize($request->input('items', [])),
+            ]);
+        }
+
         $validator = Validator::make($request->all(), [
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            // Optional order context — when provided, each discount is actually
+            // checked against it (amount, zone, items, etc.) to fill is_valid.
+            // Without it, is_valid always comes back true (nothing to check yet).
+            'items' => ['nullable', 'array'],
+            'items.*.piece_id' => ['required_with:items', 'integer', 'exists:pieces,id'],
+            'items.*.quantity' => ['required_with:items', 'integer', 'min:1'],
+            'pickup_address_id' => ['nullable', 'exists:addresses,id'],
+            'delivery_address_id' => ['nullable', 'exists:addresses,id'],
         ]);
 
         if ($validator->fails()) {
@@ -1938,6 +1952,7 @@ class OrderController extends Controller
         }
 
         $user = $request->user();
+        $lang = app()->getLocale();
 
         // Get branch and vendor
         $branch = \Modules\Branch\Models\Branch::with('vendor')->find($request->branch_id);
@@ -1946,6 +1961,18 @@ class OrderController extends Controller
         }
 
         $vendorId = $branch->vendor->id;
+
+        $hasOrderContext = $request->filled('items');
+        $orderCity = null;
+        if ($hasOrderContext) {
+            $pickupAddress = $request->pickup_address_id
+                ? Address::where('id', $request->pickup_address_id)->where('client_id', $user->id)->first()
+                : null;
+            $deliveryAddress = $request->delivery_address_id
+                ? Address::where('id', $request->delivery_address_id)->where('client_id', $user->id)->first()
+                : null;
+            $orderCity = $deliveryAddress?->city ?? $pickupAddress?->city;
+        }
 
         // Base query for active discounts within valid date range and usage limit
         $query = Discount::with(['vendors', 'zones', 'clients'])
@@ -1980,7 +2007,25 @@ class OrderController extends Controller
                 default:
                     return false;
             }
-        })->values()->map(function ($discount) {
+        })->values()->map(function ($discount) use ($hasOrderContext, $request, $user, $vendorId, $lang, $orderCity) {
+            $isValid = true;
+            if ($hasOrderContext) {
+                // Reuses the exact same validation the client hits when actually
+                // typing this code in at checkout — a code only shows as valid here
+                // if applying it for real, right now, with these items, would succeed.
+                $result = $this->discountService->validateAndCalculateDiscount(
+                    (string) $discount->code,
+                    $request->items,
+                    (int) $user->id,
+                    $vendorId,
+                    $lang,
+                    (int) $request->branch_id,
+                    0.0,
+                    $orderCity
+                );
+                $isValid = (bool) ($result['success'] ?? false);
+            }
+
             return [
                 'id' => $discount->id,
                 'title' => $discount->name,
@@ -1993,6 +2038,7 @@ class OrderController extends Controller
                 'max_discount_amount' => (float) ($discount->max_discount_amount ?? 0),
                 'start_date' => $discount->start_date?->toISOString(),
                 'end_date' => $discount->end_date?->toISOString(),
+                'is_valid' => $isValid,
             ];
         });
 
