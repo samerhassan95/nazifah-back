@@ -962,7 +962,10 @@ class OrderTrackingController extends Controller
                         $user->id,
                         $vendorId,
                         $lang,
-                        (int) $order->branch_id
+                        (int) $order->branch_id,
+                        0.0,
+                        null,
+                        ! ($pickupAtVendor && $deliveryAtVendor)
                     );
 
                     if (! $result['success']) {

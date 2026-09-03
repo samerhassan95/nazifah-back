@@ -454,7 +454,10 @@ class OrderController extends Controller
                     $user->id,
                     $vendorId,
                     $lang,
-                    (int) $request->branch_id
+                    (int) $request->branch_id,
+                    0.0,
+                    null,
+                    ! ($pickupAtVendor && $deliveryAtVendor)
                 );
 
                 if (! $result['success']) {
@@ -1002,7 +1005,10 @@ class OrderController extends Controller
                     $user->id,
                     $vendorId,
                     $lang,
-                    (int) $request->branch_id
+                    (int) $request->branch_id,
+                    0.0,
+                    null,
+                    ! ($pickupAtVendor && $deliveryAtVendor)
                 );
 
                 if (! $result['success']) {
@@ -1950,6 +1956,8 @@ class OrderController extends Controller
             'items.*.quantity' => ['required_with:items', 'integer', 'min:1'],
             'pickup_address_id' => ['nullable', 'exists:addresses,id'],
             'delivery_address_id' => ['nullable', 'exists:addresses,id'],
+            'pickup_at_vendor' => ['nullable', 'boolean'],
+            'delivery_at_vendor' => ['nullable', 'boolean'],
         ]);
 
         if ($validator->fails()) {
@@ -1967,6 +1975,7 @@ class OrderController extends Controller
 
         $vendorId = $branch->vendor->id;
 
+        $hasDelivery = ! ($request->boolean('pickup_at_vendor') && $request->boolean('delivery_at_vendor'));
         $hasOrderContext = $request->filled('items');
         $orderCity = null;
         if ($hasOrderContext) {
@@ -2012,7 +2021,7 @@ class OrderController extends Controller
                 default:
                     return false;
             }
-        })->values()->map(function ($discount) use ($hasOrderContext, $request, $user, $vendorId, $lang, $orderCity) {
+        })->values()->map(function ($discount) use ($hasOrderContext, $request, $user, $vendorId, $lang, $orderCity, $hasDelivery) {
             $isValid = true;
             $invalidReason = null;
             if ($hasOrderContext) {
@@ -2027,7 +2036,8 @@ class OrderController extends Controller
                     $lang,
                     (int) $request->branch_id,
                     0.0,
-                    $orderCity
+                    $orderCity,
+                    $hasDelivery
                 );
                 $isValid = (bool) ($result['success'] ?? false);
                 if (! $isValid) {
@@ -2141,7 +2151,10 @@ class OrderController extends Controller
                 $user->id,
                 $vendorId,
                 $lang,
-                (int) $request->branch_id
+                (int) $request->branch_id,
+                0.0,
+                null,
+                ! ($pickupAtVendor && $deliveryAtVendor)
             );
 
             if (! $result['success']) {

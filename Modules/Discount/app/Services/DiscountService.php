@@ -75,7 +75,8 @@ class DiscountService
         string $lang = 'ar',
         ?int $branchId = null,
         float $deliveryFee = 0.0,
-        ?string $city = null
+        ?string $city = null,
+        bool $hasDelivery = true
     ): array {
         $msg = $this->getMessages();
         $itemsValidation = $this->validateItems($items, $vendorId, $lang, $branchId);
@@ -90,7 +91,8 @@ class DiscountService
             $userId,
             $branchId,
             $deliveryFee,
-            $city
+            $city,
+            $hasDelivery
         );
 
         $discount = $this->discountQueryForDomain(Discount::DOMAIN_ORDER)
@@ -860,6 +862,10 @@ class DiscountService
                 'en' => 'This discount requires a specific bundle',
                 'ar' => 'هذا الخصم يتطلب باقة محددة',
             ],
+            'no_delivery_leg' => [
+                'en' => 'This is a delivery discount, but this order is a vendor pickup — there is no delivery fee to discount',
+                'ar' => 'هذا الكود مخصص لخصم التوصيل، وهذا الطلب استلام من المغسلة وليس توصيل، فلا يوجد رسوم توصيل لتطبيق الخصم عليها',
+            ],
         ];
     }
 
@@ -874,7 +880,8 @@ class DiscountService
         ?int $clientId,
         ?int $branchId,
         float $deliveryFee,
-        ?string $city
+        ?string $city,
+        bool $hasDelivery = true
     ): array {
         return [
             'items_breakdown' => $itemsBreakdown,
@@ -883,6 +890,7 @@ class DiscountService
             'client_id' => $clientId,
             'branch_id' => $branchId,
             'delivery_fee' => round(max(0, $deliveryFee), 2),
+            'has_delivery' => $hasDelivery,
             'city' => $city,
             'items_count' => array_sum(array_map(fn (array $line) => (int) ($line['quantity'] ?? 0), $itemsBreakdown)),
             'client' => $clientId ? Client::find($clientId) : null,
@@ -913,6 +921,13 @@ class DiscountService
         $eligibilityCheck = $this->validateOrderContextEligibility($discount, $context, $lang);
         if (! $eligibilityCheck['success']) {
             return $eligibilityCheck;
+        }
+
+        // A delivery discount is meaningless on an order with no delivery leg at all
+        // (client picks up from / drops off at the vendor themselves) — reject it
+        // outright instead of silently "succeeding" with a zero-value discount.
+        if ($this->isDeliveryDiscount($discount) && ! ($context['has_delivery'] ?? true)) {
+            return ['success' => false, 'message' => $msg['no_delivery_leg'][$lang], 'code' => 400];
         }
 
         $discountBaseAmount = $this->resolveDiscountBaseAmount(
