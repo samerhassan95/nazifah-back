@@ -1444,9 +1444,17 @@ class OrderTrackingController extends Controller
             // This edit's new item list supersedes whatever the vendor's still-pending
             // review had proposed — clear the pending-review markers so a later edit
             // doesn't re-anchor on the now-stale original_final_amount snapshot.
+            // original_total_amount must be cleared too: VendorOrderReviewService only
+            // (re)snapshots original_total_amount/original_final_amount when
+            // original_total_amount is empty — leaving it set here would make that
+            // guard think a snapshot already exists, so the NEXT vendor review would
+            // never re-snapshot original_final_amount, permanently breaking
+            // reviewedPaymentDelta() (it falls back to final_amount vs itself, i.e.
+            // delta 0) for every later review round on this order.
             if ($resolvesPendingVendorReview) {
                 $updateData['vendor_reviewed'] = false;
                 $updateData['client_approved'] = false;
+                $updateData['original_total_amount'] = null;
                 $updateData['original_final_amount'] = null;
             }
 
