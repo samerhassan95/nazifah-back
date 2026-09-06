@@ -830,6 +830,8 @@ class OrderController extends Controller
                 'payment_status_label' => \App\Support\PaymentStatusPresenter::label($order->payment_status ?? 'pending'),
                 'items_count' => \Modules\Order\Support\OrderItemGrouper::totalPiecesCount($order->items),
                 'distance' => $order->distance !== null ? (float) $order->distance : 0,
+                'pickup_distance_km' => $order->pickup_distance !== null ? (float) $order->pickup_distance : 0,
+                'delivery_distance_km' => $order->delivery_distance !== null ? (float) $order->delivery_distance : 0,
                 'pickup_time' => $order->pickup_time ? $order->pickup_time->toISOString() : null,
                 'time_remaining' => $timeRemaining,
                 'rating' => $order->rating !== null ? (int) $order->rating : null,
@@ -1193,6 +1195,8 @@ class OrderController extends Controller
             $pickupAtVendor = $request->boolean('pickup_at_vendor');
             $deliveryAtVendor = $request->boolean('delivery_at_vendor');
             $totalDistance = 0;
+            $pickupDistance = 0;
+            $deliveryDistance = 0;
             $pickupFee = 0;
             $deliveryFeeAmount = 0;
 
@@ -1399,6 +1403,8 @@ class OrderController extends Controller
                         'payment_method' => $orderPaymentMethod,
                         'payment_methods' => $paymentMethods,
                         'distance' => $totalDistance,
+                        'pickup_distance' => $pickupDistance,
+                        'delivery_distance' => $deliveryDistance,
                     ],
                     'items_data' => $itemsData,
                     'discount_id' => $appliedDiscount?->id,
@@ -1457,6 +1463,8 @@ class OrderController extends Controller
                         'qr_code' => $qrCode,
                         'distance' => (float) $totalDistance,
                         'total_distance_km' => (float) $totalDistance,
+                        'pickup_distance_km' => (float) $pickupDistance,
+                        'delivery_distance_km' => (float) $deliveryDistance,
                         'pickup_at_vendor' => (bool) $pickupAtVendor,
                         'delivery_at_vendor' => (bool) $deliveryAtVendor,
                         'pickup_time' => $pickupDatetime,
@@ -1490,6 +1498,8 @@ class OrderController extends Controller
                 'payment_method' => $orderPaymentMethod,
                 'payment_methods' => $paymentMethods,
                 'distance' => $totalDistance,
+                'pickup_distance' => $pickupDistance,
+                'delivery_distance' => $deliveryDistance,
             ]);
 
             foreach ($itemsData as $index => $itemData) {
@@ -1612,6 +1622,8 @@ class OrderController extends Controller
                     'qr_code' => $order->qr_code,
                     'distance' => $order->distance !== null ? (float) $order->distance : 0,
                     'total_distance_km' => $order->distance !== null ? (float) $order->distance : 0,
+                    'pickup_distance_km' => $order->pickup_distance !== null ? (float) $order->pickup_distance : 0,
+                    'delivery_distance_km' => $order->delivery_distance !== null ? (float) $order->delivery_distance : 0,
                     'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
                     'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
                     'driver_id' => $order->driver_id,
@@ -1865,6 +1877,8 @@ class OrderController extends Controller
                 'modified_count' => count($categorizedItems['modified']),
                 'distance' => $order->distance !== null ? (float) $order->distance : 0,
                 'total_distance_km' => $order->distance !== null ? (float) $order->distance : 0,
+                'pickup_distance_km' => $order->pickup_distance !== null ? (float) $order->pickup_distance : 0,
+                'delivery_distance_km' => $order->delivery_distance !== null ? (float) $order->delivery_distance : 0,
                 'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
                 'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
                 'driver_id' => $order->driver_id,

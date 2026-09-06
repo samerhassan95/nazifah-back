@@ -491,6 +491,8 @@ class OrderTrackingController extends Controller
             ...$this->freeDeliveryFields($order),
             'final_amount' => (float) $order->final_amount,
             'distance' => $order->distance !== null ? (float) $order->distance : 0,
+            'pickup_distance_km' => $order->pickup_distance !== null ? (float) $order->pickup_distance : 0,
+            'delivery_distance_km' => $order->delivery_distance !== null ? (float) $order->delivery_distance : 0,
             ...$order->paymentFieldsForApi(),
             'payment_breakdown' => $order->paymentBreakdownForApi(),
             'payment_status' => $order->payment_status ?? 'pending',
@@ -1173,6 +1175,8 @@ class OrderTrackingController extends Controller
             // - pickup_at_vendor=true  & delivery_at_vendor=true  → no delivery charge
             $deliveryFee = 0;
             $totalDistance = 0;
+            $pickupDistance = 0;
+            $deliveryDistance = 0;
             $pickupFee = 0;
             $deliveryFeeAmount = 0;
 
@@ -1345,6 +1349,8 @@ class OrderTrackingController extends Controller
                             'delivery_fee' => (float) $pricingTotals['delivery_fee'],
                             'final_amount' => $finalAmount,
                             'distance' => $totalDistance,
+                            'pickup_distance' => $pickupDistance,
+                            'delivery_distance' => $deliveryDistance,
                             'pickup_at_vendor' => $pickupAtVendor,
                             'delivery_at_vendor' => $deliveryAtVendor,
                             'pickup_address_id' => ! $pickupAtVendor && $pickupAddress ? $pickupAddress->id : null,
@@ -1427,6 +1433,8 @@ class OrderTrackingController extends Controller
                             'delivery_fee' => (float) $pricingTotals['delivery_fee'],
                 'final_amount' => $finalAmount,
                 'distance' => $totalDistance,
+                'pickup_distance' => $pickupDistance,
+                'delivery_distance' => $deliveryDistance,
             ];
 
             if ($request->has('notes')) {
@@ -1546,6 +1554,8 @@ class OrderTrackingController extends Controller
                     'qr_code' => $order->qr_code,
                     'distance' => $order->distance !== null ? (float) $order->distance : 0,
                     'total_distance_km' => $order->distance !== null ? (float) $order->distance : 0,
+                    'pickup_distance_km' => $order->pickup_distance !== null ? (float) $order->pickup_distance : 0,
+                    'delivery_distance_km' => $order->delivery_distance !== null ? (float) $order->delivery_distance : 0,
                     'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
                     'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
                     'driver_id' => $order->driver_id,

@@ -82,6 +82,8 @@ class Order extends Model
         'pickup_at_vendor',
         'delivery_at_vendor',
         'distance',
+        'pickup_distance',
+        'delivery_distance',
     ];
 
     protected $casts = [
@@ -94,6 +96,8 @@ class Order extends Model
         'original_total_amount' => 'decimal:2',
         'original_final_amount' => 'decimal:2',
         'distance' => 'decimal:2',
+        'pickup_distance' => 'decimal:2',
+        'delivery_distance' => 'decimal:2',
         'pickup_time' => 'datetime',
         'estimated_delivery_time' => 'datetime',
         'actual_delivery_time' => 'datetime',

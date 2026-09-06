@@ -1310,6 +1310,8 @@ class OrderPaymentService
             'delivery_fee' => $staged['delivery_fee'] ?? null,
             'final_amount' => $staged['final_amount'] ?? null,
             'distance' => $staged['distance'] ?? null,
+            'pickup_distance' => $staged['pickup_distance'] ?? null,
+            'delivery_distance' => $staged['delivery_distance'] ?? null,
         ], fn ($v) => $v !== null);
 
         $fieldUpdate = [];
