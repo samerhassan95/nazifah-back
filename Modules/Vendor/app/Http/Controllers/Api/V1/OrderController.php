@@ -577,6 +577,40 @@ class OrderController extends Controller
     }
 
     /**
+     * When delivery is free (waived by a discount), also surface what it would have
+     * cost so the vendor UI can show that amount struck through / know a discount is
+     * in effect even though discount_amount is 0 for a delivery-type discount.
+     *
+     * @return array{is_free_delivery?: true, original_delivery_fee?: float}
+     */
+    private function freeDeliveryFields(Order $order): array
+    {
+        if ((float) $order->delivery_fee !== 0.0) {
+            return [];
+        }
+
+        $fields = ['is_free_delivery' => true];
+
+        $distance = (float) ($order->distance ?? 0);
+        if ($distance <= 0) {
+            return $fields;
+        }
+
+        $deliveryPricePerKm = (float) (
+            $order->branch?->vendor?->delivery_price_per_km
+            ?? $order->vendor?->delivery_price_per_km
+            ?? \Modules\Admin\Models\AdminSetting::getValue('delivery_price_per_km', 5)
+        );
+
+        $originalDeliveryFee = round($distance * $deliveryPricePerKm, 2);
+        if ($originalDeliveryFee > 0) {
+            $fields['original_delivery_fee'] = $originalDeliveryFee;
+        }
+
+        return $fields;
+    }
+
+    /**
      * Recalculate pickup/delivery fees using the order's method flags and addresses.
      *
      * @return array{
@@ -1786,6 +1820,7 @@ class OrderController extends Controller
             'rejected_items' => $rejectedItems->map($toBreakdownLine)->values(),
             'subtotal' => $subtotal,
             'delivery_fee' => $deliveryFee,
+            ...$this->freeDeliveryFields($order),
             'discount' => $discount,
             'tax' => $tax,
             'final_total' => $finalTotal,
@@ -1909,6 +1944,7 @@ class OrderController extends Controller
             ...$order->couponResponseFields($locale),
             'tax_amount' => (float) $order->tax_amount,
             'delivery_fee' => (float) $order->delivery_fee,
+            ...$this->freeDeliveryFields($order),
             'final_amount' => (float) $order->final_amount,
             'distance' => $order->distance !== null ? (float) $order->distance : 0,
             'pickup_distance_km' => $order->pickup_distance !== null ? (float) $order->pickup_distance : 0,
