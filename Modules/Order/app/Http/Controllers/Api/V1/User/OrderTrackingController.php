@@ -1360,6 +1360,19 @@ class OrderTrackingController extends Controller
                             'coupon_discount_id' => $appliedDiscount?->id,
                         ];
 
+                        // Same as the immediate-apply $updateData below: this edit resolves
+                        // whatever pending vendor review the order was sitting on, so clear
+                        // its markers here too — a wallet-only surcharge applies via this
+                        // staged array (applyStagedOrderModification()), never via
+                        // $updateData, so without this the flags never get cleared for that
+                        // path and the next vendor review silently fails to re-snapshot.
+                        if ($resolvesPendingVendorReview) {
+                            $stagedPricing['vendor_reviewed'] = false;
+                            $stagedPricing['client_approved'] = false;
+                            $stagedPricing['original_total_amount'] = null;
+                            $stagedPricing['original_final_amount'] = null;
+                        }
+
                         $modificationIntent = $this->orderPaymentService->createModificationIntent(
                             $order,
                             $delta,

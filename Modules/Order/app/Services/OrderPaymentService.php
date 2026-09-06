@@ -1333,6 +1333,18 @@ class OrderPaymentService
         if (array_key_exists('status', $staged)) {
             $fieldUpdate['status'] = $staged['status'];
         }
+        if (array_key_exists('vendor_reviewed', $staged)) {
+            $fieldUpdate['vendor_reviewed'] = $staged['vendor_reviewed'];
+        }
+        if (array_key_exists('client_approved', $staged)) {
+            $fieldUpdate['client_approved'] = $staged['client_approved'];
+        }
+        if (array_key_exists('original_total_amount', $staged)) {
+            $fieldUpdate['original_total_amount'] = $staged['original_total_amount'];
+        }
+        if (array_key_exists('original_final_amount', $staged)) {
+            $fieldUpdate['original_final_amount'] = $staged['original_final_amount'];
+        }
 
         $order->update(array_merge($pricingUpdate, $fieldUpdate));
 
