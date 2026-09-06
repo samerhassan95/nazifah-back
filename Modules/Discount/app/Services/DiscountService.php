@@ -692,6 +692,7 @@ class DiscountService
             'applied' => false,
             'discount' => null,
             'discount_amount' => 0.0,
+            'delivery_discount_amount' => 0.0,
         ];
         $evaluation = $this->evaluateOrderDiscount($discount, array_merge([
             'order_amount' => round(max(0, $orderAmount), 2),
@@ -701,6 +702,7 @@ class DiscountService
             'client_id' => $userId,
             'branch_id' => $context['branch_id'] ?? null,
             'delivery_fee' => (float) ($context['delivery_fee'] ?? 0.0),
+            'has_delivery' => $context['has_delivery'] ?? true,
             'city' => $context['city'] ?? null,
             'client' => $userId ? Client::find($userId) : null,
             'order_count' => $userId ? $this->clientOrdersCount($userId) : 0,
@@ -713,6 +715,7 @@ class DiscountService
             'applied' => true,
             'discount' => $discount,
             'discount_amount' => (float) ($evaluation['discount_amount'] ?? 0.0),
+            'delivery_discount_amount' => (float) ($evaluation['delivery_discount_amount'] ?? 0.0),
         ];
     }
 

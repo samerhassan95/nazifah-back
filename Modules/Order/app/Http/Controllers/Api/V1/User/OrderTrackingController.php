@@ -1149,6 +1149,10 @@ class OrderTrackingController extends Controller
                 }
 
                 // Keep order coupon only when rules still pass on the new item totals.
+                // Pass branch_id so zone/branch-restricted discounts (e.g. delivery_free
+                // coupons scoped to specific zones) don't spuriously fail eligibility and
+                // get silently dropped from the order just because this edit didn't
+                // resubmit the coupon_code.
                 if (! $appliedDiscount && ! ($request->filled('coupon_code'))) {
                     if ($order->discount) {
                         $soft = $this->discountService->applyIfEligible(
@@ -1156,11 +1160,13 @@ class OrderTrackingController extends Controller
                             (float) $totalAmount,
                             (int) $user->id,
                             $vendorId,
-                            true
+                            true,
+                            ['branch_id' => $storeBranchId]
                         );
                         if ($soft['applied']) {
                             $appliedDiscount = $soft['discount'];
                             $discountAmount = (float) $soft['discount_amount'];
+                            $deliveryDiscountAmount = (float) ($soft['delivery_discount_amount'] ?? 0);
                         }
                     } elseif ((float) $order->discount_amount > 0) {
                         $discountAmount = min((float) $order->discount_amount, (float) $totalAmount);
@@ -1223,7 +1229,12 @@ class OrderTrackingController extends Controller
             }
 
             $discountCity = $deliveryAddress?->city ?? $pickupAddress?->city;
-            if ($appliedDiscount && $discountItemsBreakdown !== []) {
+            // Also covers the "keep order coupon" fallback above, which never populates
+            // $discountItemsBreakdown (only the coupon_code re-entry path does) — without
+            // this, that path's delivery_discount_amount stayed stuck at whatever it
+            // computed with delivery_fee=0.0 (before this block's real delivery fee is
+            // known), e.g. always 0 for a fully-free-delivery coupon kept across an edit.
+            if ($appliedDiscount) {
                 $rechecked = $this->discountService->evaluateKnownOrderDiscount(
                     $appliedDiscount,
                     $discountItemsBreakdown,
