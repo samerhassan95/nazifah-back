@@ -14,7 +14,7 @@ class ExpireStaleOrderModificationIntents extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'orders:expire-stale-modification-intents
-                            {--minutes=15 : Age threshold in minutes}
+                            {--minutes=5 : Age threshold in minutes}
                             {--dry-run : Show what would be expired without making changes}';
 
     /**
