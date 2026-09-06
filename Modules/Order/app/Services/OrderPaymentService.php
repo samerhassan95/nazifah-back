@@ -1427,6 +1427,42 @@ class OrderPaymentService
     }
 
     /**
+     * Expire one stale, never-completed modification intent: cancel its unpaid
+     * surcharge leg(s) (releasing any wallet hold) so they stop showing as
+     * "pending" in payment_breakdown forever, then mark the intent expired.
+     * The staged item/price change was never applied (that only happens once
+     * the surcharge is fully paid), so the order itself needs no changes.
+     */
+    public function expireStaleModificationIntent(OrderModificationIntent $intent): void
+    {
+        if ($intent->status !== OrderModificationIntent::STATUS_PENDING) {
+            return;
+        }
+
+        $legs = OrderPayment::where('modification_intent_id', $intent->id)
+            ->where('status', OrderPayment::STATUS_PENDING)
+            ->get();
+
+        foreach ($legs as $leg) {
+            if ($leg->payment_method === PaymentMethod::Nathefah_WALLET->value) {
+                $this->releaseReservedWalletLeg($leg);
+
+                continue;
+            }
+
+            if ($leg->payment_transaction_id) {
+                PaymentTransaction::whereKey($leg->payment_transaction_id)->update(['status' => 'cancelled']);
+            }
+
+            OrderPayment::whereKey($leg->id)
+                ->where('status', OrderPayment::STATUS_PENDING)
+                ->update(['status' => OrderPayment::STATUS_CANCELLED]);
+        }
+
+        $intent->update(['status' => OrderModificationIntent::STATUS_EXPIRED]);
+    }
+
+    /**
      * Create a staged modification intent for a gateway surcharge.
      *
      * @param  array<string, mixed>  $stagedPricing

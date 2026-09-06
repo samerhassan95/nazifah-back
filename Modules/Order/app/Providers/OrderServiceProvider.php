@@ -5,6 +5,7 @@ namespace Modules\Order\Providers;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Modules\Order\Console\Commands\ExpireStaleOrderModificationIntents;
 use Modules\Order\Console\Commands\ReleaseExpiredPendingOrderWallets;
 use Modules\Order\Models\Order;
 use Modules\Order\Observers\OrderObserver;
@@ -43,6 +44,7 @@ class OrderServiceProvider extends ServiceProvider
     {
         $this->commands([
             ReleaseExpiredPendingOrderWallets::class,
+            ExpireStaleOrderModificationIntents::class,
         ]);
     }
 
@@ -51,6 +53,11 @@ class OrderServiceProvider extends ServiceProvider
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
             $schedule->command('orders:release-expired-wallet-holds')
                 ->everyMinute()
+                ->withoutOverlapping()
+                ->runInBackground();
+
+            $schedule->command('orders:expire-stale-modification-intents')
+                ->everyFiveMinutes()
                 ->withoutOverlapping()
                 ->runInBackground();
         });
