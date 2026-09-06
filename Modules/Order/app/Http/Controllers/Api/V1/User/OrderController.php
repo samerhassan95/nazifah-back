@@ -235,6 +235,8 @@ class OrderController extends Controller
      *     delivery_fee: float,
      *     pickup_fee: float,
      *     delivery_fee_amount: float,
+     *     pickup_distance_km: float,
+     *     delivery_distance_km: float,
      *     total_distance_km: float,
      *     distance: float
      * }|JsonResponse
@@ -251,12 +253,16 @@ class OrderController extends Controller
         $totalDistance = 0.0;
         $pickupFee = 0.0;
         $deliveryFeeAmount = 0.0;
+        $pickupDistance = 0.0;
+        $deliveryDistance = 0.0;
 
         if ($pickupAtVendor && $deliveryAtVendor) {
             return [
                 'delivery_fee' => $deliveryFee,
                 'pickup_fee' => $pickupFee,
                 'delivery_fee_amount' => $deliveryFeeAmount,
+                'pickup_distance_km' => round($pickupDistance, 2),
+                'delivery_distance_km' => round($deliveryDistance, 2),
                 'total_distance_km' => round($totalDistance, 2),
                 'distance' => round($totalDistance, 2),
             ];
@@ -303,6 +309,8 @@ class OrderController extends Controller
             'delivery_fee' => (float) $deliveryFee,
             'pickup_fee' => (float) $pickupFee,
             'delivery_fee_amount' => (float) $deliveryFeeAmount,
+            'pickup_distance_km' => (float) round($pickupDistance, 2),
+            'delivery_distance_km' => (float) round($deliveryDistance, 2),
             'total_distance_km' => (float) round($totalDistance, 2),
             'distance' => (float) round($totalDistance, 2),
         ];
@@ -337,6 +345,8 @@ class OrderController extends Controller
             'final_amount' => (float) $totals['final_amount'],
             'pickup_fee' => (float) $deliveryFees['pickup_fee'],
             'delivery_fee_amount' => (float) $deliveryFees['delivery_fee_amount'],
+            'pickup_distance_km' => (float) ($deliveryFees['pickup_distance_km'] ?? 0),
+            'delivery_distance_km' => (float) ($deliveryFees['delivery_distance_km'] ?? 0),
             'total_distance_km' => (float) $deliveryFees['total_distance_km'],
             'distance' => (float) $deliveryFees['distance'],
             'pickup_at_vendor' => $pickupAtVendor,
