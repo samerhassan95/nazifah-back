@@ -818,7 +818,9 @@ class Order extends Model
         $deliveryDiscountAmount = min(max(0, $deliveryDiscountAmount), max(0, $deliveryFee));
         $itemsAfterDiscount = $itemsSubtotal - $discountAmount;
         $effectiveDeliveryFee = $deliveryFee - $deliveryDiscountAmount;
-        $taxAmount = round($itemsSubtotal * $taxPercentage / 100, 2);
+        // Tax base = full items subtotal (item discounts don't reduce it — unchanged) +
+        // delivery fee NET of any delivery discount (free delivery -> 0 tax on delivery).
+        $taxAmount = round(($itemsSubtotal + $effectiveDeliveryFee) * $taxPercentage / 100, 2);
         $finalAmount = round($itemsAfterDiscount + $taxAmount + $effectiveDeliveryFee, 2);
 
         return [
@@ -834,14 +836,16 @@ class Order extends Model
     }
 
     /**
-     * Tax is calculated on the full items subtotal (coupon does not reduce the tax base).
+     * Tax base = full items subtotal (item discounts don't reduce it) + delivery fee
+     * (already net of any delivery discount — that's what's persisted in delivery_fee).
      */
-    public function getEffectiveTax(?float $subtotal = null): float
+    public function getEffectiveTax(?float $subtotal = null, ?float $deliveryFee = null): float
     {
         $subtotal = $subtotal ?? $this->getEffectiveSubtotal();
+        $deliveryFee = $deliveryFee ?? (float) $this->delivery_fee;
         $taxRate = self::getTaxRate();
 
-        return round($subtotal * $taxRate / 100, 2);
+        return round(($subtotal + $deliveryFee) * $taxRate / 100, 2);
     }
 
     /**
@@ -851,8 +855,8 @@ class Order extends Model
     {
         $subtotal = $subtotal ?? $this->getEffectiveSubtotal();
         $discount = (float) $this->discount_amount;
-        $tax = $tax ?? $this->getEffectiveTax($subtotal);
         $deliveryFee = (float) $this->delivery_fee;
+        $tax = $tax ?? $this->getEffectiveTax($subtotal, $deliveryFee);
 
         return round($subtotal - $discount + $tax + $deliveryFee, 2);
     }
