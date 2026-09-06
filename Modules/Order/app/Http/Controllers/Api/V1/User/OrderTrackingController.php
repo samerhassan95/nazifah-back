@@ -1607,12 +1607,12 @@ class OrderTrackingController extends Controller
                 // Non-null only when a gateway increase was paid in this request:
                 // contains the payment link(s)/params for the difference (gateway legs).
                 'payment' => $payment,
-            ], __('order.order_updated_successfully'));
+            ], __('order.order_updated'));
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return serverErrorResponse(__('order.failed_to_update_order').': '.$e->getMessage());
+            return serverErrorResponse(__('order.order_update_failed').': '.$e->getMessage());
         }
     }
 
