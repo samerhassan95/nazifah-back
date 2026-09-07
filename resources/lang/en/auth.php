@@ -79,4 +79,13 @@ return [
     'employee_not_found' => 'Employee not found. Please contact your vendor administrator.',
     'account_not_active' => 'Your account is not active. Please contact your vendor administrator.',
     'employee_profile_retrieved' => 'Employee profile retrieved successfully',
+    'name_required_ar_or_en' => 'At least one name (ar or en) is required',
+    'register_failed' => 'Failed to register. Please try again.',
+    'employee_account_creation_failed' => 'Unable to create or find employee account. Please contact support.',
+    'otp_resend_failed' => 'Failed to resend OTP. Please try again.',
+    'vendor_not_found' => 'Vendor not found',
+    'vendor_profile_retrieved' => 'Vendor profile retrieved successfully',
+    'vendor_profile_retrieval_failed' => 'Error retrieving vendor profile',
+    'vendor_update_forbidden' => 'Only the vendor owner can update the vendor profile.',
+    'not_available' => 'Not available',
 ];

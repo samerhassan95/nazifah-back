@@ -79,4 +79,13 @@ return [
     'employee_not_found' => 'الموظف غير موجود. يرجى التواصل مع مدير النظام.',
     'account_not_active' => 'حسابك غير نشط. يرجى التواصل مع مدير النظام.',
     'employee_profile_retrieved' => 'تم استرجاع بيانات الموظف بنجاح',
+    'name_required_ar_or_en' => 'يرجى إدخال اسم واحد على الأقل (عربي أو إنجليزي)',
+    'register_failed' => 'فشل التسجيل. يرجى المحاولة مرة أخرى.',
+    'employee_account_creation_failed' => 'تعذر إنشاء أو العثور على حساب الموظف. يرجى التواصل مع الدعم.',
+    'otp_resend_failed' => 'فشل إعادة إرسال رمز التحقق. يرجى المحاولة مرة أخرى.',
+    'vendor_not_found' => 'المغسلة غير موجودة',
+    'vendor_profile_retrieved' => 'تم استرجاع بيانات المغسلة بنجاح',
+    'vendor_profile_retrieval_failed' => 'حدث خطأ أثناء استرجاع بيانات المغسلة',
+    'vendor_update_forbidden' => 'فقط مالك المغسلة يمكنه تعديل بيانات المغسلة.',
+    'not_available' => 'لا يوجد',
 ];

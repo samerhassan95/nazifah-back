@@ -134,7 +134,7 @@ class AuthController extends Controller
 
         // Ensure at least one name (ar or en) is provided
         if (empty($request->name['ar']) && empty($request->name['en'])) {
-            return validationErrorResponse(['name' => ['At least one name (ar or en) is required']]);
+            return validationErrorResponse(['name' => [__('auth.name_required_ar_or_en')]]);
         }
 
         try {
@@ -142,7 +142,7 @@ class AuthController extends Controller
 
             $existingEmployee = VendorEmployee::findByPhone($phone);
             if ($existingEmployee) {
-                return errorResponse('Phone number already registered. Please login instead.', null, 400);
+                return errorResponse(__('auth.phone_already_registered'), null, 400);
             }
 
             $registrationData = [
@@ -157,10 +157,10 @@ class AuthController extends Controller
                 $secondsRemaining = $session->getSecondsUntilReset();
 
                 return errorResponse(
-                    'Rate limit exceeded. Please wait before requesting another OTP.',
+                    __('auth.rate_limit_exceeded'),
                     [
                         'retry_after' => $secondsRemaining,
-                        'message' => "Please wait {$secondsRemaining} seconds before requesting another OTP",
+                        'message' => __('auth.rate_limit_message', ['seconds' => $secondsRemaining]),
                     ],
                     429
                 );
@@ -191,7 +191,7 @@ class AuthController extends Controller
                 return errorResponse(__('auth.rate_limit_exceeded'), null, 429);
             }
 
-            return errorResponse('Failed to register. Please try again.', null, 500);
+            return errorResponse(__('auth.register_failed'), null, 500);
         }
     }
 
@@ -290,7 +290,7 @@ class AuthController extends Controller
                 }
 
                 if (! $employee) {
-                    return errorResponse('Unable to create or find employee account. Please contact support.', null, 500);
+                    return errorResponse(__('auth.employee_account_creation_failed'), null, 500);
                 }
 
                 if (! $employee->is_active) {
@@ -383,10 +383,10 @@ class AuthController extends Controller
             ]);
 
             if (! app()->environment('production')) {
-                return errorResponse('Failed to verify OTP. Please try again. '.$e->getMessage(), null, 500);
+                return errorResponse(__('auth.otp_verification_failed').' '.$e->getMessage(), null, 500);
             }
 
-            return errorResponse('Failed to verify OTP. Please try again.', null, 500);
+            return errorResponse(__('auth.otp_verification_failed'), null, 500);
         }
     }
 
@@ -424,7 +424,7 @@ class AuthController extends Controller
                     __('auth.rate_limit_exceeded'),
                     [
                         'retry_after' => $secondsRemaining,
-                        'message' => "Please wait {$secondsRemaining} seconds before requesting another OTP",
+                        'message' => __('auth.rate_limit_message', ['seconds' => $secondsRemaining]),
                     ],
                     429
                 );
@@ -446,15 +446,15 @@ class AuthController extends Controller
                 'session_key' => $session->session_key,
                 'phone' => $session->phone,
                 'remaining_attempts' => $session->getRemainingAttempts(),
-                'message' => 'OTP resent to your phone number',
-            ], 'OTP resent successfully');
+                'message' => __('auth.otp_resent_message'),
+            ], __('auth.otp_resent_successfully'));
 
         } catch (\Exception $e) {
             if (str_contains($e->getMessage(), 'Rate limit exceeded')) {
-                return errorResponse('Rate limit exceeded. Please wait before requesting another OTP.', null, 429);
+                return errorResponse(__('auth.rate_limit_exceeded'), null, 429);
             }
 
-            return errorResponse('Failed to resend OTP. Please try again.', null, 500);
+            return errorResponse(__('auth.otp_resend_failed'), null, 500);
         }
     }
 
@@ -505,7 +505,7 @@ class AuthController extends Controller
                 'longitude' => $employee->branch->longitude,
                 'is_active' => $employee->branch->is_active,
             ] : null,
-        ], 'Profile retrieved successfully');
+        ], __('auth.employee_profile_retrieved'));
     }
 
     /**
@@ -518,7 +518,7 @@ class AuthController extends Controller
             $vendor = $employee->vendor;
 
             if (! $vendor) {
-                return notFoundResponse('Vendor not found');
+                return notFoundResponse(__('auth.vendor_not_found'));
             }
 
             // Format attachments
@@ -543,7 +543,7 @@ class AuthController extends Controller
                 'phone' => $vendor->phone,
                 'logo' => $this->uploadFilesService->getFullUrl($vendor->logo),
                 'official_number' => $vendor->official_number,
-                'vat_number' => $vendor->vat_number ?? 'لا يوجد',
+                'vat_number' => $vendor->vat_number ?? __('auth.not_available'),
                 'delivery_price_per_km' => (float) ($vendor->delivery_price_per_km ?? 0),
                 'wallet_balance' => (float) ($vendor->wallet_balance ?? 0),
                 'is_active' => (bool) $vendor->is_active,
@@ -554,9 +554,9 @@ class AuthController extends Controller
                 'attachments' => $attachments,
                 'created_at' => $vendor->created_at?->toDateTimeString(),
                 'updated_at' => $vendor->updated_at?->toDateTimeString(),
-            ], 'Vendor profile retrieved successfully');
+            ], __('auth.vendor_profile_retrieved'));
         } catch (\Exception $e) {
-            return errorResponse('Error retrieving vendor profile: '.$e->getMessage(), null, 500);
+            return errorResponse(__('auth.vendor_profile_retrieval_failed').': '.$e->getMessage(), null, 500);
         }
     }
 
@@ -588,12 +588,12 @@ class AuthController extends Controller
         $vendor = $employee->vendor;
 
         if (! $vendor) {
-            return errorResponse('Vendor not found', null, 404);
+            return errorResponse(__('auth.vendor_not_found'), null, 404);
         }
 
         // Only owner or employees with edit_vendor_profile permission can update vendor profile
         if (! $employee->hasVendorPermission('edit_vendor_profile')) {
-            return errorResponse('Only vendor owner can update vendor profile.', null, 403);
+            return errorResponse(__('auth.vendor_update_forbidden'), null, 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -865,6 +865,6 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return successResponse(null, 'Logged out successfully');
+        return successResponse(null, __('auth.logout_successful'));
     }
 }
