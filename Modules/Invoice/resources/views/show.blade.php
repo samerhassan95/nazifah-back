@@ -276,13 +276,13 @@
             <div class="info-grid">
                 {{-- Seller --}}
                 <div class="info-card">
-                    <h3>بيانات البائع / Seller</h3>
+                    <h3>بيانات البائع</h3>
                     <div class="info-row">
                         <span class="label">الاسم</span>
                         <span class="value">{{ $invoice->seller_name }}</span>
                     </div>
                     <div class="info-row">
-                        <span class="label">الرقم الضريبي (TRN)</span>
+                        <span class="label">الرقم الضريبي</span>
                         <span class="value">{{ $invoice->seller_vat_number ?? '—' }}</span>
                     </div>
                     @if($invoice->seller_registration_number)
@@ -301,7 +301,7 @@
 
                 {{-- Customer & Order --}}
                 <div class="info-card">
-                    <h3>بيانات العميل والطلب / Customer & Order</h3>
+                    <h3>بيانات العميل والطلب</h3>
                     <div class="info-row">
                         <span class="label">العميل</span>
                         <span class="value">{{ $invoice->customer_name }}</span>
@@ -323,7 +323,7 @@
 
             {{-- Line Items Table --}}
             <div class="items-section">
-                <h3>تفاصيل الخدمات / Items</h3>
+                <h3>تفاصيل الخدمات</h3>
                 <div class="table-scroll">
                 <table>
                     <thead>
@@ -358,27 +358,27 @@
             <div class="totals-section">
                 <div class="totals-card">
                     <div class="total-row">
-                        <span class="label">المجموع الفرعي (Subtotal)</span>
+                        <span class="label">المجموع الفرعي</span>
                         <span class="value">{{ number_format((float) $invoice->subtotal_amount, 2) }} {{ $invoice->currency }}</span>
                     </div>
                     @if((float) $invoice->discount_amount > 0)
                     <div class="total-row">
-                        <span class="label">الخصم (Discount)</span>
-                        <span class="value" style="color: #e74c3c;">- {{ number_format((float) $invoice->discount_amount, 2) }} {{ $invoice->currency }}</span>
+                        <span class="label">الخصم</span>
+                        <span class="value">{{ (float) $invoice->subtotal_amount > 0 ? number_format(((float) $invoice->discount_amount / (float) $invoice->subtotal_amount) * 100, 0) : 0 }}%</span>
                     </div>
                     @endif
                     @if((float) $invoice->delivery_fee > 0)
                     <div class="total-row">
-                        <span class="label">رسوم التوصيل (Delivery)</span>
+                        <span class="label">رسوم التوصيل</span>
                         <span class="value">{{ number_format((float) $invoice->delivery_fee, 2) }} {{ $invoice->currency }}</span>
                     </div>
                     @endif
                     <div class="total-row">
-                        <span class="label">ضريبة القيمة المضافة ({{ $payload['vat_rate'] ?? 15 }}% VAT)</span>
+                        <span class="label">ضريبة القيمة المضافة ({{ $payload['vat_rate'] ?? 15 }}%)</span>
                         <span class="value">{{ number_format((float) $invoice->tax_amount, 2) }} {{ $invoice->currency }}</span>
                     </div>
                     <div class="total-row grand">
-                        <span class="label">الإجمالي (Total)</span>
+                        <span class="label">الإجمالي</span>
                         <span class="value">{{ number_format((float) $invoice->total_amount, 2) }} {{ $invoice->currency }}</span>
                     </div>
                 </div>
