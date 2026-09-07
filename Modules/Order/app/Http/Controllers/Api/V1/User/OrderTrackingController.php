@@ -1533,6 +1533,17 @@ class OrderTrackingController extends Controller
                     $modificationIntent ? (float) $modificationIntent->delta_amount : null,
                     $deferApplication
                 );
+
+                // A staged gateway surcharge never touches order.total_amount/final_amount
+                // until the payment completes (see the comment on $intentAppliedImmediately
+                // above) — the client would otherwise have no way to know what its new
+                // total will actually be once it pays, since amount_due here is measured
+                // against original_final_amount (what was truly last paid), not the
+                // order's current provisional final_amount.
+                if ($deferApplication && $modificationIntent) {
+                    $payment['new_total_amount'] = (float) $modificationIntent->new_total;
+                    $payment['new_final_amount'] = (float) $modificationIntent->new_final_amount;
+                }
             } else {
                 $payment = null;
             }
