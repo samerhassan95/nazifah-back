@@ -484,6 +484,19 @@ class VendorOrderReviewService
             ]);
         }
 
+        // This approval fully resolves whatever the vendor's review proposed — clear
+        // the original_total_amount/original_final_amount snapshot so a FUTURE vendor
+        // review (after this order is edited or re-reviewed down the line) takes a
+        // fresh one instead of finding original_total_amount still set and skipping
+        // the snapshot (its "only snapshot once" guard), which would silently anchor
+        // reviewedPaymentDelta() on this stale, now long-outdated baseline.
+        if ($order->original_total_amount !== null || $order->original_final_amount !== null) {
+            $order->update([
+                'original_total_amount' => null,
+                'original_final_amount' => null,
+            ]);
+        }
+
         $statusService = app(\App\Services\OrderStatusService::class);
         $statusService->transitionTo($order, OrderStatus::CONFIRMED, [
             'notes' => $notes,
