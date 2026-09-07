@@ -171,7 +171,11 @@ class OrderController extends Controller
         $pickupAddress = null;
         $deliveryAddress = null;
 
-        if (! $pickupAtVendor) {
+        // Only resolve a leg's address when that leg's at_vendor flag was actually sent —
+        // a calculate() preview may cover just one leg (pickup only or delivery only), in
+        // which case the other leg's address must NOT be silently resolved from the
+        // client's default address (that would price a leg they never asked about).
+        if ($request->has('pickup_at_vendor') && ! $pickupAtVendor) {
             if ($request->pickup_address_id) {
                 $pickupAddress = Address::where('id', $request->pickup_address_id)
                     ->where('client_id', $user->id)
@@ -188,7 +192,7 @@ class OrderController extends Controller
             }
         }
 
-        if (! $deliveryAtVendor) {
+        if ($request->has('delivery_at_vendor') && ! $deliveryAtVendor) {
             if ($request->delivery_address_id) {
                 $deliveryAddress = Address::where('id', $request->delivery_address_id)
                     ->where('client_id', $user->id)
@@ -376,15 +380,18 @@ class OrderController extends Controller
 
         $validator = Validator::make($request->all(), [
             'branch_id' => ['required', 'exists:branches,id'],
-            'pickup_at_vendor' => ['required', 'boolean'],
-            'delivery_at_vendor' => ['required', 'boolean'],
+            // A preview can be for just the pickup leg or just the delivery leg — the
+            // client isn't required to send both at once (order creation still does).
+            // At least one of the two must be present so there's something to price.
+            'pickup_at_vendor' => ['required_without:delivery_at_vendor', 'nullable', 'boolean'],
+            'delivery_at_vendor' => ['required_without:pickup_at_vendor', 'nullable', 'boolean'],
             'pickup_address_id' => [
-                Rule::requiredIf(fn () => ! $request->boolean('pickup_at_vendor')),
+                Rule::requiredIf(fn () => $request->has('pickup_at_vendor') && ! $request->boolean('pickup_at_vendor')),
                 'nullable',
                 'exists:addresses,id',
             ],
             'delivery_address_id' => [
-                Rule::requiredIf(fn () => ! $request->boolean('delivery_at_vendor')),
+                Rule::requiredIf(fn () => $request->has('delivery_at_vendor') && ! $request->boolean('delivery_at_vendor')),
                 'nullable',
                 'exists:addresses,id',
             ],
