@@ -284,9 +284,16 @@ class VendorOrderReviewService
                     ]);
                 }
             } else {
+                // Nothing rejected/modified this round — there's no delta for the client
+                // to approve, so this review resolves itself immediately. Clear the
+                // snapshot here too (same as finalizeClientApproval()) or a LATER review
+                // round on this order finds original_total_amount already set and skips
+                // re-snapshotting, silently breaking reviewedPaymentDelta() for it.
                 $order->update([
                     'client_approved' => true,
                     'client_approved_at' => now(),
+                    'original_total_amount' => null,
+                    'original_final_amount' => null,
                 ]);
                 $statusService = app(\App\Services\OrderStatusService::class);
                 if (OrderStatus::from($order->status) === OrderStatus::PENDING) {
