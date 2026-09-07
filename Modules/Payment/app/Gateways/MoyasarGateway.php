@@ -415,10 +415,17 @@ class MoyasarGateway extends AbstractPaymentGateway
             $payment = $this->fetchPayment($reference);
 
             if (! $payment) {
+                // Not being able to reach Moyasar right now (network blip, rate limit, a
+                // concurrent verify call racing this one) is inconclusive, NOT proof the
+                // payment failed — the payment may well have succeeded and simply be
+                // unconfirmable this instant. Report 'pending' (matching the "no
+                // reference yet" branch above) so a caller never persists a definitive
+                // 'failed' off a lookup hiccup; a later retry (webhook redelivery, the
+                // client re-polling) gets another chance to confirm it correctly.
                 return new PaymentResponse(
                     success: false,
                     transactionId: $transactionId,
-                    status: 'failed',
+                    status: 'pending',
                     message: __('payment.could_not_retrieve_payment')
                 );
             }
