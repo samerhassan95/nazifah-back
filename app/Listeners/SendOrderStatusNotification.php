@@ -82,8 +82,8 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'تحديثات على طلبك', 'Updates on Your Order',
-            "قامت المغسلة بمراجعة طلبك #{$num}. يرجى المراجعة والموافقة.",
-            "The laundry has reviewed your order #{$num}. Please review and approve.",
+            "قامت المغسلة بتعديل طلبك #{$num}. يرجى المراجعة والموافقة.",
+            "The laundry has modified your order #{$num}. Please review and approve.",
             'order_reviewed',
         );
         $this->notifyVendorAndAdmins($order, $actorType,

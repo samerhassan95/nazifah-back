@@ -681,8 +681,8 @@ class VendorOrderReviewService
         $rejectedCount = $order->items->where('vendor_status', 'rejected')->count();
         $modifiedCount = $order->items->where('vendor_status', 'modified')->count();
 
-        $messageAr = "قامت المغسلة بمراجعة طلبك #{$order->order_number}. ";
-        $messageEn = "The laundry has reviewed your order #{$order->order_number}. ";
+        $messageAr = "قامت المغسلة بتعديل طلبك #{$order->order_number}. ";
+        $messageEn = "The laundry has modified your order #{$order->order_number}. ";
 
         if ($rejectedCount > 0 && $acceptedCount > 0) {
             $messageAr .= 'المغسلة تقدم بعض الخدمات فقط. يرجى مراجعة العناصر غير المتوفرة.';
