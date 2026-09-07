@@ -1431,13 +1431,19 @@ class OrderPaymentService
     }
 
     /**
-     * Expire a pending modification intent (superseded by a new edit).
+     * Expire any pending modification intent(s) on this order (superseded by a new
+     * edit) — cancelling their unpaid surcharge leg(s) too, not just flipping the
+     * intent's status, or a superseded gateway leg is left stuck 'pending' forever
+     * (it's tied to an 'expired' intent, so the stale-intent sweep never picks it
+     * back up either) while a fresh leg is created for the new edit — the two
+     * pending amounts pile up in payment_breakdown instead of the old one clearing.
      */
     public function expirePendingModificationIntents(int $orderId): void
     {
         OrderModificationIntent::where('order_id', $orderId)
             ->where('status', OrderModificationIntent::STATUS_PENDING)
-            ->update(['status' => OrderModificationIntent::STATUS_EXPIRED]);
+            ->get()
+            ->each(fn (OrderModificationIntent $intent) => $this->expireStaleModificationIntent($intent));
     }
 
     /**
