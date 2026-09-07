@@ -740,7 +740,7 @@ class AuthController extends Controller
                 'created_at' => $vendor->created_at?->toDateTimeString(),
                 'updated_at' => $vendor->updated_at?->toDateTimeString(),
             ],
-        ], 'Profile updated successfully');
+        ], __('auth.profile_updated'));
     }
 
     /**
