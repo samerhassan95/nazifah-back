@@ -863,7 +863,7 @@ class OrderTrackingController extends Controller
             // items diff) via the shared resolver — calculateOrderUpdate()'s read-only
             // preview uses the exact same method, so the numbers can never drift between
             // what the client previews and what actually gets committed here.
-            $computation = $this->resolveOrderUpdateComputation($order, $request, $user, $lang, $oldFinalAmount);
+            $computation = $this->resolveOrderUpdateComputation($order, $request, $user, $lang, $oldFinalAmount, $resolvesPendingVendorReview);
             if (isset($computation['error'])) {
                 DB::rollBack();
 
@@ -1336,7 +1336,7 @@ class OrderTrackingController extends Controller
             ? (float) $order->original_final_amount
             : (float) $order->final_amount;
 
-        $computation = $this->resolveOrderUpdateComputation($order, $request, $user, $lang, $oldFinalAmount);
+        $computation = $this->resolveOrderUpdateComputation($order, $request, $user, $lang, $oldFinalAmount, $resolvesPendingVendorReview);
         if (isset($computation['error'])) {
             return $computation['error'];
         }
@@ -1350,7 +1350,8 @@ class OrderTrackingController extends Controller
         // added / removed, so the client app can grey out what stayed the same
         // and highlight exactly what this edit changes — not just the
         // removed/added diff lists above, which omit anything unchanged.
-        $oldComponents = $this->extractOrderComponents($order->items);
+        // Same $resolvesPendingVendorReview rule as resolveOrderUpdateComputation().
+        $oldComponents = $this->extractOrderComponents($order->items, $resolvesPendingVendorReview);
         $newComponents = $this->extractItemsDataComponents($computation['items_data']);
         $allSignatures = array_unique(array_merge(array_keys($oldComponents), array_keys($newComponents)));
         $componentLookups = $this->buildOrderComponentLookups($allSignatures);
@@ -1422,7 +1423,7 @@ class OrderTrackingController extends Controller
      * return it as-is, rolling back its own transaction first if it has one), or the
      * full set of computed values otherwise.
      */
-    private function resolveOrderUpdateComputation(Order $order, Request $request, $user, string $lang, float $oldFinalAmount): array
+    private function resolveOrderUpdateComputation(Order $order, Request $request, $user, string $lang, float $oldFinalAmount, bool $resolvesPendingVendorReview = false): array
     {
         // Use request values if provided, otherwise keep existing order values
         $pickupAtVendor = $request->has('pickup_at_vendor')
@@ -1736,7 +1737,15 @@ class OrderTrackingController extends Controller
         // like the entire old line was removed and an entirely new one added
         // (same total delta, but a misleading "removed: X" for something never
         // touched). Diffing per component means only what actually changed shows.
-        $oldComponents = $this->extractOrderComponents($order->items);
+        //
+        // $resolvesPendingVendorReview: a vendor-rejected item/addon is normally
+        // excluded here (it doesn't count toward the order's current total) — but
+        // when this edit resolves a pending vendor review, the client submitting
+        // new items instead of an explicit approve/reject is treated as implicitly
+        // accepting whatever the vendor rejected, so it's included at its
+        // would-have-been price and — since the new submission never re-adds it —
+        // naturally comes out as a "removed" component below.
+        $oldComponents = $this->extractOrderComponents($order->items, $resolvesPendingVendorReview);
         $newComponents = $this->extractItemsDataComponents($itemsData);
 
         $changedSignatures = array_unique(array_merge(array_keys($oldComponents), array_keys($newComponents)));
@@ -1906,16 +1915,36 @@ class OrderTrackingController extends Controller
      *
      * @return array<string, float> component signature => total amount
      */
-    private function extractOrderComponents(\Illuminate\Support\Collection $items): array
+    /**
+     * $includeRejected controls whether vendor-rejected rows count:
+     * - false (default): matches the order's current committed total (same rule
+     *   as Order::getEffectiveSubtotal()) — a rejected item/addon contributes 0.
+     * - true: also includes rejected rows at their would-have-been price. Pass
+     *   true only when this edit resolves a pending vendor review (the client
+     *   adding items instead of explicitly approving/rejecting is treated as
+     *   implicitly accepting whatever the vendor rejected) — the rejected
+     *   component then naturally shows up as "removed" in the diff against the
+     *   new submission, which never re-includes it.
+     */
+    private function extractOrderComponents(\Illuminate\Support\Collection $items, bool $includeRejected = false): array
     {
         $components = [];
         foreach ($items as $item) {
             $pieceId = (int) $item->piece_id;
+            $itemRejected = ($item->vendor_status ?? 'accepted') === 'rejected';
 
-            $svcSig = $this->orderComponentSignature('s', $pieceId, (int) $item->service_id);
-            $components[$svcSig] = ($components[$svcSig] ?? 0.0) + (float) $item->service_price;
+            if (! $itemRejected || $includeRejected) {
+                $svcSig = $this->orderComponentSignature('s', $pieceId, (int) $item->service_id);
+                $components[$svcSig] = ($components[$svcSig] ?? 0.0) + (float) $item->service_price;
+            }
 
+            // A rejected item's own additions are moot (nothing on it is billed),
+            // but an otherwise-accepted item can still have one addition rejected.
             foreach ($item->additionalServicesPivot as $pivot) {
+                $addonRejected = $itemRejected || ($pivot->vendor_status ?? 'accepted') === 'rejected';
+                if ($addonRejected && ! $includeRejected) {
+                    continue;
+                }
                 $addonSig = $this->orderComponentSignature('a', $pieceId, (int) $pivot->service_addition_id);
                 $qty = (int) ($pivot->quantity ?? 1);
                 $price = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
