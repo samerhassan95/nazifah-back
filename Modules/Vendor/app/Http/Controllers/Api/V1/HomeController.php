@@ -873,7 +873,7 @@ class HomeController extends Controller
         return successResponse(array_merge([
             'id' => $order->id,
             'status' => $order->status,
-            'status_label' => $order->status_label,
+            'status_label' => $order->vendor_status_label,
             'order_number' => $order->order_number,
             'branch_id' => $order->branch_id,
             'total_price' => (float) $order->total_amount,
