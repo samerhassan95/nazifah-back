@@ -1371,23 +1371,40 @@ class OrderTrackingController extends Controller
             }
         }
 
+        // Tax on just the net item-level change, for the "review changes" card:
+        // إجمالي المضاف / إجمالي المحذوف / صافي التغيير / الضريبة / الإجمالي, where
+        // الضريبة = صافي × نسبة الضريبة and الإجمالي = صافي + الضريبة. This is
+        // NOT always equal to amount_due below: amount_due also reconciles a
+        // pending vendor-rejected item this same edit resolves (see
+        // $resolvesPendingVendorReview) and — very rarely — an order that spans a
+        // tax-rate change. amount_due is the number that's actually
+        // charged/refunded; net_total_amount is only for a self-consistent
+        // "المضاف/المحذوف/الصافي/الضريبة/الإجمالي" display.
+        $taxRate = (float) ($computation['pricing_totals']['tax_percentage'] ?? 15) / 100;
+        $netAmount = (float) $itemsChangeSummary['net_amount'];
+        $netTaxAmount = round($netAmount * $taxRate, 2);
+        $netTotalAmount = round($netAmount + $netTaxAmount, 2);
+
         return successResponse([
             // What's original vs what this edit changes — grey vs highlighted in the UI.
             'items_breakdown' => $itemsBreakdown,
-            // Item-level diff, before tax/delivery — "cart" totals.
+            // Item-level diff, before tax — "cart" totals for the review card.
             'added_total' => $itemsChangeSummary['added_total'],
             'removed_total' => $itemsChangeSummary['removed_total'],
-            'net_amount' => $itemsChangeSummary['net_amount'],
+            'net_amount' => $netAmount,
             'net_type' => $itemsChangeSummary['net_type'],
-            // The new order's totals if this edit is confirmed as-is.
+            'net_tax_amount' => $netTaxAmount,
+            'net_total_amount' => $netTotalAmount,
+            // The new order's totals if this edit is confirmed as-is (the whole
+            // order, every item — not just what this edit changed).
             'subtotal' => round((float) $computation['total_amount'], 2),
             'discount_amount' => round((float) $computation['discount_amount'], 2),
             'delivery_fee' => round((float) $computation['pricing_totals']['delivery_fee'], 2),
             'tax_amount' => round((float) $computation['tax_amount'], 2),
             'total_amount' => round((float) $computation['final_amount'], 2),
-            // The real money delta (post-tax/delivery) — never the old total stacked
-            // on top of the new one. This is what will actually be charged/refunded,
-            // e.g. via wallet, if the edit is confirmed.
+            // The real money delta (post-tax/delivery, reconciling any pending
+            // vendor review) — never the old total stacked on top of the new one.
+            // This is what will actually be charged/refunded, e.g. via wallet.
             'amount_due' => round(abs($delta), 2),
             'amount_due_type' => $deltaCmp < 0 ? 'refund' : ($deltaCmp > 0 ? 'charge' : 'none'),
         ], __('order.order_calculated'));
