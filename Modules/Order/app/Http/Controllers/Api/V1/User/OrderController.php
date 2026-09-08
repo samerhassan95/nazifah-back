@@ -2410,102 +2410,28 @@ class OrderController extends Controller
     // Orders should never be deleted, only cancelled for audit trail purposes
 
     /**
-     * Generate unique order number
-     * Handles race conditions by using database lock and retry mechanism
+     * Generate the next sequential order number.
+     *
+     * A single row in order_number_sequences, incremented under lockForUpdate()
+     * inside one transaction, is genuinely atomic: a concurrent request's
+     * lockForUpdate() on that same row blocks until this transaction commits,
+     * so two requests can never be handed the same value. This replaces an
+     * earlier "scan MAX(order_number) across 3 tables" approach whose lock
+     * only held for a short-lived sub-transaction (released long before the
+     * number was actually used) — under real concurrency that let two
+     * requests compute the same "next" number, exhausting its retry budget
+     * and falling back to a millisecond timestamp as the order number (e.g.
+     * a customer receiving order "#1788875674742" by SMS).
      */
     private function generateUniqueOrderNumber(): string
     {
-        $maxRetries = 10;
-        $retry = 0;
+        $next = DB::transaction(function () {
+            DB::table('order_number_sequences')->where('id', 1)->lockForUpdate()->increment('next_value');
 
-        while ($retry < $maxRetries) {
-            try {
-                $nextSequence = DB::transaction(function () {
-                    return $this->getMaxReservedOrderSequence() + 1;
-                });
+            return DB::table('order_number_sequences')->where('id', 1)->value('next_value');
+        });
 
-                $orderNumber = (string) $nextSequence;
-
-                if (! $this->isOrderNumberReserved($orderNumber)) {
-                    return $orderNumber;
-                }
-
-                $retry++;
-                usleep(10000);
-            } catch (\Exception $e) {
-                $retry++;
-
-                if ($retry >= $maxRetries) {
-                    return (string) ((int) (microtime(true) * 1000));
-                }
-                usleep(10000);
-            }
-        }
-
-        return (string) ((int) (microtime(true) * 1000));
-    }
-
-    /**
-     * Highest plain numeric order number already used (orders, pending checkout, payments).
-     */
-    private function getMaxReservedOrderSequence(): int
-    {
-        $maxSequence = 0;
-
-        $candidates = [
-            Order::whereRaw("order_number REGEXP '^[0-9]+$'")
-                ->lockForUpdate()
-                ->orderByRaw('CAST(order_number AS UNSIGNED) desc')
-                ->value('order_number'),
-            PaymentTransaction::whereRaw("transaction_id REGEXP '^[0-9]+$'")
-                ->orderByRaw('CAST(transaction_id AS UNSIGNED) desc')
-                ->value('transaction_id'),
-        ];
-
-        foreach ($candidates as $orderNumber) {
-            $sequence = $this->parseOrderNumberSequence($orderNumber);
-            if ($sequence !== null) {
-                $maxSequence = max($maxSequence, $sequence);
-            }
-        }
-
-        PendingOrder::where('order_data->order_number', 'REGEXP', '^[0-9]+$')
-            ->lockForUpdate()
-            ->select(['order_data'])
-            ->chunkById(100, function ($pendingOrders) use (&$maxSequence) {
-                foreach ($pendingOrders as $pendingOrder) {
-                    $sequence = $this->parseOrderNumberSequence(
-                        $pendingOrder->order_data['order_number'] ?? null
-                    );
-                    if ($sequence !== null) {
-                        $maxSequence = max($maxSequence, $sequence);
-                    }
-                }
-            });
-
-        return $maxSequence;
-    }
-
-    private function parseOrderNumberSequence(?string $orderNumber): ?int
-    {
-        if ($orderNumber === null || $orderNumber === '' || ! preg_match('/^\d+$/', $orderNumber)) {
-            return null;
-        }
-
-        return (int) $orderNumber;
-    }
-
-    private function isOrderNumberReserved(string $orderNumber): bool
-    {
-        if (Order::where('order_number', $orderNumber)->exists()) {
-            return true;
-        }
-
-        if (PaymentTransaction::where('transaction_id', $orderNumber)->exists()) {
-            return true;
-        }
-
-        return PendingOrder::where('order_data->order_number', $orderNumber)->exists();
+        return (string) $next;
     }
 
     /**
