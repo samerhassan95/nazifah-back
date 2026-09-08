@@ -1364,24 +1364,37 @@ class OrderTrackingController extends Controller
             ];
         }
         $removedNames = collect($itemsChangeSummary['removed_items'])->pluck('name')->all();
+        // Group by cart line (line_group), not by individual OrderItem row — a
+        // multi-service line is stored as multiple rows; showing each row as its
+        // own "original" entry would fragment one item into several and misprice
+        // each fragment. See resolveOrderUpdateComputation() for the same grouping.
+        $oldLineGroups = $this->groupOrderItemsIntoLines($order->items);
         // withTrashed(): a piece/service on an existing order line may have been
         // discontinued since the order was placed — a plain belongsTo would return
         // null and OrderItemDisplayNames::pieceName()/serviceName() require non-null.
-        $existingPiecesById = Piece::withTrashed()->whereIn('id', $order->items->pluck('piece_id')->unique())->get()->keyBy('id');
-        $existingServicesById = \Modules\Service\Models\Service::withTrashed()->whereIn('id', $order->items->pluck('service_id')->unique())->get()->keyBy('id');
-        foreach ($order->items as $existingItem) {
-            $existingPiece = $existingPiecesById->get($existingItem->piece_id);
-            $existingService = $existingServicesById->get($existingItem->service_id);
+        $existingPiecesById = Piece::withTrashed()->whereIn('id', collect($oldLineGroups)->pluck('piece_id')->unique())->get()->keyBy('id');
+        $existingServicesById = \Modules\Service\Models\Service::withTrashed()
+            ->whereIn('id', collect($oldLineGroups)->pluck('service_ids')->flatten()->unique())
+            ->get()->keyBy('id');
+        foreach ($oldLineGroups as $group) {
+            $existingPiece = $existingPiecesById->get($group['piece_id']);
+            $serviceNames = [];
+            foreach ($group['service_ids'] as $sid) {
+                $existingService = $existingServicesById->get($sid);
+                if ($existingService) {
+                    $serviceNames[] = \App\Support\OrderItemDisplayNames::serviceName($existingService, (int) $order->branch_id, $lang);
+                }
+            }
             $sig = trim(
                 ($existingPiece ? \App\Support\OrderItemDisplayNames::pieceName($existingPiece, (int) $order->branch_id, $lang) : '')
                 .' - '.
-                ($existingService ? \App\Support\OrderItemDisplayNames::serviceName($existingService, (int) $order->branch_id, $lang) : ''),
+                implode(' + ', $serviceNames),
                 ' -'
             );
             if (! in_array($sig, $removedNames, true)) {
                 $itemsBreakdown[] = [
                     'name' => $sig,
-                    'amount' => round((float) $existingItem->total_price, 2),
+                    'amount' => round($group['total'], 2),
                     'status' => 'original',
                 ];
             }
@@ -1727,15 +1740,26 @@ class OrderTrackingController extends Controller
         // e.g. "removed item worth 3, added items worth 2, net: 1 refund"
         // right when the edit is submitted, not just the final tax-inclusive
         // amount_due/refund.
+        // Signature is piece_id + the FULL set of service_ids on the line, not just
+        // one service. A multi-service cart line (e.g. two services on one piece)
+        // is stored as multiple OrderItem rows sharing a line_group (see
+        // replaceOrderItems()) — matching on a single service_id would treat every
+        // non-primary row as spuriously "removed" whenever the line is resubmitted
+        // unchanged, folding its value into the primary row's "added" delta instead.
+        $oldLineGroups = $this->groupOrderItemsIntoLines($order->items);
         $oldItemTotals = [];
-        foreach ($order->items as $oldItem) {
-            $sig = $oldItem->piece_id.'-'.$oldItem->service_id;
-            $oldItemTotals[$sig] = ($oldItemTotals[$sig] ?? 0) + (float) $oldItem->total_price;
+        foreach ($oldLineGroups as $group) {
+            $sig = $this->orderLineSignature($group['piece_id'], $group['service_ids']);
+            $oldItemTotals[$sig] = ($oldItemTotals[$sig] ?? 0) + $group['total'];
         }
 
         $newItemTotals = [];
         foreach ($itemsData as $newItem) {
-            $sig = $newItem['piece_id'].'-'.$newItem['service_id'];
+            $serviceIds = array_map(
+                fn ($row) => (int) ($row['service_id'] ?? 0),
+                $newItem['services'] ?? [['service_id' => $newItem['service_id']]]
+            );
+            $sig = $this->orderLineSignature((int) $newItem['piece_id'], $serviceIds);
             $newItemTotals[$sig] = ($newItemTotals[$sig] ?? 0) + (float) ($newItem['total_price'] ?? 0);
         }
 
@@ -1743,22 +1767,28 @@ class OrderTrackingController extends Controller
         $changedPieceIds = [];
         $changedServiceIds = [];
         foreach ($changedSignatures as $sig) {
-            [$sigPieceId, $sigServiceId] = array_map('intval', explode('-', $sig));
+            [$sigPieceId, $sigServiceIds] = $this->parseOrderLineSignature($sig);
             $changedPieceIds[] = $sigPieceId;
-            $changedServiceIds[] = $sigServiceId;
+            array_push($changedServiceIds, ...$sigServiceIds);
         }
         $piecesById = Piece::withTrashed()->whereIn('id', array_unique($changedPieceIds))->get()->keyBy('id');
         $servicesById = \Modules\Service\Models\Service::withTrashed()->whereIn('id', array_unique($changedServiceIds))->get()->keyBy('id');
 
         $describeItemSignature = function (string $sig) use ($piecesById, $servicesById, $storeBranchId, $lang) {
-            [$sigPieceId, $sigServiceId] = array_map('intval', explode('-', $sig));
+            [$sigPieceId, $sigServiceIds] = $this->parseOrderLineSignature($sig);
             $piece = $piecesById->get($sigPieceId);
-            $service = $servicesById->get($sigServiceId);
+            $serviceNames = [];
+            foreach ($sigServiceIds as $sid) {
+                $service = $servicesById->get($sid);
+                if ($service) {
+                    $serviceNames[] = \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang);
+                }
+            }
 
             return trim(
                 ($piece ? \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang) : '')
                 .' - '.
-                ($service ? \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang) : ''),
+                implode(' + ', $serviceNames),
                 ' -'
             );
         };
@@ -1936,6 +1966,52 @@ class OrderTrackingController extends Controller
             'delta' => $delta,
             'delta_cmp' => $deltaCmp,
         ];
+    }
+
+    /**
+     * Reconstruct "cart line" units from an order's exploded OrderItem rows. A
+     * multi-service cart line (two or more main services on one piece) is stored
+     * as multiple OrderItem rows sharing a line_group (see replaceOrderItems());
+     * a single-service line has line_group null and is its own unit.
+     *
+     * @return list<array{piece_id: int, service_ids: int[], total: float}>
+     */
+    private function groupOrderItemsIntoLines(\Illuminate\Support\Collection $items): array
+    {
+        $groups = [];
+        foreach ($items as $item) {
+            $key = $item->line_group ?? ('single-'.$item->id);
+            if (! isset($groups[$key])) {
+                $groups[$key] = ['piece_id' => (int) $item->piece_id, 'service_ids' => [], 'total' => 0.0];
+            }
+            $groups[$key]['service_ids'][] = (int) $item->service_id;
+            $groups[$key]['total'] += (float) $item->total_price;
+        }
+
+        return array_values($groups);
+    }
+
+    /**
+     * Stable key for a cart line: piece_id + its full (sorted, deduped) set of
+     * service_ids — not just one service, or a multi-service line's non-primary
+     * rows would always look "removed" when the line is resubmitted unchanged.
+     */
+    private function orderLineSignature(int $pieceId, array $serviceIds): string
+    {
+        $serviceIds = array_unique(array_map('intval', $serviceIds));
+        sort($serviceIds);
+
+        return $pieceId.':'.implode(',', $serviceIds);
+    }
+
+    /**
+     * @return array{0: int, 1: int[]}
+     */
+    private function parseOrderLineSignature(string $sig): array
+    {
+        [$pieceId, $serviceIdsCsv] = explode(':', $sig, 2);
+
+        return [(int) $pieceId, array_map('intval', explode(',', $serviceIdsCsv))];
     }
 
     /**
