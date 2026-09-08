@@ -768,7 +768,7 @@ class OrderTrackingController extends Controller
         $user = $request->user();
         $lang = app()->getLocale();
 
-            $order = Order::with(['items', 'vendor', 'branch', 'pickupAddress', 'deliveryAddress', 'discount'])
+            $order = Order::with(['items.additionalServicesPivot', 'vendor', 'branch', 'pickupAddress', 'deliveryAddress', 'discount'])
             ->where('client_id', $user->id)
             ->find($order_id);
 
@@ -1291,7 +1291,7 @@ class OrderTrackingController extends Controller
         $user = $request->user();
         $lang = app()->getLocale();
 
-        $order = Order::with(['items', 'vendor', 'branch', 'pickupAddress', 'deliveryAddress', 'discount'])
+        $order = Order::with(['items.additionalServicesPivot', 'vendor', 'branch', 'pickupAddress', 'deliveryAddress', 'discount'])
             ->where('client_id', $user->id)
             ->find($order_id);
 
@@ -1345,58 +1345,29 @@ class OrderTrackingController extends Controller
         $delta = (float) $computation['delta'];
         $deltaCmp = $computation['delta_cmp'];
 
-        // Full "invoice" view: every line in the new item list, each tagged so the
-        // client app can render originals in grey and additions highlighted, plus the
-        // removed lines struck through — not just the removed/added diff lists above.
+        // Full "invoice" view: every component (each main service and each
+        // additional service, on every piece — old or new) tagged original /
+        // added / removed, so the client app can grey out what stayed the same
+        // and highlight exactly what this edit changes — not just the
+        // removed/added diff lists above, which omit anything unchanged.
+        $oldComponents = $this->extractOrderComponents($order->items);
+        $newComponents = $this->extractItemsDataComponents($computation['items_data']);
+        $allSignatures = array_unique(array_merge(array_keys($oldComponents), array_keys($newComponents)));
+        $componentLookups = $this->buildOrderComponentLookups($allSignatures);
+
         $itemsBreakdown = [];
-        foreach ($itemsChangeSummary['removed_items'] as $removed) {
-            $itemsBreakdown[] = [
-                'name' => $removed['name'],
-                'amount' => $removed['amount'],
-                'status' => 'removed',
-            ];
-        }
-        foreach ($itemsChangeSummary['added_items'] as $added) {
-            $itemsBreakdown[] = [
-                'name' => $added['name'],
-                'amount' => $added['amount'],
-                'status' => 'added',
-            ];
-        }
-        $removedNames = collect($itemsChangeSummary['removed_items'])->pluck('name')->all();
-        // Group by cart line (line_group), not by individual OrderItem row — a
-        // multi-service line is stored as multiple rows; showing each row as its
-        // own "original" entry would fragment one item into several and misprice
-        // each fragment. See resolveOrderUpdateComputation() for the same grouping.
-        $oldLineGroups = $this->groupOrderItemsIntoLines($order->items);
-        // withTrashed(): a piece/service on an existing order line may have been
-        // discontinued since the order was placed — a plain belongsTo would return
-        // null and OrderItemDisplayNames::pieceName()/serviceName() require non-null.
-        $existingPiecesById = Piece::withTrashed()->whereIn('id', collect($oldLineGroups)->pluck('piece_id')->unique())->get()->keyBy('id');
-        $existingServicesById = \Modules\Service\Models\Service::withTrashed()
-            ->whereIn('id', collect($oldLineGroups)->pluck('service_ids')->flatten()->unique())
-            ->get()->keyBy('id');
-        foreach ($oldLineGroups as $group) {
-            $existingPiece = $existingPiecesById->get($group['piece_id']);
-            $serviceNames = [];
-            foreach ($group['service_ids'] as $sid) {
-                $existingService = $existingServicesById->get($sid);
-                if ($existingService) {
-                    $serviceNames[] = \App\Support\OrderItemDisplayNames::serviceName($existingService, (int) $order->branch_id, $lang);
-                }
-            }
-            $sig = trim(
-                ($existingPiece ? \App\Support\OrderItemDisplayNames::pieceName($existingPiece, (int) $order->branch_id, $lang) : '')
-                .' - '.
-                implode(' + ', $serviceNames),
-                ' -'
-            );
-            if (! in_array($sig, $removedNames, true)) {
-                $itemsBreakdown[] = [
-                    'name' => $sig,
-                    'amount' => round($group['total'], 2),
-                    'status' => 'original',
-                ];
+        foreach ($allSignatures as $sig) {
+            $oldAmount = $oldComponents[$sig] ?? 0.0;
+            $newAmount = $newComponents[$sig] ?? 0.0;
+            $componentDelta = round($newAmount - $oldAmount, 2);
+            $name = $this->describeOrderComponent($sig, $componentLookups, (int) $order->branch_id, $lang);
+
+            if ($componentDelta > 0.005) {
+                $itemsBreakdown[] = ['name' => $name, 'amount' => $componentDelta, 'status' => 'added'];
+            } elseif ($componentDelta < -0.005) {
+                $itemsBreakdown[] = ['name' => $name, 'amount' => round(abs($componentDelta), 2), 'status' => 'removed'];
+            } else {
+                $itemsBreakdown[] = ['name' => $name, 'amount' => round($oldAmount, 2), 'status' => 'original'];
             }
         }
 
@@ -1734,100 +1705,39 @@ class OrderTrackingController extends Controller
             }
         }
 
-        // Plain-language "what changed" summary: which items were dropped vs
-        // added compared to the order's previous item list, and the net
-        // item-level price impact (before tax/delivery) — so the client sees
-        // e.g. "removed item worth 3, added items worth 2, net: 1 refund"
+        // Plain-language "what changed" summary: which individual services/addons
+        // were dropped vs added compared to the order's previous item list, and
+        // the net item-level price impact (before tax/delivery) — so the client
+        // sees e.g. "removed item worth 3, added items worth 2, net: 1 refund"
         // right when the edit is submitted, not just the final tax-inclusive
         // amount_due/refund.
-        // Signature is piece_id + the FULL set of service_ids on the line, not just
-        // one service. A multi-service cart line (e.g. two services on one piece)
-        // is stored as multiple OrderItem rows sharing a line_group (see
-        // replaceOrderItems()) — matching on a single service_id would treat every
-        // non-primary row as spuriously "removed" whenever the line is resubmitted
-        // unchanged, folding its value into the primary row's "added" delta instead.
-        $oldLineGroups = $this->groupOrderItemsIntoLines($order->items);
-        $oldItemTotals = [];
-        foreach ($oldLineGroups as $group) {
-            $sig = $this->orderLineSignature($group['piece_id'], $group['service_ids']);
-            $oldItemTotals[$sig] = ($oldItemTotals[$sig] ?? 0) + $group['total'];
-        }
+        //
+        // Diffed at the ATOMIC component level — each main service and each
+        // additional service on a piece is its own component — not at the whole
+        // cart-line level. A whole-line signature (piece + all its services) would
+        // make adding a single new service to an existing multi-service line look
+        // like the entire old line was removed and an entirely new one added
+        // (same total delta, but a misleading "removed: X" for something never
+        // touched). Diffing per component means only what actually changed shows.
+        $oldComponents = $this->extractOrderComponents($order->items);
+        $newComponents = $this->extractItemsDataComponents($itemsData);
 
-        $newItemTotals = [];
-        foreach ($itemsData as $newItem) {
-            $serviceIds = array_map(
-                fn ($row) => (int) ($row['service_id'] ?? 0),
-                $newItem['services'] ?? [['service_id' => $newItem['service_id']]]
-            );
-            $sig = $this->orderLineSignature((int) $newItem['piece_id'], $serviceIds);
-            $newItemTotals[$sig] = ($newItemTotals[$sig] ?? 0) + (float) ($newItem['total_price'] ?? 0);
-        }
-
-        $changedSignatures = array_unique(array_merge(array_keys($oldItemTotals), array_keys($newItemTotals)));
-        $changedPieceIds = [];
-        $changedServiceIds = [];
-        foreach ($changedSignatures as $sig) {
-            [$sigPieceId, $sigServiceIds] = $this->parseOrderLineSignature($sig);
-            $changedPieceIds[] = $sigPieceId;
-            array_push($changedServiceIds, ...$sigServiceIds);
-        }
-        $piecesById = Piece::withTrashed()->whereIn('id', array_unique($changedPieceIds))->get()->keyBy('id');
-        $servicesById = \Modules\Service\Models\Service::withTrashed()->whereIn('id', array_unique($changedServiceIds))->get()->keyBy('id');
-
-        $describeItemSignature = function (string $sig) use ($piecesById, $servicesById, $storeBranchId, $lang) {
-            [$sigPieceId, $sigServiceIds] = $this->parseOrderLineSignature($sig);
-            $piece = $piecesById->get($sigPieceId);
-            $serviceNames = [];
-            foreach ($sigServiceIds as $sid) {
-                $service = $servicesById->get($sid);
-                if ($service) {
-                    $serviceNames[] = \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang);
-                }
-            }
-
-            return trim(
-                ($piece ? \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang) : '')
-                .' - '.
-                implode(' + ', $serviceNames),
-                ' -'
-            );
-        };
+        $changedSignatures = array_unique(array_merge(array_keys($oldComponents), array_keys($newComponents)));
+        $componentLookups = $this->buildOrderComponentLookups($changedSignatures);
+        $describeComponentSignature = fn (string $sig) => $this->describeOrderComponent($sig, $componentLookups, $storeBranchId, $lang);
 
         $removedItemsSummary = [];
         $removedItemsTotal = 0.0;
-        foreach ($oldItemTotals as $sig => $amount) {
-            if (! array_key_exists($sig, $newItemTotals)) {
-                $removedItemsTotal += $amount;
-                $removedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round($amount, 2)];
-            }
-        }
-
         $addedItemsSummary = [];
         $addedItemsTotal = 0.0;
-        foreach ($newItemTotals as $sig => $amount) {
-            if (! array_key_exists($sig, $oldItemTotals)) {
-                $addedItemsTotal += $amount;
-                $addedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round($amount, 2)];
-            }
-        }
-
-        // Same piece+service kept, but its line total changed — e.g. an additional
-        // service or quantity was added/removed on it. The signature match above
-        // treats "present in both" as unchanged and skips it entirely, silently
-        // dropping this delta from added_total/removed_total (and therefore from
-        // net_amount) even though real money moved. Attribute the difference to
-        // whichever side it belongs on so the totals stay accurate.
-        foreach ($oldItemTotals as $sig => $oldAmount) {
-            if (! array_key_exists($sig, $newItemTotals)) {
-                continue;
-            }
-            $lineDelta = round($newItemTotals[$sig] - $oldAmount, 2);
-            if ($lineDelta > 0.005) {
-                $addedItemsTotal += $lineDelta;
-                $addedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => $lineDelta];
-            } elseif ($lineDelta < -0.005) {
-                $removedItemsTotal += abs($lineDelta);
-                $removedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round(abs($lineDelta), 2)];
+        foreach ($changedSignatures as $sig) {
+            $componentDelta = round(($newComponents[$sig] ?? 0.0) - ($oldComponents[$sig] ?? 0.0), 2);
+            if ($componentDelta > 0.005) {
+                $addedItemsTotal += $componentDelta;
+                $addedItemsSummary[] = ['name' => $describeComponentSignature($sig), 'amount' => $componentDelta];
+            } elseif ($componentDelta < -0.005) {
+                $removedItemsTotal += abs($componentDelta);
+                $removedItemsSummary[] = ['name' => $describeComponentSignature($sig), 'amount' => round(abs($componentDelta), 2)];
             }
         }
 
@@ -1969,49 +1879,131 @@ class OrderTrackingController extends Controller
     }
 
     /**
-     * Reconstruct "cart line" units from an order's exploded OrderItem rows. A
-     * multi-service cart line (two or more main services on one piece) is stored
-     * as multiple OrderItem rows sharing a line_group (see replaceOrderItems());
-     * a single-service line has line_group null and is its own unit.
+     * Decompose an order's persisted OrderItem rows into atomic priced components:
+     * one per main service (its own service_price, not the row's total_price,
+     * which bakes additional services into the primary row of a multi-service
+     * line — see replaceOrderItems()) and one per additional service (from
+     * additionalServicesPivot, which must be eager-loaded on $items). Components
+     * for the same piece+service/addon across multiple rows (e.g. quantity > 1
+     * explodes into repeated rows) are summed together.
      *
-     * @return list<array{piece_id: int, service_ids: int[], total: float}>
+     * @return array<string, float> component signature => total amount
      */
-    private function groupOrderItemsIntoLines(\Illuminate\Support\Collection $items): array
+    private function extractOrderComponents(\Illuminate\Support\Collection $items): array
     {
-        $groups = [];
+        $components = [];
         foreach ($items as $item) {
-            $key = $item->line_group ?? ('single-'.$item->id);
-            if (! isset($groups[$key])) {
-                $groups[$key] = ['piece_id' => (int) $item->piece_id, 'service_ids' => [], 'total' => 0.0];
+            $pieceId = (int) $item->piece_id;
+
+            $svcSig = $this->orderComponentSignature('s', $pieceId, (int) $item->service_id);
+            $components[$svcSig] = ($components[$svcSig] ?? 0.0) + (float) $item->service_price;
+
+            foreach ($item->additionalServicesPivot as $pivot) {
+                $addonSig = $this->orderComponentSignature('a', $pieceId, (int) $pivot->service_addition_id);
+                $qty = (int) ($pivot->quantity ?? 1);
+                $price = \App\Support\OrderItemDisplayNames::storedAdditionalServiceUnitPrice($pivot);
+                $components[$addonSig] = ($components[$addonSig] ?? 0.0) + $price * $qty;
             }
-            $groups[$key]['service_ids'][] = (int) $item->service_id;
-            $groups[$key]['total'] += (float) $item->total_price;
         }
 
-        return array_values($groups);
+        return $components;
     }
 
     /**
-     * Stable key for a cart line: piece_id + its full (sorted, deduped) set of
-     * service_ids — not just one service, or a multi-service line's non-primary
-     * rows would always look "removed" when the line is resubmitted unchanged.
+     * Same decomposition as extractOrderComponents(), but for the freshly-priced
+     * $itemsData this edit is submitting (built in resolveOrderUpdateComputation())
+     * instead of persisted OrderItem rows.
+     *
+     * @return array<string, float> component signature => total amount
      */
-    private function orderLineSignature(int $pieceId, array $serviceIds): string
+    private function extractItemsDataComponents(array $itemsData): array
     {
-        $serviceIds = array_unique(array_map('intval', $serviceIds));
-        sort($serviceIds);
+        $components = [];
+        foreach ($itemsData as $itemData) {
+            $pieceId = (int) $itemData['piece_id'];
+            $quantity = max(1, (int) ($itemData['quantity'] ?? 1));
 
-        return $pieceId.':'.implode(',', $serviceIds);
+            foreach ($itemData['services'] ?? [] as $row) {
+                $sig = $this->orderComponentSignature('s', $pieceId, (int) ($row['service_id'] ?? 0));
+                $price = (float) ($row['service_piece_price'] ?? $row['price'] ?? 0);
+                $components[$sig] = ($components[$sig] ?? 0.0) + $price * $quantity;
+            }
+
+            foreach ($itemData['additional_services'] ?? [] as $addon) {
+                $sig = $this->orderComponentSignature('a', $pieceId, (int) ($addon['id'] ?? 0));
+                $price = (float) ($addon['price'] ?? 0);
+                $components[$sig] = ($components[$sig] ?? 0.0) + $price * $quantity;
+            }
+        }
+
+        return $components;
+    }
+
+    private function orderComponentSignature(string $kind, int $pieceId, int $refId): string
+    {
+        return $kind.':'.$pieceId.':'.$refId;
     }
 
     /**
-     * @return array{0: int, 1: int[]}
+     * @return array{0: string, 1: int, 2: int} [kind ('s'|'a'), piece_id, service_id or addition_id]
      */
-    private function parseOrderLineSignature(string $sig): array
+    private function parseOrderComponentSignature(string $sig): array
     {
-        [$pieceId, $serviceIdsCsv] = explode(':', $sig, 2);
+        [$kind, $pieceId, $refId] = explode(':', $sig, 3);
 
-        return [(int) $pieceId, array_map('intval', explode(',', $serviceIdsCsv))];
+        return [$kind, (int) $pieceId, (int) $refId];
+    }
+
+    /**
+     * Piece/service/addition lookups (withTrashed — a component may reference a
+     * since-discontinued piece/service/addition) for every signature that will be
+     * described, batched into 3 queries regardless of how many signatures.
+     *
+     * @param  string[]  $signatures
+     * @return array{pieces: \Illuminate\Support\Collection, services: \Illuminate\Support\Collection, additions: \Illuminate\Support\Collection}
+     */
+    private function buildOrderComponentLookups(array $signatures): array
+    {
+        $pieceIds = [];
+        $serviceIds = [];
+        $additionIds = [];
+        foreach ($signatures as $sig) {
+            [$kind, $pieceId, $refId] = $this->parseOrderComponentSignature($sig);
+            $pieceIds[] = $pieceId;
+            if ($kind === 's') {
+                $serviceIds[] = $refId;
+            } else {
+                $additionIds[] = $refId;
+            }
+        }
+
+        return [
+            'pieces' => Piece::withTrashed()->whereIn('id', array_unique($pieceIds))->get()->keyBy('id'),
+            'services' => \Modules\Service\Models\Service::withTrashed()->whereIn('id', array_unique($serviceIds))->get()->keyBy('id'),
+            'additions' => \Modules\Service\Models\ServiceAddition::withTrashed()->whereIn('id', array_unique($additionIds))->get()->keyBy('id'),
+        ];
+    }
+
+    /**
+     * Human-readable "{piece} - {service or addon name}" for one component
+     * signature, using the batched lookups from buildOrderComponentLookups().
+     */
+    private function describeOrderComponent(string $sig, array $lookups, ?int $branchId, string $lang): string
+    {
+        [$kind, $pieceId, $refId] = $this->parseOrderComponentSignature($sig);
+        $piece = $lookups['pieces']->get($pieceId);
+        if ($kind === 's') {
+            $service = $lookups['services']->get($refId);
+            $label = $service ? \App\Support\OrderItemDisplayNames::serviceName($service, $branchId, $lang) : '';
+        } else {
+            $addition = $lookups['additions']->get($refId);
+            $label = $addition ? \App\Support\OrderItemDisplayNames::additionalServiceName($addition, $branchId, $lang) : '';
+        }
+
+        return trim(
+            ($piece ? \App\Support\OrderItemDisplayNames::pieceName($piece, $branchId, $lang) : '').' - '.$label,
+            ' -'
+        );
     }
 
     /**
