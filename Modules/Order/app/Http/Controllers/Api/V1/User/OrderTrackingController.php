@@ -858,495 +858,37 @@ class OrderTrackingController extends Controller
                 PaymentTransaction::whereKey($paymentTransaction->id)->lockForUpdate()->first();
             }
 
-            // Use request values if provided, otherwise keep existing order values
-            $pickupAtVendor = $request->has('pickup_at_vendor')
-                ? $request->boolean('pickup_at_vendor')
-                : (bool) $order->pickup_at_vendor;
-            $deliveryAtVendor = $request->has('delivery_at_vendor')
-                ? $request->boolean('delivery_at_vendor')
-                : (bool) $order->delivery_at_vendor;
-
-            // Resolve pickup address
-            $pickupAddress = null;
-            if (! $pickupAtVendor) {
-                if ($request->has('pickup_address_id') && $request->pickup_address_id) {
-                    $pickupAddress = Address::where('id', $request->pickup_address_id)
-                        ->where('client_id', $user->id)
-                        ->first();
-                    if (! $pickupAddress) {
-                        return errorResponse(__('order.invalid_pickup_address'), 400);
-                    }
-                } elseif ($order->pickup_address_id) {
-                    $pickupAddress = $order->pickupAddress;
-                } else {
-                    $pickupAddress = $user->defaultAddress();
-                    if (! $pickupAddress) {
-                        return errorResponse(__('order.no_pickup_address'), 400);
-                    }
-                }
-            }
-
-            // Resolve delivery address
-            $deliveryAddress = null;
-            if (! $deliveryAtVendor) {
-                if ($request->has('delivery_address_id') && $request->delivery_address_id) {
-                    $deliveryAddress = Address::where('id', $request->delivery_address_id)
-                        ->where('client_id', $user->id)
-                        ->first();
-                    if (! $deliveryAddress) {
-                        return errorResponse(__('order.invalid_delivery_address'), 400);
-                    }
-                } elseif ($order->delivery_address_id) {
-                    $deliveryAddress = $order->deliveryAddress;
-                } else {
-                    $deliveryAddress = $user->defaultAddress();
-                    if (! $deliveryAddress) {
-                        return errorResponse(__('order.no_delivery_address'), 400);
-                    }
-                }
-            }
-
-            // Get branch for delivery calculations
-            $branch = $order->branch;
-
-            if (! $branch) {
-                return errorResponse(__('order.branch_not_found'), 400);
-            }
-
-            $branch->loadMissing('vendor');
-            $vendor = $branch->vendor;
-            if (! $vendor) {
+            // Use request values if provided, otherwise keep existing order values, and
+            // recompute everything the edit changes (items, discounts, delivery fee, tax,
+            // items diff) via the shared resolver — calculateOrderUpdate()'s read-only
+            // preview uses the exact same method, so the numbers can never drift between
+            // what the client previews and what actually gets committed here.
+            $computation = $this->resolveOrderUpdateComputation($order, $request, $user, $lang, $oldFinalAmount);
+            if (isset($computation['error'])) {
                 DB::rollBack();
 
-                return errorResponse(__('order.vendor_not_found'), 404);
+                return $computation['error'];
             }
 
-            $vendorId = (int) $vendor->id;
-            $existingLineKeys = $order->items
-                ->mapWithKeys(fn ($item) => [((int) $item->piece_id).':'.((int) $item->service_id) => true])
-                ->all();
-
-            $branchZoneId = $branch->zone_id;
-            if ($branchZoneId !== null) {
-                if ($pickupAddress && ! $pickupAtVendor) {
-                    if ($pickupAddress->zone_id === null) {
-                        return errorResponse(__('order.address_must_be_in_branch_zone'), 400);
-                    }
-                    if ((int) $pickupAddress->zone_id !== (int) $branchZoneId) {
-                        return errorResponse(__('order.pickup_address_not_in_branch_zone'), 400);
-                    }
-                }
-                if ($deliveryAddress && ! $deliveryAtVendor) {
-                    if ($deliveryAddress->zone_id === null) {
-                        return errorResponse(__('order.address_must_be_in_branch_zone'), 400);
-                    }
-                    if ((int) $deliveryAddress->zone_id !== (int) $branchZoneId) {
-                        return errorResponse(__('order.delivery_address_not_in_branch_zone'), 400);
-                    }
-                }
-            }
-
-            // Handle items update: recalculate all amounts using branch-based pricing (same as create order)
-            $itemsData = [];
-            $totalAmount = 0;
-            $discountAmount = 0;
-            $deliveryDiscountAmount = 0;
-            $appliedDiscount = null;
-            $pieces = null;
-            $storeBranchId = (int) $order->branch_id;
-            $discountItemsBreakdown = [];
-
-            if ($request->has('items') && is_array($request->items) && count($request->items) > 0) {
-                if ($request->has('coupon_code') && $request->coupon_code) {
-                    $result = $this->discountService->validateAndCalculateDiscount(
-                        $request->coupon_code,
-                        $request->items,
-                        $user->id,
-                        $vendorId,
-                        $lang,
-                        (int) $order->branch_id,
-                        0.0,
-                        null,
-                        ! ($pickupAtVendor && $deliveryAtVendor)
-                    );
-
-                    if (! $result['success']) {
-                        DB::rollBack();
-
-                        return errorResponse($result['message'], $result['code'], $result['errors'] ?? null);
-                    }
-
-                    $totalAmount = $result['data']['order_amount'];
-                    $discountAmount = $result['data']['discount_amount'];
-                    $deliveryDiscountAmount = (float) ($result['data']['delivery_discount_amount'] ?? 0);
-                    $appliedDiscount = $result['data']['discount'];
-                    $pieces = $result['data']['pieces'];
-                    $discountItemsBreakdown = $result['data']['items_breakdown'] ?? [];
-                } else {
-                    $pieceIds = collect($request->items)->pluck('piece_id')->unique()->map(fn ($id) => (int) $id);
-                    $pieces = Piece::withTrashed()
-                        ->with(['vendor', 'services', 'additionalServices' => function ($query) use ($order) {
-                            $query->where(function ($q) use ($order) {
-                                $q->where('service_addition_piece.branch_id', $order->branch_id)
-                                    ->orWhereNull('service_addition_piece.branch_id');
-                            });
-                        }])
-                        ->whereIn('id', $pieceIds)
-                        ->get();
-
-                    if ($pieces->count() !== $pieceIds->count()) {
-                        DB::rollBack();
-
-                        return errorResponse(__('order.items_not_available'), 400);
-                    }
-
-                    $vendorIds = $pieces->pluck('vendor_id')->unique();
-                    if ($vendorIds->count() > 1 || (int) $vendorIds->first() !== $vendorId) {
-                        DB::rollBack();
-
-                        return errorResponse(__('order.items_vendor_not_match'), 400);
-                    }
-                }
-
-                $branchPieceIds = $branch->activePieces()->pluck('pieces.id')->toArray();
-                $branchServiceIds = $branch->activeServices()->pluck('services.id')->toArray();
-
-                foreach ($request->items as $index => $item) {
-                    $pieceId = (int) $item['piece_id'];
-                    $mainServiceIds = OrderItemsNormalizer::mainServiceIds($item);
-                    if ($mainServiceIds === []) {
-                        DB::rollBack();
-
-                        return errorResponse(trans('order.piece_not_found'), 400);
-                    }
-
-                    $piece = $pieces->firstWhere('id', $pieceId);
-                    if (! $piece) {
-                        DB::rollBack();
-
-                        return errorResponse(trans('order.piece_not_found'), 400);
-                    }
-
-                    $servicesRows = [];
-                    $servicesTotal = 0.0;
-
-                    foreach ($mainServiceIds as $serviceId) {
-                        $lineKey = $pieceId.':'.$serviceId;
-                        $lineExistedOnOrder = isset($existingLineKeys[$lineKey]);
-
-                        $availabilityError = $this->catalogAvailabilityService->validateOrderLineForOrderUpdate(
-                            $storeBranchId,
-                            $pieceId,
-                            $serviceId,
-                            $item['additional_service_ids'] ?? [],
-                            $lang,
-                            $lineExistedOnOrder
-                        );
-                        if ($availabilityError !== null) {
-                            DB::rollBack();
-
-                            return errorResponse($availabilityError, 400);
-                        }
-
-                        if (! $lineExistedOnOrder && ! in_array($pieceId, $branchPieceIds, true)) {
-                            $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang);
-                            DB::rollBack();
-
-                            return errorResponse(trans('order.piece_not_available_at_branch', ['piece_name' => $pieceName]), 400);
-                        }
-
-                        $service = $piece->services->firstWhere('id', $serviceId);
-                        if (! $service) {
-                            $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang);
-                            DB::rollBack();
-
-                            return errorResponse(__('order.service_not_available', ['piece_name' => $pieceName]), 400);
-                        }
-                        if (! $lineExistedOnOrder && ! in_array($serviceId, $branchServiceIds, true)) {
-                            $serviceName = \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang);
-                            DB::rollBack();
-
-                            return errorResponse(trans('order.service_not_available_at_branch', ['service_name' => $serviceName]), 400);
-                        }
-
-                        $servicePrice = (float) $service->getPriceForPieceAtBranch($piece->id, $storeBranchId);
-                        $servicesTotal += $servicePrice;
-                        $servicesRows[] = [
-                            'service_id' => $serviceId,
-                            'service_piece_price' => $servicePrice,
-                            'price' => $servicePrice,
-                        ];
-                    }
-
-                    $piecePrice = 0.0;
-                    $additionalServicesTotal = 0;
-                    $additionalServicesData = [];
-
-                    if (! empty($item['additional_service_ids'])) {
-                        $uniqueAdditionalServiceIds = array_unique($item['additional_service_ids']);
-                        $availableAdditions = $piece->getAdditionalServicesForBranch($storeBranchId);
-                        foreach ($uniqueAdditionalServiceIds as $additionalServiceId) {
-                            $additionModel = $availableAdditions->firstWhere('id', $additionalServiceId);
-                            if (! $additionModel) {
-                                $additionForError = \Modules\Service\Models\ServiceAddition::find($additionalServiceId);
-                                $additionName = $additionForError
-                                    ? \App\Support\OrderItemDisplayNames::additionalServiceName($additionForError, $storeBranchId, $lang)
-                                    : "ID: {$additionalServiceId}";
-                                DB::rollBack();
-
-                                return errorResponse(__('order.additional_service_not_available_at_branch', ['service_name' => $additionName]), 400);
-                            }
-                            $additionalPrice = $additionModel->getPriceForPieceAtBranch($piece->id, $storeBranchId);
-                            $additionalServicesTotal += $additionalPrice;
-                            $additionalServicesData[] = \App\Support\OrderItemDisplayNames::additionalServiceLine(
-                                $additionModel,
-                                $storeBranchId,
-                                $lang,
-                                (float) $additionalPrice
-                            );
-                        }
-                    }
-
-                    $unitPrice = $piecePrice + $servicesTotal + $additionalServicesTotal;
-                    $itemTotal = $unitPrice * $item['quantity'];
-
-                    if (! $appliedDiscount) {
-                        $totalAmount += $itemTotal;
-                    }
-
-                    $imageFile = $item['image'] ?? null;
-                    if (! ($imageFile instanceof \Illuminate\Http\UploadedFile)) {
-                        $imageFile = $request->file("items.{$index}.image");
-                    }
-
-                    $uploadedImage = null;
-                    if ($imageFile instanceof \Illuminate\Http\UploadedFile) {
-                        $uploadedImage = $this->uploadFilesService->uploadImage($imageFile, 'orders/items');
-                    }
-
-                    $existingItem = $order->items->first(function ($i) use ($pieceId, $servicesRows) {
-                        return (int) $i->piece_id === $pieceId && (int) $i->service_id === (int) $servicesRows[0]['service_id'];
-                    });
-
-                    $itemNote = $item['note'] ?? $item['notes'] ?? $existingItem?->notes;
-                    $itemImage = $uploadedImage ?? $item['images'] ?? $existingItem?->images;
-
-                    $itemsData[] = [
-                        'piece_id' => $item['piece_id'],
-                        'piece_price' => $piecePrice,
-                        'service_id' => $servicesRows[0]['service_id'],
-                        'service_price' => $servicesRows[0]['service_piece_price'],
-                        'services' => $servicesRows,
-                        'quantity' => $item['quantity'],
-                        'unit_price' => $unitPrice,
-                        'total_price' => $itemTotal,
-                        'additional_services' => $additionalServicesData,
-                        'additional_services_total' => (float) $additionalServicesTotal,
-                        'note' => $itemNote,
-                        'notes' => $itemNote,
-                        'images' => $itemImage,
-                    ];
-                }
-
-                // Keep order coupon only when rules still pass on the new item totals.
-                // Pass branch_id so zone/branch-restricted discounts (e.g. delivery_free
-                // coupons scoped to specific zones) don't spuriously fail eligibility and
-                // get silently dropped from the order just because this edit didn't
-                // resubmit the coupon_code.
-                if (! $appliedDiscount && ! ($request->filled('coupon_code'))) {
-                    if ($order->discount) {
-                        $soft = $this->discountService->applyIfEligible(
-                            $order->discount,
-                            (float) $totalAmount,
-                            (int) $user->id,
-                            $vendorId,
-                            true,
-                            ['branch_id' => $storeBranchId]
-                        );
-                        if ($soft['applied']) {
-                            $appliedDiscount = $soft['discount'];
-                            $discountAmount = (float) $soft['discount_amount'];
-                            $deliveryDiscountAmount = (float) ($soft['delivery_discount_amount'] ?? 0);
-                        }
-                    } elseif ((float) $order->discount_amount > 0) {
-                        $discountAmount = min((float) $order->discount_amount, (float) $totalAmount);
-                    }
-                }
-            }
-
-            // Plain-language "what changed" summary: which items were dropped vs
-            // added compared to the order's previous item list, and the net
-            // item-level price impact (before tax/delivery) — so the client sees
-            // e.g. "removed item worth 3, added items worth 2, net: 1 refund"
-            // right when the edit is submitted, not just the final tax-inclusive
-            // amount_due/refund.
-            $oldItemTotals = [];
-            foreach ($order->items as $oldItem) {
-                $sig = $oldItem->piece_id.'-'.$oldItem->service_id;
-                $oldItemTotals[$sig] = ($oldItemTotals[$sig] ?? 0) + (float) $oldItem->total_price;
-            }
-
-            $newItemTotals = [];
-            foreach ($itemsData as $newItem) {
-                $sig = $newItem['piece_id'].'-'.$newItem['service_id'];
-                $newItemTotals[$sig] = ($newItemTotals[$sig] ?? 0) + (float) ($newItem['total_price'] ?? 0);
-            }
-
-            $changedSignatures = array_unique(array_merge(array_keys($oldItemTotals), array_keys($newItemTotals)));
-            $changedPieceIds = [];
-            $changedServiceIds = [];
-            foreach ($changedSignatures as $sig) {
-                [$sigPieceId, $sigServiceId] = array_map('intval', explode('-', $sig));
-                $changedPieceIds[] = $sigPieceId;
-                $changedServiceIds[] = $sigServiceId;
-            }
-            $piecesById = Piece::withTrashed()->whereIn('id', array_unique($changedPieceIds))->get()->keyBy('id');
-            $servicesById = \Modules\Service\Models\Service::withTrashed()->whereIn('id', array_unique($changedServiceIds))->get()->keyBy('id');
-
-            $describeItemSignature = function (string $sig) use ($piecesById, $servicesById, $storeBranchId, $lang) {
-                [$sigPieceId, $sigServiceId] = array_map('intval', explode('-', $sig));
-                $piece = $piecesById->get($sigPieceId);
-                $service = $servicesById->get($sigServiceId);
-
-                return trim(
-                    ($piece ? \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang) : '')
-                    .' - '.
-                    ($service ? \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang) : ''),
-                    ' -'
-                );
-            };
-
-            $removedItemsSummary = [];
-            $removedItemsTotal = 0.0;
-            foreach ($oldItemTotals as $sig => $amount) {
-                if (! array_key_exists($sig, $newItemTotals)) {
-                    $removedItemsTotal += $amount;
-                    $removedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round($amount, 2)];
-                }
-            }
-
-            $addedItemsSummary = [];
-            $addedItemsTotal = 0.0;
-            foreach ($newItemTotals as $sig => $amount) {
-                if (! array_key_exists($sig, $oldItemTotals)) {
-                    $addedItemsTotal += $amount;
-                    $addedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round($amount, 2)];
-                }
-            }
-
-            $netItemsAmount = round($addedItemsTotal - $removedItemsTotal, 2);
-            $itemsChangeSummary = [
-                'removed_items' => $removedItemsSummary,
-                'removed_total' => round($removedItemsTotal, 2),
-                'added_items' => $addedItemsSummary,
-                'added_total' => round($addedItemsTotal, 2),
-                'net_amount' => $netItemsAmount,
-                'net_type' => $netItemsAmount < -0.005 ? 'refund' : ($netItemsAmount > 0.005 ? 'charge' : 'none'),
-            ];
-
-            // Calculate delivery fee using branch coordinates:
-            // - pickup_at_vendor=false & delivery_at_vendor=false → charge pickup + delivery fees
-            // - pickup_at_vendor=false & delivery_at_vendor=true  → charge pickup fee only
-            // - pickup_at_vendor=true  & delivery_at_vendor=false → charge delivery fee only
-            // - pickup_at_vendor=true  & delivery_at_vendor=true  → no delivery charge
-            $deliveryFee = 0;
-            $totalDistance = 0;
-            $pickupDistance = 0;
-            $deliveryDistance = 0;
-            $pickupFee = 0;
-            $deliveryFeeAmount = 0;
-
-            if (! $pickupAtVendor || ! $deliveryAtVendor) {
-                if (! $branch->latitude || ! $branch->longitude) {
-                    return errorResponse(__('order.vendor_location_not_available'), 400);
-                }
-
-                $deliveryPricePerKm = $vendor->delivery_price_per_km
-                    ?? AdminSetting::getValue('delivery_price_per_km', 5);
-
-                // Calculate pickup fee (customer address → branch) if pickup is via delivery
-                if (! $pickupAtVendor && $pickupAddress) {
-                    if (! $pickupAddress->latitude || ! $pickupAddress->longitude) {
-                        return errorResponse(__('order.pickup_address_location_not_available'), 400);
-                    }
-                    $pickupDistance = $this->calculateDistance(
-                        (float) $pickupAddress->latitude,
-                        (float) $pickupAddress->longitude,
-                        (float) $branch->latitude,
-                        (float) $branch->longitude
-                    );
-                    $totalDistance += $pickupDistance;
-                    $pickupFee = $pickupDistance * $deliveryPricePerKm;
-                }
-
-                // Calculate delivery fee (branch → customer address) if delivery is via delivery
-                if (! $deliveryAtVendor && $deliveryAddress) {
-                    if (! $deliveryAddress->latitude || ! $deliveryAddress->longitude) {
-                        return errorResponse(__('order.delivery_address_location_not_available'), 400);
-                    }
-                    $deliveryDistance = $this->calculateDistance(
-                        (float) $branch->latitude,
-                        (float) $branch->longitude,
-                        (float) $deliveryAddress->latitude,
-                        (float) $deliveryAddress->longitude
-                    );
-                    $totalDistance += $deliveryDistance;
-                    $deliveryFeeAmount = $deliveryDistance * $deliveryPricePerKm;
-                }
-
-                // Sum applicable fees
-                $deliveryFee = $pickupFee + $deliveryFeeAmount;
-            }
-
-            $discountCity = $deliveryAddress?->city ?? $pickupAddress?->city;
-            // Also covers the "keep order coupon" fallback above, which never populates
-            // $discountItemsBreakdown (only the coupon_code re-entry path does) — without
-            // this, that path's delivery_discount_amount stayed stuck at whatever it
-            // computed with delivery_fee=0.0 (before this block's real delivery fee is
-            // known), e.g. always 0 for a fully-free-delivery coupon kept across an edit.
-            if ($appliedDiscount) {
-                $rechecked = $this->discountService->evaluateKnownOrderDiscount(
-                    $appliedDiscount,
-                    $discountItemsBreakdown,
-                    (float) $totalAmount,
-                    (int) $user->id,
-                    (int) $vendorId,
-                    $storeBranchId,
-                    (float) $deliveryFee,
-                    $discountCity,
-                    false,
-                    $lang,
-                    ! ($pickupAtVendor && $deliveryAtVendor)
-                );
-                $discountAmount = (float) $rechecked['discount_amount'];
-                $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);
-            } elseif (! $request->filled('coupon_code')) {
-                $automatic = $this->discountService->findBestAutomaticOrderDiscount(
-                    $request->items ?? [],
-                    (int) $user->id,
-                    (int) $vendorId,
-                    $lang,
-                    $storeBranchId,
-                    (float) $deliveryFee,
-                    $discountCity
-                );
-                if ($automatic['applied']) {
-                    $appliedDiscount = $automatic['discount'];
-                    $discountAmount = (float) $automatic['discount_amount'];
-                    $deliveryDiscountAmount = (float) ($automatic['delivery_discount_amount'] ?? 0);
-                }
-            }
-
-            $pricingTotals = Order::calculatePricingTotals($totalAmount, $discountAmount, $deliveryFee, $deliveryDiscountAmount);
-            $taxAmount = $pricingTotals['tax_amount'];
-            $finalAmount = $pricingTotals['final_amount'];
-
-            // Delta between old and new final amount, computed with bc math — never
-            // float arithmetic on money. $deltaCmp: -1 decrease, 0 unchanged, 1 increase.
-            $oldFinal = number_format($oldFinalAmount, 2, '.', '');
-            $newFinal = number_format($finalAmount, 2, '.', '');
-            $delta = bcsub($newFinal, $oldFinal, 2);
-            $deltaCmp = bccomp($delta, '0', 2);
+            $pickupAtVendor = $computation['pickup_at_vendor'];
+            $deliveryAtVendor = $computation['delivery_at_vendor'];
+            $pickupAddress = $computation['pickup_address'];
+            $deliveryAddress = $computation['delivery_address'];
+            $itemsData = $computation['items_data'];
+            $totalAmount = $computation['total_amount'];
+            $discountAmount = $computation['discount_amount'];
+            $appliedDiscount = $computation['applied_discount'];
+            $itemsChangeSummary = $computation['items_change_summary'];
+            $totalDistance = $computation['total_distance'];
+            $pickupDistance = $computation['pickup_distance'];
+            $deliveryDistance = $computation['delivery_distance'];
+            $pricingTotals = $computation['pricing_totals'];
+            $taxAmount = $computation['tax_amount'];
+            $finalAmount = $computation['final_amount'];
+            $oldFinal = $computation['old_final'];
+            $newFinal = $computation['new_final'];
+            $delta = $computation['delta'];
+            $deltaCmp = $computation['delta_cmp'];
 
             // A gateway increase is paid IN THIS request via surcharge_payment: wallet
             // legs settle now, gateway legs return payment link(s). The edit is STAGED
@@ -1732,6 +1274,649 @@ class OrderTrackingController extends Controller
 
             return serverErrorResponse(__('order.order_update_failed').': '.$e->getMessage());
         }
+    }
+
+    /**
+     * Read-only preview of what updateOrder() would do with this exact request body,
+     * without persisting anything — no order/items writes, no wallet holds, no gateway
+     * calls, no modification intent. Lets the client see the new totals and the
+     * items diff (what's original vs added/removed, and the net refund/charge) BEFORE
+     * tapping "confirm changes", instead of only finding out after updateOrder() commits.
+     *
+     * Uses the exact same resolveOrderUpdateComputation() as the real update, so the
+     * previewed numbers can never drift from what actually gets charged/refunded.
+     */
+    public function calculateOrderUpdate(Request $request, int $order_id): JsonResponse
+    {
+        $user = $request->user();
+        $lang = app()->getLocale();
+
+        $order = Order::with(['items', 'vendor', 'branch', 'pickupAddress', 'deliveryAddress', 'discount'])
+            ->where('client_id', $user->id)
+            ->find($order_id);
+
+        if (! $order) {
+            return notFoundResponse(__('order.order_not_found'));
+        }
+
+        if (! \App\Enums\OrderStatus::isClientEditable($order->status)) {
+            return errorResponse(__('order.order_can_only_update_pending'), 400);
+        }
+
+        $request->merge([
+            'items' => OrderItemsNormalizer::normalize($request->input('items', [])),
+        ]);
+
+        $validator = Validator::make($request->all(), [
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.piece_id' => ['required', 'exists:pieces,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.service_id' => ['required', 'exists:services,id'],
+            'items.*.additional_service_ids' => ['nullable', 'array'],
+            'items.*.additional_service_ids.*' => ['integer', 'exists:service_additions,id'],
+            'items.*.note' => ['nullable', 'string', 'max:500'],
+            'items.*.notes' => ['nullable', 'string', 'max:500'],
+            'items.*.image' => ['nullable', 'sometimes'],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'pickup_at_vendor' => ['nullable', 'boolean'],
+            'delivery_at_vendor' => ['nullable', 'boolean'],
+            'pickup_address_id' => ['nullable', 'exists:addresses,id'],
+            'delivery_address_id' => ['nullable', 'exists:addresses,id'],
+        ]);
+
+        if ($validator->fails()) {
+            return validationErrorResponse($validator->errors());
+        }
+
+        // Same anchor rule as updateOrder(): if the order is sitting in BRANCH_REVIEW
+        // with a pending vendor review, compare against what was actually last paid
+        // (original_final_amount), not the provisional final_amount the review wrote in.
+        $resolvesPendingVendorReview = $order->status === OrderStatus::BRANCH_REVIEW->value && $order->original_final_amount !== null;
+        $oldFinalAmount = $resolvesPendingVendorReview
+            ? (float) $order->original_final_amount
+            : (float) $order->final_amount;
+
+        $computation = $this->resolveOrderUpdateComputation($order, $request, $user, $lang, $oldFinalAmount);
+        if (isset($computation['error'])) {
+            return $computation['error'];
+        }
+
+        $itemsChangeSummary = $computation['items_change_summary'];
+        $delta = (float) $computation['delta'];
+        $deltaCmp = $computation['delta_cmp'];
+
+        // Full "invoice" view: every line in the new item list, each tagged so the
+        // client app can render originals in grey and additions highlighted, plus the
+        // removed lines struck through — not just the removed/added diff lists above.
+        $itemsBreakdown = [];
+        foreach ($itemsChangeSummary['removed_items'] as $removed) {
+            $itemsBreakdown[] = [
+                'name' => $removed['name'],
+                'amount' => $removed['amount'],
+                'status' => 'removed',
+            ];
+        }
+        foreach ($itemsChangeSummary['added_items'] as $added) {
+            $itemsBreakdown[] = [
+                'name' => $added['name'],
+                'amount' => $added['amount'],
+                'status' => 'added',
+            ];
+        }
+        $removedNames = collect($itemsChangeSummary['removed_items'])->pluck('name')->all();
+        // withTrashed(): a piece/service on an existing order line may have been
+        // discontinued since the order was placed — a plain belongsTo would return
+        // null and OrderItemDisplayNames::pieceName()/serviceName() require non-null.
+        $existingPiecesById = Piece::withTrashed()->whereIn('id', $order->items->pluck('piece_id')->unique())->get()->keyBy('id');
+        $existingServicesById = \Modules\Service\Models\Service::withTrashed()->whereIn('id', $order->items->pluck('service_id')->unique())->get()->keyBy('id');
+        foreach ($order->items as $existingItem) {
+            $existingPiece = $existingPiecesById->get($existingItem->piece_id);
+            $existingService = $existingServicesById->get($existingItem->service_id);
+            $sig = trim(
+                ($existingPiece ? \App\Support\OrderItemDisplayNames::pieceName($existingPiece, (int) $order->branch_id, $lang) : '')
+                .' - '.
+                ($existingService ? \App\Support\OrderItemDisplayNames::serviceName($existingService, (int) $order->branch_id, $lang) : ''),
+                ' -'
+            );
+            if (! in_array($sig, $removedNames, true)) {
+                $itemsBreakdown[] = [
+                    'name' => $sig,
+                    'amount' => round((float) $existingItem->total_price, 2),
+                    'status' => 'original',
+                ];
+            }
+        }
+
+        return successResponse([
+            'order_preview' => [
+                'subtotal' => round((float) $computation['total_amount'], 2),
+                'discount_amount' => round((float) $computation['discount_amount'], 2),
+                'delivery_fee' => round((float) $computation['pricing_totals']['delivery_fee'], 2),
+                'tax_amount' => round((float) $computation['tax_amount'], 2),
+                'total_amount' => round((float) $computation['final_amount'], 2),
+            ],
+            // What's original vs what this edit changes — grey vs highlighted in the UI.
+            'items_breakdown' => $itemsBreakdown,
+            // Same removed/added/net shape already returned by updateOrder() on commit.
+            'items_change_summary' => $itemsChangeSummary,
+            // The one number that matters for "how much will I actually pay/get back":
+            // never stack the old total on top of the new one — this is the net delta.
+            'payment_preview' => [
+                'amount_due' => round(abs($delta), 2),
+                'net_type' => $deltaCmp < 0 ? 'refund' : ($deltaCmp > 0 ? 'charge' : 'none'),
+                'old_final_amount' => round((float) $oldFinalAmount, 2),
+                'new_final_amount' => round((float) $computation['final_amount'], 2),
+            ],
+        ], __('order.order_calculated'));
+    }
+
+    /**
+     * Pure computation shared by updateOrder() (commit) and calculateOrderUpdate()
+     * (read-only preview): resolves addresses, re-prices every item against the
+     * branch's catalog, re-evaluates the coupon/discount, builds the items diff
+     * (removed/added/net), computes the delivery fee + tax + final amount, and the
+     * delta against $oldFinalAmount. Does not write anything to the database and does
+     * not touch payment/wallet — callers own persistence and money movement.
+     *
+     * Returns ['error' => JsonResponse] on any validation failure (the caller must
+     * return it as-is, rolling back its own transaction first if it has one), or the
+     * full set of computed values otherwise.
+     */
+    private function resolveOrderUpdateComputation(Order $order, Request $request, $user, string $lang, float $oldFinalAmount): array
+    {
+        // Use request values if provided, otherwise keep existing order values
+        $pickupAtVendor = $request->has('pickup_at_vendor')
+            ? $request->boolean('pickup_at_vendor')
+            : (bool) $order->pickup_at_vendor;
+        $deliveryAtVendor = $request->has('delivery_at_vendor')
+            ? $request->boolean('delivery_at_vendor')
+            : (bool) $order->delivery_at_vendor;
+
+        // Resolve pickup address
+        $pickupAddress = null;
+        if (! $pickupAtVendor) {
+            if ($request->has('pickup_address_id') && $request->pickup_address_id) {
+                $pickupAddress = Address::where('id', $request->pickup_address_id)
+                    ->where('client_id', $user->id)
+                    ->first();
+                if (! $pickupAddress) {
+                    return ['error' => errorResponse(__('order.invalid_pickup_address'), 400)];
+                }
+            } elseif ($order->pickup_address_id) {
+                $pickupAddress = $order->pickupAddress;
+            } else {
+                $pickupAddress = $user->defaultAddress();
+                if (! $pickupAddress) {
+                    return ['error' => errorResponse(__('order.no_pickup_address'), 400)];
+                }
+            }
+        }
+
+        // Resolve delivery address
+        $deliveryAddress = null;
+        if (! $deliveryAtVendor) {
+            if ($request->has('delivery_address_id') && $request->delivery_address_id) {
+                $deliveryAddress = Address::where('id', $request->delivery_address_id)
+                    ->where('client_id', $user->id)
+                    ->first();
+                if (! $deliveryAddress) {
+                    return ['error' => errorResponse(__('order.invalid_delivery_address'), 400)];
+                }
+            } elseif ($order->delivery_address_id) {
+                $deliveryAddress = $order->deliveryAddress;
+            } else {
+                $deliveryAddress = $user->defaultAddress();
+                if (! $deliveryAddress) {
+                    return ['error' => errorResponse(__('order.no_delivery_address'), 400)];
+                }
+            }
+        }
+
+        // Get branch for delivery calculations
+        $branch = $order->branch;
+
+        if (! $branch) {
+            return ['error' => errorResponse(__('order.branch_not_found'), 400)];
+        }
+
+        $branch->loadMissing('vendor');
+        $vendor = $branch->vendor;
+        if (! $vendor) {
+            return ['error' => errorResponse(__('order.vendor_not_found'), 404)];
+        }
+
+        $vendorId = (int) $vendor->id;
+        $existingLineKeys = $order->items
+            ->mapWithKeys(fn ($item) => [((int) $item->piece_id).':'.((int) $item->service_id) => true])
+            ->all();
+
+        $branchZoneId = $branch->zone_id;
+        if ($branchZoneId !== null) {
+            if ($pickupAddress && ! $pickupAtVendor) {
+                if ($pickupAddress->zone_id === null) {
+                    return ['error' => errorResponse(__('order.address_must_be_in_branch_zone'), 400)];
+                }
+                if ((int) $pickupAddress->zone_id !== (int) $branchZoneId) {
+                    return ['error' => errorResponse(__('order.pickup_address_not_in_branch_zone'), 400)];
+                }
+            }
+            if ($deliveryAddress && ! $deliveryAtVendor) {
+                if ($deliveryAddress->zone_id === null) {
+                    return ['error' => errorResponse(__('order.address_must_be_in_branch_zone'), 400)];
+                }
+                if ((int) $deliveryAddress->zone_id !== (int) $branchZoneId) {
+                    return ['error' => errorResponse(__('order.delivery_address_not_in_branch_zone'), 400)];
+                }
+            }
+        }
+
+        // Handle items update: recalculate all amounts using branch-based pricing (same as create order)
+        $itemsData = [];
+        $totalAmount = 0;
+        $discountAmount = 0;
+        $deliveryDiscountAmount = 0;
+        $appliedDiscount = null;
+        $pieces = null;
+        $storeBranchId = (int) $order->branch_id;
+        $discountItemsBreakdown = [];
+
+        if ($request->has('items') && is_array($request->items) && count($request->items) > 0) {
+            if ($request->has('coupon_code') && $request->coupon_code) {
+                $result = $this->discountService->validateAndCalculateDiscount(
+                    $request->coupon_code,
+                    $request->items,
+                    $user->id,
+                    $vendorId,
+                    $lang,
+                    (int) $order->branch_id,
+                    0.0,
+                    null,
+                    ! ($pickupAtVendor && $deliveryAtVendor)
+                );
+
+                if (! $result['success']) {
+                    return ['error' => errorResponse($result['message'], $result['code'], $result['errors'] ?? null)];
+                }
+
+                $totalAmount = $result['data']['order_amount'];
+                $discountAmount = $result['data']['discount_amount'];
+                $deliveryDiscountAmount = (float) ($result['data']['delivery_discount_amount'] ?? 0);
+                $appliedDiscount = $result['data']['discount'];
+                $pieces = $result['data']['pieces'];
+                $discountItemsBreakdown = $result['data']['items_breakdown'] ?? [];
+            } else {
+                $pieceIds = collect($request->items)->pluck('piece_id')->unique()->map(fn ($id) => (int) $id);
+                $pieces = Piece::withTrashed()
+                    ->with(['vendor', 'services', 'additionalServices' => function ($query) use ($order) {
+                        $query->where(function ($q) use ($order) {
+                            $q->where('service_addition_piece.branch_id', $order->branch_id)
+                                ->orWhereNull('service_addition_piece.branch_id');
+                        });
+                    }])
+                    ->whereIn('id', $pieceIds)
+                    ->get();
+
+                if ($pieces->count() !== $pieceIds->count()) {
+                    return ['error' => errorResponse(__('order.items_not_available'), 400)];
+                }
+
+                $vendorIds = $pieces->pluck('vendor_id')->unique();
+                if ($vendorIds->count() > 1 || (int) $vendorIds->first() !== $vendorId) {
+                    return ['error' => errorResponse(__('order.items_vendor_not_match'), 400)];
+                }
+            }
+
+            $branchPieceIds = $branch->activePieces()->pluck('pieces.id')->toArray();
+            $branchServiceIds = $branch->activeServices()->pluck('services.id')->toArray();
+
+            foreach ($request->items as $index => $item) {
+                $pieceId = (int) $item['piece_id'];
+                $mainServiceIds = OrderItemsNormalizer::mainServiceIds($item);
+                if ($mainServiceIds === []) {
+                    return ['error' => errorResponse(trans('order.piece_not_found'), 400)];
+                }
+
+                $piece = $pieces->firstWhere('id', $pieceId);
+                if (! $piece) {
+                    return ['error' => errorResponse(trans('order.piece_not_found'), 400)];
+                }
+
+                $servicesRows = [];
+                $servicesTotal = 0.0;
+
+                foreach ($mainServiceIds as $serviceId) {
+                    $lineKey = $pieceId.':'.$serviceId;
+                    $lineExistedOnOrder = isset($existingLineKeys[$lineKey]);
+
+                    $availabilityError = $this->catalogAvailabilityService->validateOrderLineForOrderUpdate(
+                        $storeBranchId,
+                        $pieceId,
+                        $serviceId,
+                        $item['additional_service_ids'] ?? [],
+                        $lang,
+                        $lineExistedOnOrder
+                    );
+                    if ($availabilityError !== null) {
+                        return ['error' => errorResponse($availabilityError, 400)];
+                    }
+
+                    if (! $lineExistedOnOrder && ! in_array($pieceId, $branchPieceIds, true)) {
+                        $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang);
+
+                        return ['error' => errorResponse(trans('order.piece_not_available_at_branch', ['piece_name' => $pieceName]), 400)];
+                    }
+
+                    $service = $piece->services->firstWhere('id', $serviceId);
+                    if (! $service) {
+                        $pieceName = \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang);
+
+                        return ['error' => errorResponse(__('order.service_not_available', ['piece_name' => $pieceName]), 400)];
+                    }
+                    if (! $lineExistedOnOrder && ! in_array($serviceId, $branchServiceIds, true)) {
+                        $serviceName = \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang);
+
+                        return ['error' => errorResponse(trans('order.service_not_available_at_branch', ['service_name' => $serviceName]), 400)];
+                    }
+
+                    $servicePrice = (float) $service->getPriceForPieceAtBranch($piece->id, $storeBranchId);
+                    $servicesTotal += $servicePrice;
+                    $servicesRows[] = [
+                        'service_id' => $serviceId,
+                        'service_piece_price' => $servicePrice,
+                        'price' => $servicePrice,
+                    ];
+                }
+
+                $piecePrice = 0.0;
+                $additionalServicesTotal = 0;
+                $additionalServicesData = [];
+
+                if (! empty($item['additional_service_ids'])) {
+                    $uniqueAdditionalServiceIds = array_unique($item['additional_service_ids']);
+                    $availableAdditions = $piece->getAdditionalServicesForBranch($storeBranchId);
+                    foreach ($uniqueAdditionalServiceIds as $additionalServiceId) {
+                        $additionModel = $availableAdditions->firstWhere('id', $additionalServiceId);
+                        if (! $additionModel) {
+                            $additionForError = \Modules\Service\Models\ServiceAddition::find($additionalServiceId);
+                            $additionName = $additionForError
+                                ? \App\Support\OrderItemDisplayNames::additionalServiceName($additionForError, $storeBranchId, $lang)
+                                : "ID: {$additionalServiceId}";
+
+                            return ['error' => errorResponse(__('order.additional_service_not_available_at_branch', ['service_name' => $additionName]), 400)];
+                        }
+                        $additionalPrice = $additionModel->getPriceForPieceAtBranch($piece->id, $storeBranchId);
+                        $additionalServicesTotal += $additionalPrice;
+                        $additionalServicesData[] = \App\Support\OrderItemDisplayNames::additionalServiceLine(
+                            $additionModel,
+                            $storeBranchId,
+                            $lang,
+                            (float) $additionalPrice
+                        );
+                    }
+                }
+
+                $unitPrice = $piecePrice + $servicesTotal + $additionalServicesTotal;
+                $itemTotal = $unitPrice * $item['quantity'];
+
+                if (! $appliedDiscount) {
+                    $totalAmount += $itemTotal;
+                }
+
+                $imageFile = $item['image'] ?? null;
+                if (! ($imageFile instanceof \Illuminate\Http\UploadedFile)) {
+                    $imageFile = $request->file("items.{$index}.image");
+                }
+
+                $uploadedImage = null;
+                if ($imageFile instanceof \Illuminate\Http\UploadedFile) {
+                    $uploadedImage = $this->uploadFilesService->uploadImage($imageFile, 'orders/items');
+                }
+
+                $existingItem = $order->items->first(function ($i) use ($pieceId, $servicesRows) {
+                    return (int) $i->piece_id === $pieceId && (int) $i->service_id === (int) $servicesRows[0]['service_id'];
+                });
+
+                $itemNote = $item['note'] ?? $item['notes'] ?? $existingItem?->notes;
+                $itemImage = $uploadedImage ?? $item['images'] ?? $existingItem?->images;
+
+                $itemsData[] = [
+                    'piece_id' => $item['piece_id'],
+                    'piece_price' => $piecePrice,
+                    'service_id' => $servicesRows[0]['service_id'],
+                    'service_price' => $servicesRows[0]['service_piece_price'],
+                    'services' => $servicesRows,
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $unitPrice,
+                    'total_price' => $itemTotal,
+                    'additional_services' => $additionalServicesData,
+                    'additional_services_total' => (float) $additionalServicesTotal,
+                    'note' => $itemNote,
+                    'notes' => $itemNote,
+                    'images' => $itemImage,
+                ];
+            }
+
+            // Keep order coupon only when rules still pass on the new item totals.
+            // Pass branch_id so zone/branch-restricted discounts (e.g. delivery_free
+            // coupons scoped to specific zones) don't spuriously fail eligibility and
+            // get silently dropped from the order just because this edit didn't
+            // resubmit the coupon_code.
+            if (! $appliedDiscount && ! ($request->filled('coupon_code'))) {
+                if ($order->discount) {
+                    $soft = $this->discountService->applyIfEligible(
+                        $order->discount,
+                        (float) $totalAmount,
+                        (int) $user->id,
+                        $vendorId,
+                        true,
+                        ['branch_id' => $storeBranchId]
+                    );
+                    if ($soft['applied']) {
+                        $appliedDiscount = $soft['discount'];
+                        $discountAmount = (float) $soft['discount_amount'];
+                        $deliveryDiscountAmount = (float) ($soft['delivery_discount_amount'] ?? 0);
+                    }
+                } elseif ((float) $order->discount_amount > 0) {
+                    $discountAmount = min((float) $order->discount_amount, (float) $totalAmount);
+                }
+            }
+        }
+
+        // Plain-language "what changed" summary: which items were dropped vs
+        // added compared to the order's previous item list, and the net
+        // item-level price impact (before tax/delivery) — so the client sees
+        // e.g. "removed item worth 3, added items worth 2, net: 1 refund"
+        // right when the edit is submitted, not just the final tax-inclusive
+        // amount_due/refund.
+        $oldItemTotals = [];
+        foreach ($order->items as $oldItem) {
+            $sig = $oldItem->piece_id.'-'.$oldItem->service_id;
+            $oldItemTotals[$sig] = ($oldItemTotals[$sig] ?? 0) + (float) $oldItem->total_price;
+        }
+
+        $newItemTotals = [];
+        foreach ($itemsData as $newItem) {
+            $sig = $newItem['piece_id'].'-'.$newItem['service_id'];
+            $newItemTotals[$sig] = ($newItemTotals[$sig] ?? 0) + (float) ($newItem['total_price'] ?? 0);
+        }
+
+        $changedSignatures = array_unique(array_merge(array_keys($oldItemTotals), array_keys($newItemTotals)));
+        $changedPieceIds = [];
+        $changedServiceIds = [];
+        foreach ($changedSignatures as $sig) {
+            [$sigPieceId, $sigServiceId] = array_map('intval', explode('-', $sig));
+            $changedPieceIds[] = $sigPieceId;
+            $changedServiceIds[] = $sigServiceId;
+        }
+        $piecesById = Piece::withTrashed()->whereIn('id', array_unique($changedPieceIds))->get()->keyBy('id');
+        $servicesById = \Modules\Service\Models\Service::withTrashed()->whereIn('id', array_unique($changedServiceIds))->get()->keyBy('id');
+
+        $describeItemSignature = function (string $sig) use ($piecesById, $servicesById, $storeBranchId, $lang) {
+            [$sigPieceId, $sigServiceId] = array_map('intval', explode('-', $sig));
+            $piece = $piecesById->get($sigPieceId);
+            $service = $servicesById->get($sigServiceId);
+
+            return trim(
+                ($piece ? \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang) : '')
+                .' - '.
+                ($service ? \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang) : ''),
+                ' -'
+            );
+        };
+
+        $removedItemsSummary = [];
+        $removedItemsTotal = 0.0;
+        foreach ($oldItemTotals as $sig => $amount) {
+            if (! array_key_exists($sig, $newItemTotals)) {
+                $removedItemsTotal += $amount;
+                $removedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round($amount, 2)];
+            }
+        }
+
+        $addedItemsSummary = [];
+        $addedItemsTotal = 0.0;
+        foreach ($newItemTotals as $sig => $amount) {
+            if (! array_key_exists($sig, $oldItemTotals)) {
+                $addedItemsTotal += $amount;
+                $addedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round($amount, 2)];
+            }
+        }
+
+        $netItemsAmount = round($addedItemsTotal - $removedItemsTotal, 2);
+        $itemsChangeSummary = [
+            'removed_items' => $removedItemsSummary,
+            'removed_total' => round($removedItemsTotal, 2),
+            'added_items' => $addedItemsSummary,
+            'added_total' => round($addedItemsTotal, 2),
+            'net_amount' => $netItemsAmount,
+            'net_type' => $netItemsAmount < -0.005 ? 'refund' : ($netItemsAmount > 0.005 ? 'charge' : 'none'),
+        ];
+
+        // Calculate delivery fee using branch coordinates:
+        // - pickup_at_vendor=false & delivery_at_vendor=false → charge pickup + delivery fees
+        // - pickup_at_vendor=false & delivery_at_vendor=true  → charge pickup fee only
+        // - pickup_at_vendor=true  & delivery_at_vendor=false → charge delivery fee only
+        // - pickup_at_vendor=true  & delivery_at_vendor=true  → no delivery charge
+        $deliveryFee = 0;
+        $totalDistance = 0;
+        $pickupDistance = 0;
+        $deliveryDistance = 0;
+        $pickupFee = 0;
+        $deliveryFeeAmount = 0;
+
+        if (! $pickupAtVendor || ! $deliveryAtVendor) {
+            if (! $branch->latitude || ! $branch->longitude) {
+                return ['error' => errorResponse(__('order.vendor_location_not_available'), 400)];
+            }
+
+            $deliveryPricePerKm = $vendor->delivery_price_per_km
+                ?? AdminSetting::getValue('delivery_price_per_km', 5);
+
+            // Calculate pickup fee (customer address → branch) if pickup is via delivery
+            if (! $pickupAtVendor && $pickupAddress) {
+                if (! $pickupAddress->latitude || ! $pickupAddress->longitude) {
+                    return ['error' => errorResponse(__('order.pickup_address_location_not_available'), 400)];
+                }
+                $pickupDistance = $this->calculateDistance(
+                    (float) $pickupAddress->latitude,
+                    (float) $pickupAddress->longitude,
+                    (float) $branch->latitude,
+                    (float) $branch->longitude
+                );
+                $totalDistance += $pickupDistance;
+                $pickupFee = $pickupDistance * $deliveryPricePerKm;
+            }
+
+            // Calculate delivery fee (branch → customer address) if delivery is via delivery
+            if (! $deliveryAtVendor && $deliveryAddress) {
+                if (! $deliveryAddress->latitude || ! $deliveryAddress->longitude) {
+                    return ['error' => errorResponse(__('order.delivery_address_location_not_available'), 400)];
+                }
+                $deliveryDistance = $this->calculateDistance(
+                    (float) $branch->latitude,
+                    (float) $branch->longitude,
+                    (float) $deliveryAddress->latitude,
+                    (float) $deliveryAddress->longitude
+                );
+                $totalDistance += $deliveryDistance;
+                $deliveryFeeAmount = $deliveryDistance * $deliveryPricePerKm;
+            }
+
+            // Sum applicable fees
+            $deliveryFee = $pickupFee + $deliveryFeeAmount;
+        }
+
+        $discountCity = $deliveryAddress?->city ?? $pickupAddress?->city;
+        // Also covers the "keep order coupon" fallback above, which never populates
+        // $discountItemsBreakdown (only the coupon_code re-entry path does) — without
+        // this, that path's delivery_discount_amount stayed stuck at whatever it
+        // computed with delivery_fee=0.0 (before this block's real delivery fee is
+        // known), e.g. always 0 for a fully-free-delivery coupon kept across an edit.
+        if ($appliedDiscount) {
+            $rechecked = $this->discountService->evaluateKnownOrderDiscount(
+                $appliedDiscount,
+                $discountItemsBreakdown,
+                (float) $totalAmount,
+                (int) $user->id,
+                (int) $vendorId,
+                $storeBranchId,
+                (float) $deliveryFee,
+                $discountCity,
+                false,
+                $lang,
+                ! ($pickupAtVendor && $deliveryAtVendor)
+            );
+            $discountAmount = (float) $rechecked['discount_amount'];
+            $deliveryDiscountAmount = (float) ($rechecked['delivery_discount_amount'] ?? 0);
+        } elseif (! $request->filled('coupon_code')) {
+            $automatic = $this->discountService->findBestAutomaticOrderDiscount(
+                $request->items ?? [],
+                (int) $user->id,
+                (int) $vendorId,
+                $lang,
+                $storeBranchId,
+                (float) $deliveryFee,
+                $discountCity
+            );
+            if ($automatic['applied']) {
+                $appliedDiscount = $automatic['discount'];
+                $discountAmount = (float) $automatic['discount_amount'];
+                $deliveryDiscountAmount = (float) ($automatic['delivery_discount_amount'] ?? 0);
+            }
+        }
+
+        $pricingTotals = Order::calculatePricingTotals($totalAmount, $discountAmount, $deliveryFee, $deliveryDiscountAmount);
+        $taxAmount = $pricingTotals['tax_amount'];
+        $finalAmount = $pricingTotals['final_amount'];
+
+        // Delta between old and new final amount, computed with bc math — never
+        // float arithmetic on money. $deltaCmp: -1 decrease, 0 unchanged, 1 increase.
+        $oldFinal = number_format($oldFinalAmount, 2, '.', '');
+        $newFinal = number_format($finalAmount, 2, '.', '');
+        $delta = bcsub($newFinal, $oldFinal, 2);
+        $deltaCmp = bccomp($delta, '0', 2);
+
+        return [
+            'pickup_at_vendor' => $pickupAtVendor,
+            'delivery_at_vendor' => $deliveryAtVendor,
+            'pickup_address' => $pickupAddress,
+            'delivery_address' => $deliveryAddress,
+            'items_data' => $itemsData,
+            'total_amount' => $totalAmount,
+            'discount_amount' => $discountAmount,
+            'applied_discount' => $appliedDiscount,
+            'items_change_summary' => $itemsChangeSummary,
+            'total_distance' => $totalDistance,
+            'pickup_distance' => $pickupDistance,
+            'delivery_distance' => $deliveryDistance,
+            'pricing_totals' => $pricingTotals,
+            'tax_amount' => $taxAmount,
+            'final_amount' => $finalAmount,
+            'old_final' => $oldFinal,
+            'new_final' => $newFinal,
+            'delta' => $delta,
+            'delta_cmp' => $deltaCmp,
+        ];
     }
 
     /**

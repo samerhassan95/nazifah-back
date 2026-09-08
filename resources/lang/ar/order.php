@@ -7,6 +7,7 @@ return [
     'order_created' => 'تم إنشاء الطلب بنجاح',
     'payment_required' => 'يرجى إتمام الدفع لتأكيد طلبك',
     'order_updated' => 'تم تحديث الطلب بنجاح',
+    'order_calculated' => 'تم حساب التعديل بنجاح',
     'order_deleted' => 'تم حذف الطلب بنجاح',
     'order_not_found' => 'الطلب غير موجود',
     'orders_retrieved' => 'تم استرجاع الطلبات بنجاح',

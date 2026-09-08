@@ -7,6 +7,7 @@ return [
     'order_created' => 'Order placed successfully',
     'payment_required' => 'Please complete payment to place your order',
     'order_updated' => 'Order updated successfully',
+    'order_calculated' => 'Update calculated successfully',
     'order_deleted' => 'Order deleted successfully',
     'order_not_found' => 'Order not found',
     'orders_retrieved' => 'Orders retrieved successfully',

@@ -340,6 +340,13 @@ Route::middleware(['auth:client', 'banned'])->group(function () {
         Route::put('/update', [OrderTrackingController::class, 'updateOrder'])
             ->name('user.orders.update');
 
+        // Preview an update before committing it: same request body as /update, but
+        // read-only — no items/payment are touched. Returns the new totals and an
+        // items breakdown (original vs added/removed) so the client can show this to
+        // the user before they confirm the edit.
+        Route::post('/update/calculate', [OrderTrackingController::class, 'calculateOrderUpdate'])
+            ->name('user.orders.update.calculate');
+
         // Get delivery route
         Route::get('/delivery-route', [OrderTrackingController::class, 'getDeliveryRoute'])
             ->name('user.orders.delivery-route');
