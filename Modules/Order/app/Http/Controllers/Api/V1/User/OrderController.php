@@ -2415,17 +2415,16 @@ class OrderController extends Controller
      */
     private function generateUniqueOrderNumber(): string
     {
-        $datePrefix = date('Ymd');
         $maxRetries = 10;
         $retry = 0;
 
         while ($retry < $maxRetries) {
             try {
-                $nextSequence = DB::transaction(function () use ($datePrefix) {
-                    return $this->getMaxReservedOrderSequenceForDate($datePrefix) + 1;
+                $nextSequence = DB::transaction(function () {
+                    return $this->getMaxReservedOrderSequence() + 1;
                 });
 
-                $orderNumber = 'ORD-'.$datePrefix.'-'.str_pad($nextSequence, 5, '0', STR_PAD_LEFT);
+                $orderNumber = (string) $nextSequence;
 
                 if (! $this->isOrderNumberReserved($orderNumber)) {
                     return $orderNumber;
@@ -2437,52 +2436,46 @@ class OrderController extends Controller
                 $retry++;
 
                 if ($retry >= $maxRetries) {
-                    $timestamp = (int) (microtime(true) * 1000);
-
-                    return 'ORD-'.$datePrefix.'-'.str_pad($timestamp % 100000, 5, '0', STR_PAD_LEFT);
+                    return (string) ((int) (microtime(true) * 1000));
                 }
                 usleep(10000);
             }
         }
 
-        $timestamp = (int) (microtime(true) * 1000);
-
-        return 'ORD-'.$datePrefix.'-'.str_pad($timestamp % 100000, 5, '0', STR_PAD_LEFT);
+        return (string) ((int) (microtime(true) * 1000));
     }
 
     /**
-     * Highest ORD-{date}-##### sequence already used today (orders, pending checkout, payments).
+     * Highest plain numeric order number already used (orders, pending checkout, payments).
      */
-    private function getMaxReservedOrderSequenceForDate(string $datePrefix): int
+    private function getMaxReservedOrderSequence(): int
     {
-        $pattern = "ORD-{$datePrefix}-%";
         $maxSequence = 0;
 
         $candidates = [
-            Order::where('order_number', 'like', $pattern)
+            Order::whereRaw("order_number REGEXP '^[0-9]+$'")
                 ->lockForUpdate()
-                ->orderBy('order_number', 'desc')
+                ->orderByRaw('CAST(order_number AS UNSIGNED) desc')
                 ->value('order_number'),
-            PaymentTransaction::where('transaction_id', 'like', $pattern)
-                ->orderBy('transaction_id', 'desc')
+            PaymentTransaction::whereRaw("transaction_id REGEXP '^[0-9]+$'")
+                ->orderByRaw('CAST(transaction_id AS UNSIGNED) desc')
                 ->value('transaction_id'),
         ];
 
         foreach ($candidates as $orderNumber) {
-            $sequence = $this->parseOrderNumberSequence($orderNumber, $datePrefix);
+            $sequence = $this->parseOrderNumberSequence($orderNumber);
             if ($sequence !== null) {
                 $maxSequence = max($maxSequence, $sequence);
             }
         }
 
-        PendingOrder::where('order_data->order_number', 'like', $pattern)
+        PendingOrder::where('order_data->order_number', 'REGEXP', '^[0-9]+$')
             ->lockForUpdate()
             ->select(['order_data'])
-            ->chunkById(100, function ($pendingOrders) use ($datePrefix, &$maxSequence) {
+            ->chunkById(100, function ($pendingOrders) use (&$maxSequence) {
                 foreach ($pendingOrders as $pendingOrder) {
                     $sequence = $this->parseOrderNumberSequence(
-                        $pendingOrder->order_data['order_number'] ?? null,
-                        $datePrefix
+                        $pendingOrder->order_data['order_number'] ?? null
                     );
                     if ($sequence !== null) {
                         $maxSequence = max($maxSequence, $sequence);
@@ -2493,18 +2486,13 @@ class OrderController extends Controller
         return $maxSequence;
     }
 
-    private function parseOrderNumberSequence(?string $orderNumber, string $datePrefix): ?int
+    private function parseOrderNumberSequence(?string $orderNumber): ?int
     {
-        if ($orderNumber === null || $orderNumber === '') {
+        if ($orderNumber === null || $orderNumber === '' || ! preg_match('/^\d+$/', $orderNumber)) {
             return null;
         }
 
-        $pattern = '/^ORD-'.preg_quote($datePrefix, '/').'-(\d+)$/';
-        if (! preg_match($pattern, $orderNumber, $matches)) {
-            return null;
-        }
-
-        return (int) $matches[1];
+        return (int) $orderNumber;
     }
 
     private function isOrderNumberReserved(string $orderNumber): bool

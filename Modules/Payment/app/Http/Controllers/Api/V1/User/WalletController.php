@@ -822,6 +822,13 @@ class WalletController extends Controller
 
     private function extractOrderNumberFromWalletDescription(string $raw): ?string
     {
+        // Descriptions are built as "Order #{order_number} - ...". Match the token
+        // right after "#" so both the legacy ORD-YYYYMMDD-##### format and the
+        // current plain sequential numbers are recognized.
+        if (preg_match('/#([A-Za-z0-9-]+)/', $raw, $matches)) {
+            return $matches[1];
+        }
+
         if (preg_match('/ORD-[A-Z0-9-]+/i', $raw, $matches)) {
             return strtoupper($matches[0]);
         }
