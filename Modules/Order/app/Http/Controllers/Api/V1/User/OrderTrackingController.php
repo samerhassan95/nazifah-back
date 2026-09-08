@@ -1388,25 +1388,24 @@ class OrderTrackingController extends Controller
         }
 
         return successResponse([
-            'order_preview' => [
-                'subtotal' => round((float) $computation['total_amount'], 2),
-                'discount_amount' => round((float) $computation['discount_amount'], 2),
-                'delivery_fee' => round((float) $computation['pricing_totals']['delivery_fee'], 2),
-                'tax_amount' => round((float) $computation['tax_amount'], 2),
-                'total_amount' => round((float) $computation['final_amount'], 2),
-            ],
             // What's original vs what this edit changes — grey vs highlighted in the UI.
             'items_breakdown' => $itemsBreakdown,
-            // Same removed/added/net shape already returned by updateOrder() on commit.
-            'items_change_summary' => $itemsChangeSummary,
-            // The one number that matters for "how much will I actually pay/get back":
-            // never stack the old total on top of the new one — this is the net delta.
-            'payment_preview' => [
-                'amount_due' => round(abs($delta), 2),
-                'net_type' => $deltaCmp < 0 ? 'refund' : ($deltaCmp > 0 ? 'charge' : 'none'),
-                'old_final_amount' => round((float) $oldFinalAmount, 2),
-                'new_final_amount' => round((float) $computation['final_amount'], 2),
-            ],
+            // Item-level diff, before tax/delivery — "cart" totals.
+            'added_total' => $itemsChangeSummary['added_total'],
+            'removed_total' => $itemsChangeSummary['removed_total'],
+            'net_amount' => $itemsChangeSummary['net_amount'],
+            'net_type' => $itemsChangeSummary['net_type'],
+            // The new order's totals if this edit is confirmed as-is.
+            'subtotal' => round((float) $computation['total_amount'], 2),
+            'discount_amount' => round((float) $computation['discount_amount'], 2),
+            'delivery_fee' => round((float) $computation['pricing_totals']['delivery_fee'], 2),
+            'tax_amount' => round((float) $computation['tax_amount'], 2),
+            'total_amount' => round((float) $computation['final_amount'], 2),
+            // The real money delta (post-tax/delivery) — never the old total stacked
+            // on top of the new one. This is what will actually be charged/refunded,
+            // e.g. via wallet, if the edit is confirmed.
+            'amount_due' => round(abs($delta), 2),
+            'amount_due_type' => $deltaCmp < 0 ? 'refund' : ($deltaCmp > 0 ? 'charge' : 'none'),
         ], __('order.order_calculated'));
     }
 
@@ -1779,6 +1778,26 @@ class OrderTrackingController extends Controller
             if (! array_key_exists($sig, $oldItemTotals)) {
                 $addedItemsTotal += $amount;
                 $addedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round($amount, 2)];
+            }
+        }
+
+        // Same piece+service kept, but its line total changed — e.g. an additional
+        // service or quantity was added/removed on it. The signature match above
+        // treats "present in both" as unchanged and skips it entirely, silently
+        // dropping this delta from added_total/removed_total (and therefore from
+        // net_amount) even though real money moved. Attribute the difference to
+        // whichever side it belongs on so the totals stay accurate.
+        foreach ($oldItemTotals as $sig => $oldAmount) {
+            if (! array_key_exists($sig, $newItemTotals)) {
+                continue;
+            }
+            $lineDelta = round($newItemTotals[$sig] - $oldAmount, 2);
+            if ($lineDelta > 0.005) {
+                $addedItemsTotal += $lineDelta;
+                $addedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => $lineDelta];
+            } elseif ($lineDelta < -0.005) {
+                $removedItemsTotal += abs($lineDelta);
+                $removedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round(abs($lineDelta), 2)];
             }
         }
 
