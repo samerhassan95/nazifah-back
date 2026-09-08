@@ -406,6 +406,24 @@ class Order extends Model
     }
 
     /**
+     * Same as status_label, but worded for the vendor side (e.g. BRANCH_REVIEW
+     * reads "awaiting customer review" instead of "branch reviewed" — the vendor
+     * already knows they reviewed it, what matters to them is what's next).
+     */
+    public function getVendorStatusLabelAttribute(): string
+    {
+        $status = OrderStatus::tryFrom($this->status);
+
+        if (! $status) {
+            return $this->status;
+        }
+
+        $awaitingClientReceipt = $status === OrderStatus::COMPLETED && ! $this->client_delivery_handoff_at;
+
+        return $status->localizedLabel($this->payment_method, $awaitingClientReceipt, (bool) $this->delivery_at_vendor, true);
+    }
+
+    /**
      * Localized label for payment_status (Accept-Language aware).
      */
     public function getPaymentStatusLabelAttribute(): string

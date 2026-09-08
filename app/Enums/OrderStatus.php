@@ -103,13 +103,20 @@ enum OrderStatus: string
         };
     }
 
-    public function localizedLabel(?string $paymentMethod = null, bool $awaitingClientReceipt = false, bool $deliveryAtVendor = false): string
+    public function localizedLabel(?string $paymentMethod = null, bool $awaitingClientReceipt = false, bool $deliveryAtVendor = false, bool $forVendor = false): string
     {
         $isAr = app()->getLocale() === 'ar';
 
         if ($this === self::PAYMENT_CONFIRMED
             && $paymentMethod === \App\Enums\PaymentMethod::CASH_ON_DELIVERY->value) {
             return $isAr ? 'تم تأكيد الطلب' : 'Order Confirmed';
+        }
+
+        // From the vendor's side, "تم مراجعة الفرع" (branch reviewed) is stale —
+        // the vendor already knows they reviewed it; what they need to see is that
+        // it's now sitting with the client awaiting approval.
+        if ($this === self::BRANCH_REVIEW && $forVendor) {
+            return $isAr ? 'بانتظار مراجعة العميل' : 'Awaiting Customer Review';
         }
 
         // Branch self-pickup: waiting_client_receipt is reused for "vendor finished,

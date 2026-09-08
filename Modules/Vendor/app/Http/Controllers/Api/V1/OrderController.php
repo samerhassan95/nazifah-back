@@ -1934,7 +1934,7 @@ class OrderController extends Controller
         return successResponse(array_merge([
             'id' => $order->id,
             'status' => $order->status,
-            'status_label' => $order->status_label,
+            'status_label' => $order->vendor_status_label,
             'branch_id' => $order->branch_id,
             'order_number' => $order->order_number,
             'invoice' => $invoiceSummary,
@@ -2129,7 +2129,7 @@ class OrderController extends Controller
         return successResponse(array_merge([
             'id' => $order->id,
             'status' => $order->status,
-            'status_label' => $order->status_label,
+            'status_label' => $order->vendor_status_label,
             'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             ...$this->vendorHandoffMeta($order, $handoffService, $handoffActions),
@@ -2232,7 +2232,7 @@ class OrderController extends Controller
         $responseData = array_merge([
             'id' => $order->id,
             'status' => $order->status,
-            'status_label' => $order->status_label,
+            'status_label' => $order->vendor_status_label,
             'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             ...$this->vendorHandoffMeta($order, $handoffService),
