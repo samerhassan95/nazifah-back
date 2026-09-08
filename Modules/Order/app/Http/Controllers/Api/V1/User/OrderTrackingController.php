@@ -1174,6 +1174,76 @@ class OrderTrackingController extends Controller
                 }
             }
 
+            // Plain-language "what changed" summary: which items were dropped vs
+            // added compared to the order's previous item list, and the net
+            // item-level price impact (before tax/delivery) — so the client sees
+            // e.g. "removed item worth 3, added items worth 2, net: 1 refund"
+            // right when the edit is submitted, not just the final tax-inclusive
+            // amount_due/refund.
+            $oldItemTotals = [];
+            foreach ($order->items as $oldItem) {
+                $sig = $oldItem->piece_id.'-'.$oldItem->service_id;
+                $oldItemTotals[$sig] = ($oldItemTotals[$sig] ?? 0) + (float) $oldItem->total_price;
+            }
+
+            $newItemTotals = [];
+            foreach ($itemsData as $newItem) {
+                $sig = $newItem['piece_id'].'-'.$newItem['service_id'];
+                $newItemTotals[$sig] = ($newItemTotals[$sig] ?? 0) + (float) ($newItem['total_price'] ?? 0);
+            }
+
+            $changedSignatures = array_unique(array_merge(array_keys($oldItemTotals), array_keys($newItemTotals)));
+            $changedPieceIds = [];
+            $changedServiceIds = [];
+            foreach ($changedSignatures as $sig) {
+                [$sigPieceId, $sigServiceId] = array_map('intval', explode('-', $sig));
+                $changedPieceIds[] = $sigPieceId;
+                $changedServiceIds[] = $sigServiceId;
+            }
+            $piecesById = Piece::withTrashed()->whereIn('id', array_unique($changedPieceIds))->get()->keyBy('id');
+            $servicesById = \Modules\Service\Models\Service::withTrashed()->whereIn('id', array_unique($changedServiceIds))->get()->keyBy('id');
+
+            $describeItemSignature = function (string $sig) use ($piecesById, $servicesById, $storeBranchId, $lang) {
+                [$sigPieceId, $sigServiceId] = array_map('intval', explode('-', $sig));
+                $piece = $piecesById->get($sigPieceId);
+                $service = $servicesById->get($sigServiceId);
+
+                return trim(
+                    ($piece ? \App\Support\OrderItemDisplayNames::pieceName($piece, $storeBranchId, $lang) : '')
+                    .' - '.
+                    ($service ? \App\Support\OrderItemDisplayNames::serviceName($service, $storeBranchId, $lang) : ''),
+                    ' -'
+                );
+            };
+
+            $removedItemsSummary = [];
+            $removedItemsTotal = 0.0;
+            foreach ($oldItemTotals as $sig => $amount) {
+                if (! array_key_exists($sig, $newItemTotals)) {
+                    $removedItemsTotal += $amount;
+                    $removedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round($amount, 2)];
+                }
+            }
+
+            $addedItemsSummary = [];
+            $addedItemsTotal = 0.0;
+            foreach ($newItemTotals as $sig => $amount) {
+                if (! array_key_exists($sig, $oldItemTotals)) {
+                    $addedItemsTotal += $amount;
+                    $addedItemsSummary[] = ['name' => $describeItemSignature($sig), 'amount' => round($amount, 2)];
+                }
+            }
+
+            $netItemsAmount = round($addedItemsTotal - $removedItemsTotal, 2);
+            $itemsChangeSummary = [
+                'removed_items' => $removedItemsSummary,
+                'removed_total' => round($removedItemsTotal, 2),
+                'added_items' => $addedItemsSummary,
+                'added_total' => round($addedItemsTotal, 2),
+                'net_amount' => $netItemsAmount,
+                'net_type' => $netItemsAmount < -0.005 ? 'refund' : ($netItemsAmount > 0.005 ? 'charge' : 'none'),
+            ];
+
             // Calculate delivery fee using branch coordinates:
             // - pickup_at_vendor=false & delivery_at_vendor=false → charge pickup + delivery fees
             // - pickup_at_vendor=false & delivery_at_vendor=true  → charge pickup fee only
@@ -1650,6 +1720,11 @@ class OrderTrackingController extends Controller
                 // Non-null only when a gateway increase was paid in this request:
                 // contains the payment link(s)/params for the difference (gateway legs).
                 'payment' => $payment,
+                // What changed in this edit at the item level (before tax/delivery) —
+                // which lines were dropped vs added and the net effect, independent of
+                // whether the tax-inclusive total ended up as a charge, a refund, or a
+                // wash (see payment.amount_due / the refund path for the real amount due).
+                'items_change_summary' => $itemsChangeSummary,
             ], __('order.order_updated'));
 
         } catch (\Exception $e) {
