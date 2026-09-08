@@ -15,16 +15,41 @@ class StoreAdRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => ['required', 'array'],
-            'title.ar' => ['required', 'string'],
-            'title.en' => ['required', 'string'],
+            'type' => ['required', 'in:image,video,gif'],
+            'title' => ['nullable', 'array'],
+            'title.ar' => ['nullable', 'string'],
+            'title.en' => ['nullable', 'string'],
             'description' => ['nullable', 'array'],
             'description.ar' => ['nullable', 'string'],
             'description.en' => ['nullable', 'string'],
-            'image' => 'required|file|image',
+            'image' => [
+                'required',
+                'file',
+                function ($attribute, $value, $fail) {
+                    $type = $this->input('type');
+                    $mime = $value->getMimeType();
+                    $sizeKb = $value->getSize() / 1024;
+
+                    if ($type === 'video') {
+                        $allowed = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
+                        if (! in_array($mime, $allowed, true)) {
+                            $fail('The content file must be a valid video (mp4, mov, avi, webm).');
+                        } elseif ($sizeKb > 20480) {
+                            $fail('The content file must not be greater than 20MB.');
+                        }
+                    } else {
+                        $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                        if (! in_array($mime, $allowed, true)) {
+                            $fail('The content file must be a valid image (jpeg, png, gif, webp).');
+                        } elseif ($sizeKb > 5120) {
+                            $fail('The content file must not be greater than 5MB.');
+                        }
+                    }
+                },
+            ],
             'link' => 'nullable|string|url',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after:start_date',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
             'is_active' => 'boolean',
         ];
     }

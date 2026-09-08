@@ -33,13 +33,20 @@ class AdminAdController extends Controller
         $validated = $request->validated();
         $validated['is_active'] = $validated['is_active'] ?? true;
 
+        if (empty($validated['title']['ar']) && empty($validated['title']['en'])) {
+            $validated['title'] = [
+                'ar' => 'إعلان ترويجي',
+                'en' => 'Promotional Ad',
+            ];
+        }
+
         if ($request->hasFile('image')) {
-            $validated['image'] = $this->uploadFilesService->uploadImage($request->file('image'), 'ads');
+            $validated['image'] = $this->uploadFilesService->uploadFile($request->file('image'), 'ads');
         }
 
         $ad = $this->adService->createAd($validated);
 
-        return successResponse($ad, 'Ad created successfully', 201);
+        return successResponse(new AdResource($ad), 'Ad created successfully', 201);
     }
 
     public function show(int $id): JsonResponse
@@ -72,7 +79,7 @@ class AdminAdController extends Controller
         $validated = $request->validated();
 
         if ($request->hasFile('image')) {
-            $validated['image'] = $this->uploadFilesService->uploadImage($request->file('image'), 'ads');
+            $validated['image'] = $this->uploadFilesService->uploadFile($request->file('image'), 'ads');
         }
 
         $ad = $this->adService->updateAd($id, $validated);
@@ -81,7 +88,7 @@ class AdminAdController extends Controller
             return notFoundResponse('Ad not found');
         }
 
-        return successResponse($ad, 'Ad updated successfully');
+        return successResponse(new AdResource($ad), 'Ad updated successfully');
     }
 
     public function destroy(int $id): JsonResponse
