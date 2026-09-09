@@ -1931,10 +1931,29 @@ class OrderController extends Controller
             ? $this->completedOrderInvoiceSummary($order)
             : null;
 
+        // true: the vendor rejected or modified at least one item/addition during
+        // branch review. false: everything was accepted as submitted. Stays true
+        // even after the order moves past branch_review (a historical fact, not
+        // the current pending-review state) — until a later client edit replaces
+        // the item list, which carries no vendor_status history.
+        $hasModifiedOrRejectedLine = $order->items->contains(function ($item) {
+            if (($item->vendor_status ?? 'accepted') !== 'accepted') {
+                return true;
+            }
+
+            return $item->additionalServicesPivot->contains(fn ($pivot) => ($pivot->vendor_status ?? 'accepted') !== 'accepted');
+        });
+        // true only when EVERY item was rejected outright (nothing accepted) —
+        // the vendor rejected the order as a whole rather than modifying part of it.
+        $allItemsRejected = $order->items->isNotEmpty()
+            && $order->items->every(fn ($item) => ($item->vendor_status ?? 'accepted') === 'rejected');
+
         return successResponse(array_merge([
             'id' => $order->id,
             'status' => $order->status,
             'status_label' => $order->vendor_status_label,
+            'order_modified_by_vendor' => $hasModifiedOrRejectedLine,
+            'vendor_rejected_all_items' => $allItemsRejected,
             'branch_id' => $order->branch_id,
             'order_number' => $order->order_number,
             'invoice' => $invoiceSummary,

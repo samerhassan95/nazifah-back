@@ -1882,6 +1882,17 @@ class OrderController extends Controller
                 'rejected_count' => count($categorizedItems['rejected']),
                 'modified_items' => $categorizedItems['modified'],
                 'modified_count' => count($categorizedItems['modified']),
+                // true: the vendor rejected or modified at least one item during branch
+                // review. false: everything was accepted as submitted — nothing to
+                // review, the order simply confirmed. Stays true even after the client
+                // later approves the review (it's a historical fact about this order,
+                // not the current pending-review state) — until a later client edit
+                // replaces the item list, which carries no vendor_status history.
+                'order_modified_by_vendor' => count($categorizedItems['rejected']) > 0 || count($categorizedItems['modified']) > 0,
+                // true only when EVERY item was rejected (nothing accepted) — the
+                // vendor rejected the order outright rather than modifying part of it.
+                'vendor_rejected_all_items' => count($categorizedItems['accepted']) === 0
+                    && (count($categorizedItems['rejected']) + count($categorizedItems['modified'])) > 0,
                 'distance' => $order->distance !== null ? (float) $order->distance : 0,
                 'total_distance_km' => $order->distance !== null ? (float) $order->distance : 0,
                 'pickup_distance_km' => $order->pickup_distance !== null ? (float) $order->pickup_distance : 0,
