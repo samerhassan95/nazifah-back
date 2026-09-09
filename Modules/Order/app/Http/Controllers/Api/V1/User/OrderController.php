@@ -3701,7 +3701,27 @@ class OrderController extends Controller
             }
         }
 
-        $ordersData = $orders->map(function ($order) use ($lang, $handoffService, $visitService, $vendorHandoffService) {
+        $ordersData = $this->buildOnTheWayOrdersData($orders, $lang, $handoffService, $visitService, $vendorHandoffService);
+
+        return successResponse([
+            'orders' => $ordersData,
+            'total' => $ordersData->count(),
+        ], __('order.orders_on_the_way_retrieved'));
+    }
+
+    /**
+     * Builds the on-the-way/pending-action card payload for each order — shared by
+     * getOrdersOnTheWay() (single/all, tracking screen) and getOrderActions() (Home,
+     * actionable-only) so the two can never drift on what a card looks like.
+     */
+    private function buildOnTheWayOrdersData(
+        \Illuminate\Support\Collection $orders,
+        string $lang,
+        \App\Services\ClientOrderHandoffService $handoffService,
+        \App\Services\ClientOrderVisitService $visitService,
+        \App\Services\VendorOrderHandoffService $vendorHandoffService
+    ): \Illuminate\Support\Collection {
+        return $orders->map(function ($order) use ($lang, $handoffService, $visitService, $vendorHandoffService) {
             $order = $handoffService->repairInconsistentBranchPickupStatus($order)->fresh([
                 'driver',
                 'pickupAddress',
@@ -3940,6 +3960,61 @@ class OrderController extends Controller
 
             return $response;
         });
+    }
+
+    /**
+     * Home screen: every order across the client's account that currently needs a
+     * client action (branch review approval, handoff confirmation, or driver visit
+     * response) — no order_id required. Same card shape as getOrdersOnTheWay(), just
+     * pre-filtered to "needs action" and spanning all of the client's orders instead
+     * of one. Home shows the confirmation card when total > 0, hides it when 0.
+     *
+     * GET /api/v1/user/orders/order-action
+     */
+    public function getOrderActions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $lang = app()->getLocale();
+
+        $handoffService = app(\App\Services\ClientOrderHandoffService::class);
+        $visitService = app(\App\Services\ClientOrderVisitService::class);
+        $vendorHandoffService = app(\App\Services\VendorOrderHandoffService::class);
+        $onTheWayStatuses = OrderStatus::clientDriverVisitTrackingStatusValues();
+
+        $orders = Order::with([
+            'driver',
+            'pickupAddress',
+            'deliveryAddress',
+            'branch',
+            'items.piece',
+            'items.service',
+            'items.additionalServicesPivot.serviceAddition',
+        ])
+            ->where('client_id', $user->id)
+            ->where(function ($builder) use ($onTheWayStatuses) {
+                $builder->whereIn('status', $onTheWayStatuses)
+                    ->orWhere('status', OrderStatus::BRANCH_REVIEW->value)
+                    ->orWhere(function ($pendingBranchPickup) {
+                        $pendingBranchPickup
+                            ->whereIn('status', [OrderStatus::WAITING_CLIENT_RECEIPT->value, OrderStatus::COMPLETED->value])
+                            ->where('delivery_at_vendor', true)
+                            ->whereNull('client_delivery_handoff_at');
+                    });
+            })
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        $ordersData = $this->buildOnTheWayOrdersData($orders, $lang, $handoffService, $visitService, $vendorHandoffService)
+            ->filter(function (array $item) {
+                // Same rules as the Flutter-side hasClientAction check this endpoint
+                // exists to replace: branch review, a handoff to confirm, a visit to
+                // respond to, or (legacy signal) a receipt-status prompt in the message.
+                return ($item['status'] ?? null) === OrderStatus::BRANCH_REVIEW->value
+                    || ($item['requires_handoff_confirmation'] ?? false) === true
+                    || ($item['requires_visit_response'] ?? false) === true
+                    || (is_string($item['message'] ?? null) && str_contains($item['message'], 'receipt-status'));
+            })
+            ->values();
 
         return successResponse([
             'orders' => $ordersData,

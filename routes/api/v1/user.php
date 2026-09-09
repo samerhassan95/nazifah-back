@@ -250,6 +250,12 @@ Route::middleware(['auth:client', 'banned'])->group(function () {
         Route::get('/on-the-way/{order_id}', [OrderController::class, 'getOrdersOnTheWay'])
             ->name('user.orders.on-the-way');
 
+        // Home screen: every order needing a client action right now, no order_id
+        // required (empty list when nothing needs action — hide the card).
+        // See HOME_ORDER_ACTION_API.md.
+        Route::get('/order-action', [OrderController::class, 'getOrderActions'])
+            ->name('user.orders.order-action');
+
         // Client confirms actual handoff (gave/received clothes)
         Route::post('/{order_id}/confirm-handoff', [OrderController::class, 'confirmHandoff'])
             ->name('user.orders.confirm-handoff');
