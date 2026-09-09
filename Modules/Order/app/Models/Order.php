@@ -424,16 +424,6 @@ class Order extends Model
     }
 
     /**
-     * Same as vendor_status_label, reused for the driver side — a driver isn't
-     * the one reviewing either, so the same "not the client" wording applies
-     * (e.g. BRANCH_REVIEW reads "awaiting customer review", not "branch reviewed").
-     */
-    public function getDriverStatusLabelAttribute(): string
-    {
-        return $this->vendor_status_label;
-    }
-
-    /**
      * Localized label for payment_status (Accept-Language aware).
      */
     public function getPaymentStatusLabelAttribute(): string

@@ -391,7 +391,7 @@ class OrderController extends Controller
             'order_number' => $order->order_number,
             'order_title' => $orderTitle,
             'order_status' => $order->status,
-            'status_label' => $order->driver_status_label,
+            'status_label' => $order->status_label,
             'vendor_name' => $vendorName,
             'customer_name' => $order->client?->full_name ?? 'Unknown',
             'distance' => $distance,
@@ -531,7 +531,7 @@ class OrderController extends Controller
 
         if ($targetLeg === null) {
             return errorResponse(__('order.driver_on_the_way_not_allowed', [
-                'status' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
+                'status' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
             ]), ['order_status' => $order->status], 400);
         }
 
@@ -540,7 +540,7 @@ class OrderController extends Controller
         if ($leg === null) {
             return errorResponse(
                 __('order.driver_on_the_way_not_allowed', [
-                    'status' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
+                    'status' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
                 ]),
                 ['order_status' => $order->status, 'visit_type' => $targetLeg],
                 400
@@ -565,7 +565,7 @@ class OrderController extends Controller
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'status' => $order->status,
-            'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
+            'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
             'notification_sent' => true,
             'visit_type' => $leg,
             'visit_type_label' => $visitMeta['visit_type_label'],
@@ -684,7 +684,7 @@ class OrderController extends Controller
             'branch_id' => $order->branch_id,
 
             'order_status' => $order->status,
-            'status_label' => $order->driver_status_label,
+            'status_label' => $order->status_label,
 
             'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
@@ -788,7 +788,7 @@ class OrderController extends Controller
         $response['order_info'] = [
             'order_number' => $order->order_number,
             'order_status' => $order->status,
-            'status_label' => $order->driver_status_label,
+            'status_label' => $order->status_label,
 
             'client_address' => $clientAddress,
         ];
@@ -1003,7 +1003,7 @@ class OrderController extends Controller
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'status' => $order->status,
-            'status_label' => $order->driver_status_label,
+            'status_label' => $order->status_label,
 
             'progress' => $progress,
             'client' => $order->client ? [
@@ -1079,7 +1079,7 @@ class OrderController extends Controller
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'status' => $order->fresh()->status,
-            'status_label' => OrderStatus::tryFrom($order->fresh()->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->fresh()->status,
+            'status_label' => OrderStatus::tryFrom($order->fresh()->status)?->localizedLabel($order->payment_method) ?? $order->fresh()->status,
             'message' => 'Order rejected successfully',
         ], (int) $driver->id), 'Order rejected successfully');
     }
@@ -1171,7 +1171,7 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->status,
-                'status_label' => $currentStatus?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
+                'status_label' => $currentStatus?->localizedLabel($order->payment_method) ?? $order->status,
             ], (int) $driver->id), 'Pickup already completed');
         }
 
@@ -1198,7 +1198,7 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->fresh()->status,
-                'status_label' => OrderStatus::tryFrom($order->fresh()->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->fresh()->status,
+                'status_label' => OrderStatus::tryFrom($order->fresh()->status)?->localizedLabel($order->payment_method) ?? $order->fresh()->status,
             ], (int) $driver->id), app()->getLocale() === 'ar' ? 'أنت في الطريق لتوصيل الطلب للعميل' : 'You are on the way to deliver the order to the client');
         }
 
@@ -1220,7 +1220,7 @@ class OrderController extends Controller
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'status' => $order->status,
-            'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
+            'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
             'requires_client_handoff_confirmation' => ! (bool) $order->pickup_at_vendor && $order->client_pickup_handoff_at === null,
         ], (int) $driver->id), app()->getLocale() === 'ar'
             ? 'تم استلام الطلب من العميل — في انتظار تأكيد العميل'
@@ -1270,7 +1270,7 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->status,
-                'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
+                'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
                 'driver_role' => 'pickup',
             ], (int) $driver->id), __('order.vendor_handoff_driver_qr_enabled_pickup'));
         }
@@ -1281,7 +1281,7 @@ class OrderController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'status' => $order->status,
-                    'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
+                    'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
                     'driver_role' => 'delivery',
                 ], (int) $driver->id), app()->getLocale() === 'ar'
                     ? 'تم استلام الطلب من المغسلة مسبقًا — يمكنك وضع نفسك في الطريق لهذا الطلب'
@@ -1294,13 +1294,13 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->status,
-                'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
+                'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
                 'driver_role' => 'delivery',
             ], (int) $driver->id), __('order.vendor_handoff_driver_qr_enabled_delivery'));
         }
 
         // Delivery driver never transitions to delivered via confirm-qr — only client confirm-delivery does
-        $currentLabel = OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status;
+        $currentLabel = OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status;
 
         if ($isPickupDriver) {
             return errorResponse(
