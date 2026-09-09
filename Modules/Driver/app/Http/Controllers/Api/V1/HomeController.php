@@ -320,7 +320,7 @@ class HomeController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'status' => $order->status,
-                    'status_label' => $order->status_label,
+                    'status_label' => $order->driver_status_label,
                     'service_name' => $serviceName,
                     'sub_title' => $subTitle,
                     'customer_name' => $order->client?->full_name ?? 'Unknown',
@@ -496,7 +496,7 @@ class HomeController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'status' => $order->status,
-                    'status_label' => $order->status_label,
+                    'status_label' => $order->driver_status_label,
                     'client' => $order->client ? [
                         'id' => $order->client->id,
                         'name' => $order->client->full_name,
