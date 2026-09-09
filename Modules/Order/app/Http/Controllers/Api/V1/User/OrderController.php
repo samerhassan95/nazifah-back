@@ -2410,28 +2410,78 @@ class OrderController extends Controller
     // Orders should never be deleted, only cancelled for audit trail purposes
 
     /**
-     * Generate the next sequential order number.
+     * Generate the next order number: ORD-YYYYMMDD-##### (5-digit, resets daily).
      *
-     * A single row in order_number_sequences, incremented under lockForUpdate()
-     * inside one transaction, is genuinely atomic: a concurrent request's
-     * lockForUpdate() on that same row blocks until this transaction commits,
-     * so two requests can never be handed the same value. This replaces an
-     * earlier "scan MAX(order_number) across 3 tables" approach whose lock
-     * only held for a short-lived sub-transaction (released long before the
-     * number was actually used) — under real concurrency that let two
-     * requests compute the same "next" number, exhausting its retry budget
-     * and falling back to a millisecond timestamp as the order number (e.g.
-     * a customer receiving order "#1788875674742" by SMS).
+     * The counter lives in a single row (order_number_sequences), read and
+     * incremented under lockForUpdate() inside one transaction — a concurrent
+     * request's lockForUpdate() on that same row blocks until this transaction
+     * commits, so two requests can never be handed the same number. This
+     * replaced an earlier "scan MAX(order_number) across 3 tables" approach
+     * whose lock only held for a short-lived sub-transaction (released long
+     * before the number was actually used) — under real concurrency that let
+     * two requests compute the same "next" number, exhausting its retry
+     * budget and falling back to a millisecond timestamp as the order number
+     * (e.g. a customer receiving order "#1788875674742" by SMS).
      */
     private function generateUniqueOrderNumber(): string
     {
-        $next = DB::transaction(function () {
-            DB::table('order_number_sequences')->where('id', 1)->lockForUpdate()->increment('next_value');
+        $today = now()->format('Ymd');
+
+        $sequence = DB::transaction(function () use ($today) {
+            $row = DB::table('order_number_sequences')->where('id', 1)->lockForUpdate()->first();
+
+            if ($row->date_key !== $today) {
+                $next = $this->seedOrderNumberSequenceForDate($today) + 1;
+                DB::table('order_number_sequences')->where('id', 1)->update([
+                    'date_key' => $today,
+                    'next_value' => $next,
+                    'updated_at' => now(),
+                ]);
+
+                return $next;
+            }
+
+            DB::table('order_number_sequences')->where('id', 1)->increment('next_value');
 
             return DB::table('order_number_sequences')->where('id', 1)->value('next_value');
         });
 
-        return (string) $next;
+        return 'ORD-'.$today.'-'.str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * First order number of a new day: seed from the highest ORD-{date}-#####
+     * already issued for that date (covers an order created for "today"
+     * before the counter's date_key rolled over — e.g. a clock/timezone
+     * edge case), or 0 if none exist yet.
+     */
+    private function seedOrderNumberSequenceForDate(string $date): int
+    {
+        $pattern = "ORD-{$date}-%";
+        $max = 0;
+
+        $candidates = [
+            Order::where('order_number', 'like', $pattern)->orderBy('order_number', 'desc')->value('order_number'),
+            PaymentTransaction::where('transaction_id', 'like', $pattern)->orderBy('transaction_id', 'desc')->value('transaction_id'),
+        ];
+        foreach ($candidates as $orderNumber) {
+            if ($orderNumber && preg_match('/^ORD-\d{8}-(\d+)$/', $orderNumber, $m)) {
+                $max = max($max, (int) $m[1]);
+            }
+        }
+
+        PendingOrder::where('order_data->order_number', 'like', $pattern)
+            ->select(['order_data'])
+            ->chunkById(100, function ($rows) use (&$max) {
+                foreach ($rows as $row) {
+                    $orderNumber = $row->order_data['order_number'] ?? null;
+                    if ($orderNumber && preg_match('/^ORD-\d{8}-(\d+)$/', $orderNumber, $m)) {
+                        $max = max($max, (int) $m[1]);
+                    }
+                }
+            });
+
+        return $max;
     }
 
     /**
