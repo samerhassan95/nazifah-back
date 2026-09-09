@@ -1178,7 +1178,7 @@ class OrderTrackingController extends Controller
                     $isPickup ? 'Removed from Pickup Assignment' : 'Removed from Delivery Assignment',
                     $isPickup
                         ? 'تم إلغاء طلب الاستلام لوجود تعديلات من قبل العميل.'
-                        : 'تم إلغاء طلب التوصيل لوجود تعديلات من قبل العميل.',
+                        : 'تم إلغاء طلب التسليم لوجود تعديلات من قبل العميل.',
                     $isPickup
                         ? 'The pickup request was cancelled due to changes made by the client.'
                         : 'The delivery request was cancelled due to changes made by the client.',

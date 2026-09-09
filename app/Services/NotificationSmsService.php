@@ -8,6 +8,19 @@ use Illuminate\Support\Facades\Log;
 
 class NotificationSmsService
 {
+    /**
+     * Notification types that must stay push-only (in-app + FCM), never SMS,
+     * regardless of the deewan.notification_sms.types config. These are
+     * driver "your pending pickup/delivery request was cancelled" notices —
+     * frequent, low-stakes to miss, and not worth an SMS cost each time.
+     */
+    private const PUSH_ONLY_TYPES = [
+        'driver_pickup_cancelled_client_edit',
+        'driver_delivery_cancelled_client_edit',
+        'driver_pickup_unassigned',
+        'driver_delivery_unassigned',
+    ];
+
     public function __construct(protected DeewanSmsService $deewanSms) {}
 
     /**
@@ -66,6 +79,11 @@ class NotificationSmsService
      */
     private function shouldSend(string $userType, array $data): bool
     {
+        $notificationType = (string) ($data['notification_type'] ?? '');
+        if ($notificationType !== '' && in_array($notificationType, self::PUSH_ONLY_TYPES, true)) {
+            return false;
+        }
+
         if (! (bool) config('deewan.notification_sms.enabled', false)) {
             return false;
         }

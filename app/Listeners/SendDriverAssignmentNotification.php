@@ -50,7 +50,7 @@ class SendDriverAssignmentNotification
                 if ($event->actorType === 'vendor') {
                     $bodyArOld = $type === 'pickup'
                         ? "تم إلغاء طلب الاستلام من قبل المغسلة."
-                        : "تم إلغاء طلب التوصيل من قبل المغسلة.";
+                        : "تم إلغاء طلب التسليم من قبل المغسلة.";
                     $bodyEnOld = $type === 'pickup'
                         ? "The pickup request was cancelled by the laundry."
                         : "The delivery request was cancelled by the laundry.";
