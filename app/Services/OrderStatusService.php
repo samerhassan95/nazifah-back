@@ -262,7 +262,7 @@ class OrderStatusService
             $driver->id
         );
 
-        $this->dispatchEvent(new DriverAssigned($order, $driver, 'pickup', $previousPickupDriverId ? (int) $previousPickupDriverId : null));
+        $this->dispatchEvent(new DriverAssigned($order, $driver, 'pickup', $previousPickupDriverId ? (int) $previousPickupDriverId : null, $actorType));
 
         return $order;
     }
@@ -344,7 +344,7 @@ class OrderStatusService
             $driver->id
         );
 
-        $this->dispatchEvent(new DriverAssigned($order, $driver, 'delivery', $previousDeliveryDriverId ? (int) $previousDeliveryDriverId : null));
+        $this->dispatchEvent(new DriverAssigned($order, $driver, 'delivery', $previousDeliveryDriverId ? (int) $previousDeliveryDriverId : null, $actorType));
 
         return $order;
     }

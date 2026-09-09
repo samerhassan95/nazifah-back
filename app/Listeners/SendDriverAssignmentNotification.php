@@ -43,12 +43,25 @@ class SendDriverAssignmentNotification
             if ($isReassignment) {
                 $titleArOld = $type === 'pickup' ? 'تم إلغاء تعيينك من طلب استلام' : 'تم إلغاء تعيينك من طلب توصيل';
                 $titleEnOld = $type === 'pickup' ? 'Removed from Pickup Assignment' : 'Removed from Delivery Assignment';
-                $bodyArOld = $type === 'pickup'
-                    ? "تم إلغاء تعيينك لاستلام الطلب #{$num} وتحويله لسائق آخر."
-                    : "تم إلغاء تعيينك لتوصيل الطلب #{$num} وتحويله لسائق آخر.";
-                $bodyEnOld = $type === 'pickup'
-                    ? "You have been removed from picking up order #{$num}; it was reassigned to another driver."
-                    : "You have been removed from delivering order #{$num}; it was reassigned to another driver.";
+
+                // The vendor explicitly reassigned the driver — say so plainly instead
+                // of the generic "reassigned to another driver" (which reads the same
+                // whether it was the vendor's call or something else entirely).
+                if ($event->actorType === 'vendor') {
+                    $bodyArOld = $type === 'pickup'
+                        ? "تم إلغاء طلب الاستلام من قبل المغسلة."
+                        : "تم إلغاء طلب التوصيل من قبل المغسلة.";
+                    $bodyEnOld = $type === 'pickup'
+                        ? "The pickup request was cancelled by the laundry."
+                        : "The delivery request was cancelled by the laundry.";
+                } else {
+                    $bodyArOld = $type === 'pickup'
+                        ? "تم إلغاء تعيينك لاستلام الطلب #{$num} وتحويله لسائق آخر."
+                        : "تم إلغاء تعيينك لتوصيل الطلب #{$num} وتحويله لسائق آخر.";
+                    $bodyEnOld = $type === 'pickup'
+                        ? "You have been removed from picking up order #{$num}; it was reassigned to another driver."
+                        : "You have been removed from delivering order #{$num}; it was reassigned to another driver.";
+                }
 
                 $this->notifications->sendToDriver(
                     $order,

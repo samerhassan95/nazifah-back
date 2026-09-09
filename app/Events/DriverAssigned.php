@@ -16,5 +16,6 @@ class DriverAssigned
         public readonly Driver $driver,
         public readonly string $assignmentType, // 'pickup' or 'delivery'
         public readonly ?int $previousDriverId = null,
+        public readonly ?string $actorType = null, // who triggered this assignment: 'vendor', 'admin', null
     ) {}
 }

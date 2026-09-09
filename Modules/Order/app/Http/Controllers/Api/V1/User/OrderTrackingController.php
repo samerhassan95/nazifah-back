@@ -799,6 +799,19 @@ class OrderTrackingController extends Controller
             return errorResponse(__('order.order_can_only_update_pending'), 400);
         }
 
+        // Snapshot before the edit: a driver with a pending (not-yet-accepted)
+        // pickup/delivery assignment effectively loses that request once the client
+        // edits the order — postEditStatus() always reverts status to pending for a
+        // full vendor re-review, but pickup_driver_id/delivery_driver_id are left
+        // untouched (see postEditStatus() docblock), so nothing else notifies the
+        // driver that the request it was waiting to accept is no longer live.
+        $pendingDriverToNotify = null;
+        if ($order->status === OrderStatus::DRIVER_PICKUP_ASSIGNED->value && $order->pickup_driver_id) {
+            $pendingDriverToNotify = ['driver_id' => (int) $order->pickup_driver_id, 'type' => 'pickup'];
+        } elseif ($order->status === OrderStatus::DRIVER_DELIVERY_ASSIGNED->value && $order->delivery_driver_id) {
+            $pendingDriverToNotify = ['driver_id' => (int) $order->delivery_driver_id, 'type' => 'delivery'];
+        }
+
         $request->merge([
             'items' => OrderItemsNormalizer::normalize($request->input('items', [])),
         ]);
@@ -1155,6 +1168,24 @@ class OrderTrackingController extends Controller
             }
 
             DB::commit();
+
+            if ($pendingDriverToNotify !== null) {
+                $isPickup = $pendingDriverToNotify['type'] === 'pickup';
+                app(\App\Services\OrderNotificationService::class)->sendToDriver(
+                    $order,
+                    $pendingDriverToNotify['driver_id'],
+                    $isPickup ? 'تم إلغاء تعيينك من طلب استلام' : 'تم إلغاء تعيينك من طلب توصيل',
+                    $isPickup ? 'Removed from Pickup Assignment' : 'Removed from Delivery Assignment',
+                    $isPickup
+                        ? 'تم إلغاء طلب الاستلام لوجود تعديلات من قبل العميل.'
+                        : 'تم إلغاء طلب التوصيل لوجود تعديلات من قبل العميل.',
+                    $isPickup
+                        ? 'The pickup request was cancelled due to changes made by the client.'
+                        : 'The delivery request was cancelled due to changes made by the client.',
+                    'driver_'.$pendingDriverToNotify['type'].'_cancelled_client_edit',
+                    ['assignment_type' => $pendingDriverToNotify['type']]
+                );
+            }
 
             if ($modificationIntent !== null || ! empty($gatewayPayments)) {
                 $payment = $this->orderPaymentService->buildSurchargePaymentResponse(
