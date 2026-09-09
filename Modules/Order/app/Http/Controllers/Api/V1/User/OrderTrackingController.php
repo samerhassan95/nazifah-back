@@ -410,11 +410,30 @@ class OrderTrackingController extends Controller
         // this is just the summary of what got turned down and for how much).
         $allRejectedItems = $rejectedItems->concat($partiallyRejectedItems)->values();
 
+        // true: the vendor rejected or modified at least one item/addition during
+        // branch review. false: everything was accepted as submitted. Stays true
+        // even after the order moves past branch_review (a historical fact, not
+        // the current pending-review state) — until a later client edit replaces
+        // the item list, which carries no vendor_status history.
+        $hasModifiedOrRejectedLine = $order->items->contains(function ($item) {
+            if (($item->vendor_status ?? 'accepted') !== 'accepted') {
+                return true;
+            }
+
+            return $item->additionalServicesPivot->contains(fn ($pivot) => ($pivot->vendor_status ?? 'accepted') !== 'accepted');
+        });
+        // true only when EVERY item was rejected outright (nothing accepted) —
+        // the vendor rejected the order as a whole rather than modifying part of it.
+        $allItemsRejected = $order->items->isNotEmpty()
+            && $order->items->every(fn ($item) => ($item->vendor_status ?? 'accepted') === 'rejected');
+
         return successResponse(array_merge([
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'current_status' => $order->status,
             'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $awaitingClientReceipt, (bool) $order->delivery_at_vendor) ?? $order->status,
+            'order_modified_by_vendor' => $hasModifiedOrRejectedLine,
+            'vendor_rejected_all_items' => $allItemsRejected,
             'progress_percentage' => $this->getProgressPercentage($order->status),
             'laundry' => $order->vendor ? [
                 'id' => $order->vendor->id,
