@@ -402,13 +402,16 @@ class Order extends Model
 
         $awaitingClientReceipt = $status === OrderStatus::COMPLETED && ! $this->client_delivery_handoff_at;
 
-        return $status->localizedLabel($this->payment_method, $awaitingClientReceipt, (bool) $this->delivery_at_vendor);
+        // BRANCH_REVIEW reads "awaiting customer review" for every audience,
+        // client included — "branch reviewed" told the client nothing they
+        // didn't already know (they're the one being asked to act next).
+        return $status->localizedLabel($this->payment_method, $awaitingClientReceipt, (bool) $this->delivery_at_vendor, true);
     }
 
     /**
-     * Same as status_label, but worded for the vendor side (e.g. BRANCH_REVIEW
-     * reads "awaiting customer review" instead of "branch reviewed" — the vendor
-     * already knows they reviewed it, what matters to them is what's next).
+     * @deprecated Same as status_label now that BRANCH_REVIEW's "awaiting
+     * customer review" wording applies to every audience — kept only so
+     * existing vendor-module call sites don't need touching again.
      */
     public function getVendorStatusLabelAttribute(): string
     {

@@ -128,7 +128,7 @@ class OrderTrackingController extends Controller
             ->map(function ($log) use ($order) {
                 return [
                     'status' => $log->status,
-                    'status_label' => OrderStatus::fromString($log->status)?->localizedLabel($order->payment_method, false, (bool) $order->delivery_at_vendor) ?? $log->status,
+                    'status_label' => OrderStatus::fromString($log->status)?->localizedLabel($order->payment_method, false, (bool) $order->delivery_at_vendor, true) ?? $log->status,
                     'notes' => $log->notes,
                     'date' => $log->created_at->toISOString(),
                 ];
@@ -414,7 +414,7 @@ class OrderTrackingController extends Controller
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'current_status' => $order->status,
-            'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $awaitingClientReceipt, (bool) $order->delivery_at_vendor) ?? $order->status,
+            'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $awaitingClientReceipt, (bool) $order->delivery_at_vendor, true) ?? $order->status,
             'progress_percentage' => $this->getProgressPercentage($order->status),
             'laundry' => $order->vendor ? [
                 'id' => $order->vendor->id,
@@ -671,7 +671,7 @@ class OrderTrackingController extends Controller
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'status' => $order->fresh()->status,
-            'status_label' => OrderStatus::fromString($order->fresh()->status)?->localizedLabel($order->payment_method) ?? $order->fresh()->status,
+            'status_label' => OrderStatus::fromString($order->fresh()->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->fresh()->status,
             'delivered_at' => now()->toISOString(),
             'payment_method' => $order->payment_method,
             'payment_status' => $order->fresh()->payment_status ?? 'pending',
@@ -1196,7 +1196,7 @@ class OrderTrackingController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'status' => $order->status,
-                    'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+                    'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
                     'total_amount' => (float) $order->total_amount,
                     'discount_amount' => (float) $order->discount_amount,
                     ...$order->couponResponseFields(app()->getLocale()),
@@ -2238,7 +2238,7 @@ class OrderTrackingController extends Controller
         return successResponse(array_merge([
             'order_id' => $order->id,
             'status' => $order->status,
-            'status_text' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+            'status_text' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, false, false, true) ?? $order->status,
             'delivered_at' => $order->actual_delivery_time?->toISOString() ?? now()->toISOString(),
             'payment_method' => $order->payment_method,
             'payment_status' => $order->payment_status ?? 'pending',
