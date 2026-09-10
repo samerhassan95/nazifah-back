@@ -1453,6 +1453,8 @@ class OrderController extends Controller
                         'pending_order_id' => $pendingOrder->id,
                         'order_number' => $orderNumber,
                         'status_label' => 'قيد الانتظار',
+                        'pickup_at_vendor' => (bool) $pickupAtVendor,
+                        'delivery_at_vendor' => (bool) $deliveryAtVendor,
                         'total_amount' => (float) $totalAmount,
                         'discount_amount' => (float) $discountAmount,
                         'tax_amount' => (float) $taxAmount,
@@ -3002,6 +3004,8 @@ class OrderController extends Controller
                 'order_number' => $order->order_number,
                 'status' => $order->status,
                 'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $order->status,
+                'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+                'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
                 'title' => $cardTitle,
                 'message' => $cardDescription,
                 ...$cardPayload,
@@ -3180,6 +3184,8 @@ class OrderController extends Controller
                     'order_number' => $order->order_number,
                     'status' => $order->status,
                     'status_label' => OrderStatus::fromString($order->status)?->localizedLabel($order->payment_method, $order->status === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $order->status,
+                'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+                'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
                     'payment_method' => $paymentMethod,
                     'final_amount' => (float) $order->final_amount,
                 ], $order->clientVisitResponseFields()), __('order.payment_completed_successfully'));
@@ -4081,6 +4087,8 @@ class OrderController extends Controller
             'order_number' => $order->order_number,
             'status' => $order->status,
             'status_label' => $order->status_label,
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             'requires_handoff_confirmation' => $handoffContext !== null,
             'requires_visit_response' => $visitApi['requires_visit_response'],
             'available_actions' => $handoffContext !== null ? $handoffActions : $visitApi['available_actions'],
@@ -4176,6 +4184,8 @@ class OrderController extends Controller
             'order_number' => $order->order_number,
             'status' => $order->status,
             'status_label' => $order->status_label,
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             'pickup_time' => $order->pickup_time?->toIso8601String(),
             'estimated_delivery_time' => $order->estimated_delivery_time?->toIso8601String(),
             'requires_visit_response' => $visitApi['requires_visit_response'],
@@ -4333,6 +4343,8 @@ class OrderController extends Controller
                 'order_number' => $freshOrder->order_number,
                 'status' => $freshOrder->status,
                 'status_label' => OrderStatus::fromString($freshOrder->status)?->localizedLabel($order->payment_method, $freshOrder->status === OrderStatus::COMPLETED->value && ! $freshOrder->client_delivery_handoff_at, (bool) $order->delivery_at_vendor) ?? $freshOrder->status,
+                'pickup_at_vendor' => (bool) $freshOrder->pickup_at_vendor,
+                'delivery_at_vendor' => (bool) $freshOrder->delivery_at_vendor,
             ], $freshOrder->clientVisitResponseFields());
 
             if ($freshOrder->status === OrderStatus::COMPLETED->value) {

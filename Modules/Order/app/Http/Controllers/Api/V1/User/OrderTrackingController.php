@@ -691,6 +691,8 @@ class OrderTrackingController extends Controller
             'order_number' => $order->order_number,
             'status' => $order->fresh()->status,
             'status_label' => OrderStatus::fromString($order->fresh()->status)?->localizedLabel($order->payment_method) ?? $order->fresh()->status,
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             'delivered_at' => now()->toISOString(),
             'payment_method' => $order->payment_method,
             'payment_status' => $order->fresh()->payment_status ?? 'pending',

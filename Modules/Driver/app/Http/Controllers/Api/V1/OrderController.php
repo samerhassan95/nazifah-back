@@ -392,6 +392,8 @@ class OrderController extends Controller
             'order_title' => $orderTitle,
             'order_status' => $order->status,
             'status_label' => $order->status_label,
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             'vendor_name' => $vendorName,
             'customer_name' => $order->client?->full_name ?? 'Unknown',
             'distance' => $distance,
@@ -566,6 +568,8 @@ class OrderController extends Controller
             'order_number' => $order->order_number,
             'status' => $order->status,
             'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             'notification_sent' => true,
             'visit_type' => $leg,
             'visit_type_label' => $visitMeta['visit_type_label'],
@@ -789,6 +793,8 @@ class OrderController extends Controller
             'order_number' => $order->order_number,
             'order_status' => $order->status,
             'status_label' => $order->status_label,
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
 
             'client_address' => $clientAddress,
         ];
@@ -1004,6 +1010,8 @@ class OrderController extends Controller
             'order_number' => $order->order_number,
             'status' => $order->status,
             'status_label' => $order->status_label,
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
 
             'progress' => $progress,
             'client' => $order->client ? [
@@ -1362,6 +1370,10 @@ class OrderController extends Controller
 
         return array_merge(
             $payload,
+            [
+                'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+                'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
+            ],
             $order->couponResponseFields(),
             $order->clientVisitResponseFields(),
             $handoffService->vendorConfirmFlags($order),

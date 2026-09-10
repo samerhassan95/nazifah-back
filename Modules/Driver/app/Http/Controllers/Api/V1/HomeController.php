@@ -497,6 +497,8 @@ class HomeController extends Controller
                     'order_number' => $order->order_number,
                     'status' => $order->status,
                     'status_label' => $order->status_label,
+                    'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+                    'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
                     'client' => $order->client ? [
                         'id' => $order->client->id,
                         'name' => $order->client->full_name,

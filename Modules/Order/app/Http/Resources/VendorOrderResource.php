@@ -48,6 +48,8 @@ class VendorOrderResource extends JsonResource
             'delivery_price' => (float) $this->delivery_fee,
             'status' => $this->status,
             'status_label' => $this->vendor_status_label,
+            'pickup_at_vendor' => (bool) $this->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $this->delivery_at_vendor,
             ...$this->couponResponseFields($locale),
             ...$this->clientVisitResponseFields(),
             'rating' => $this->rating !== null ? (int) $this->rating : null,
