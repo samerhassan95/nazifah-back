@@ -158,11 +158,9 @@ class SendOrderStatusNotification
 
     private function onDriverPickupAccepted(Order $order, string $num, ?string $actorType): void
     {
-        $this->notifyClient($order, $actorType,
-            'تم قبول الاستلام', 'Pickup Driver Accepted',
-            "قبل السائق استلام طلبك #{$num}.", "A driver has accepted to pick up your order #{$num}.",
-            'driver_pickup_accepted',
-        );
+        // No client notification here — the client has no action to take and
+        // doesn't need to know which driver accepted; they're already told when
+        // the driver is actually on the way (onDriverOnTheWayToClient).
         $this->notifyVendorAndAdmins($order, $actorType,
             'قبل سائق الاستلام', 'Pickup Driver Accepted',
             "قبل سائق استلام الطلب #{$num}.", "Pickup driver accepted order #{$num}.",
@@ -225,11 +223,7 @@ class SendOrderStatusNotification
 
     private function onDriverDeliveryAccepted(Order $order, string $num, ?string $actorType): void
     {
-        $this->notifyClient($order, $actorType,
-            'تم قبول التوصيل', 'Delivery Driver Accepted',
-            "قبل السائق توصيل طلبك #{$num}.", "A driver has accepted to deliver your order #{$num}.",
-            'driver_delivery_accepted',
-        );
+        // No client notification here — same reasoning as onDriverPickupAccepted().
         $this->notifyVendorAndAdmins($order, $actorType,
             'قبل سائق التوصيل', 'Delivery Driver Accepted',
             "قبل سائق توصيل الطلب #{$num}.", "Delivery driver accepted order #{$num}.",
