@@ -2132,6 +2132,13 @@ class OrderTrackingController extends Controller
             return [];
         }
 
+        // Both legs happen at the vendor's own branch — there's no delivery leg to
+        // begin with, so a 0 fee here isn't "free delivery" (nothing was waived by
+        // a discount), it's just that nothing was ever chargeable.
+        if ((bool) $order->pickup_at_vendor && (bool) $order->delivery_at_vendor) {
+            return [];
+        }
+
         $fields = ['is_free_delivery' => true];
 
         $distance = (float) ($order->distance ?? 0);

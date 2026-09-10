@@ -532,7 +532,7 @@ class OrderController extends Controller
                 'delivery_at_vendor' => $deliveryAtVendor,
             ];
 
-            if ((float) $pricing['delivery_fee'] == 0.0) {
+            if ((float) $pricing['delivery_fee'] == 0.0 && ! ($pickupAtVendor && $deliveryAtVendor)) {
                 $calculateSummary['is_free_delivery'] = true;
                 // deliveryFees['delivery_fee'] here is the order's already-stored (net)
                 // delivery_fee, not the pre-discount amount, so recompute what delivery
@@ -586,6 +586,13 @@ class OrderController extends Controller
     private function freeDeliveryFields(Order $order): array
     {
         if ((float) $order->delivery_fee !== 0.0) {
+            return [];
+        }
+
+        // Both legs happen at the vendor's own branch — there's no delivery leg to
+        // begin with, so a 0 fee here isn't "free delivery" (nothing was waived by
+        // a discount), it's just that nothing was ever chargeable.
+        if ((bool) $order->pickup_at_vendor && (bool) $order->delivery_at_vendor) {
             return [];
         }
 

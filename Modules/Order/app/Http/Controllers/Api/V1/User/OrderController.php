@@ -357,7 +357,7 @@ class OrderController extends Controller
             'delivery_at_vendor' => $deliveryAtVendor,
         ];
 
-        if ((float) $totals['delivery_fee'] == 0.0) {
+        if ((float) $totals['delivery_fee'] == 0.0 && ! ($pickupAtVendor && $deliveryAtVendor)) {
             $summary['is_free_delivery'] = true;
             // Surface what delivery would have cost before the discount waived it, so
             // the client UI can show that amount struck through.
