@@ -74,7 +74,10 @@ class SendDriverAssignmentNotification
                     ['assignment_type' => $type]
                 );
 
-                $this->notifications->sendToVendorAndAdmins(
+                // Admins only — not the vendor. The vendor is the one who swaps
+                // the driver (from its own driver-assignment screen); notifying
+                // it about a change it just made itself is pointless noise.
+                $this->notifications->sendToAdmins(
                     $order,
                     $type === 'pickup' ? 'تم تعيين سائق استلام جديد' : 'تم تعيين سائق توصيل جديد',
                     $type === 'pickup' ? 'New Pickup Driver Assigned' : 'New Delivery Driver Assigned',
