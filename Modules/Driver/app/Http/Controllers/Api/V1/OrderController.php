@@ -795,13 +795,13 @@ class OrderController extends Controller
             'status_label' => $order->status_label,
             'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
+            'total_price' => (float) $order->final_amount,
 
             'client_address' => $clientAddress,
         ];
 
-        // Add total_price and payment for 75% and above
+        // Add payment details for 75% and above
         if ($progressPercentage >= 75) {
-            $response['order_info']['total_price'] = (float) $order->final_amount;
             $response['order_info']['qr_code'] = $order->qr_code;
             $response['order_info']['payment_method'] = $order->payment_method ?? 'cash_on_delivery';
             $response['order_info']['payment_status'] = $order->payment_status ?? 'pending';
