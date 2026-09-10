@@ -179,20 +179,25 @@ class OrderTrackingController extends Controller
         $activeDriver = null;
         $orderStatus = OrderStatus::fromString($order->status);
 
-        if ($orderStatus === OrderStatus::DELIVERED_TO_BRANCH) {
+        if (in_array($orderStatus, [
             // Pickup leg is done (order already at the branch) and no delivery
             // driver has started yet — nobody is actively working the order right
             // now, so there's no current driver.
+            OrderStatus::DELIVERED_TO_BRANCH,
+            // Assigned but not yet accepted — that driver hasn't committed to the
+            // job yet (could still be reassigned), so don't show them to the
+            // client as "the" driver until they actually accept.
+            OrderStatus::DRIVER_PICKUP_ASSIGNED,
+            OrderStatus::DRIVER_DELIVERY_ASSIGNED,
+        ])) {
             $activeDriver = null;
         } elseif (in_array($orderStatus, [
-            OrderStatus::DRIVER_PICKUP_ASSIGNED,
             OrderStatus::DRIVER_PICKUP_ACCEPTED,
             OrderStatus::ON_WAY_TO_PICKUP,
             OrderStatus::PICKED_UP,
         ])) {
             $activeDriver = $order->pickupDriver;
         } elseif (in_array($orderStatus, [
-            OrderStatus::DRIVER_DELIVERY_ASSIGNED,
             OrderStatus::DRIVER_DELIVERY_ACCEPTED,
             OrderStatus::ON_WAY_TO_DELIVERY,
             OrderStatus::WAITING_CLIENT_RECEIPT,
