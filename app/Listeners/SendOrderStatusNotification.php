@@ -144,11 +144,10 @@ class SendOrderStatusNotification
 
     private function onDriverPickupAssigned(Order $order, string $num, ?string $actorType): void
     {
-        $this->notifyClient($order, $actorType,
-            'تم تعيين سائق الاستلام', 'Pickup Driver Assigned',
-            "تم تعيين سائق لاستلام طلبك #{$num}.", "A driver has been assigned to pick up your order #{$num}.",
-            'driver_pickup_assigned',
-        );
+        // No client notification at assignment — a just-assigned driver hasn't
+        // committed to the job yet (could still be reassigned). The client is
+        // told once the driver actually accepts (onDriverPickupAccepted), so
+        // "you have a driver" is only ever true when we say it.
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم تعيين سائق الاستلام', 'Pickup Driver Assigned',
             "تم تعيين سائق استلام للطلب #{$num}.", "A pickup driver was assigned to order #{$num}.",
@@ -158,9 +157,13 @@ class SendOrderStatusNotification
 
     private function onDriverPickupAccepted(Order $order, string $num, ?string $actorType): void
     {
-        // No client notification here — the client has no action to take and
-        // doesn't need to know which driver accepted; they're already told when
-        // the driver is actually on the way (onDriverOnTheWayToClient).
+        // The client-facing "driver assigned" notification fires here, at
+        // acceptance, not at assignment — see onDriverPickupAssigned().
+        $this->notifyClient($order, $actorType,
+            'تم تعيين سائق الاستلام', 'Pickup Driver Assigned',
+            "تم تعيين سائق لاستلام طلبك #{$num}.", "A driver has been assigned to pick up your order #{$num}.",
+            'driver_pickup_assigned',
+        );
         $this->notifyVendorAndAdmins($order, $actorType,
             'قبل سائق الاستلام', 'Pickup Driver Accepted',
             "قبل سائق استلام الطلب #{$num}.", "Pickup driver accepted order #{$num}.",
@@ -209,11 +212,8 @@ class SendOrderStatusNotification
 
     private function onDriverDeliveryAssigned(Order $order, string $num, ?string $actorType): void
     {
-        $this->notifyClient($order, $actorType,
-            'تم تعيين سائق التوصيل', 'Delivery Driver Assigned',
-            "تم تعيين سائق لتوصيل طلبك #{$num}.", "A driver has been assigned to deliver your order #{$num}.",
-            'driver_delivery_assigned',
-        );
+        // No client notification at assignment — same reasoning as
+        // onDriverPickupAssigned(): wait until the driver actually accepts.
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم تعيين سائق التوصيل', 'Delivery Driver Assigned',
             "تم تعيين سائق توصيل للطلب #{$num}.", "A delivery driver was assigned to order #{$num}.",
@@ -223,7 +223,13 @@ class SendOrderStatusNotification
 
     private function onDriverDeliveryAccepted(Order $order, string $num, ?string $actorType): void
     {
-        // No client notification here — same reasoning as onDriverPickupAccepted().
+        // The client-facing "driver assigned" notification fires here, at
+        // acceptance, not at assignment — see onDriverDeliveryAssigned().
+        $this->notifyClient($order, $actorType,
+            'تم تعيين سائق التوصيل', 'Delivery Driver Assigned',
+            "تم تعيين سائق لتوصيل طلبك #{$num}.", "A driver has been assigned to deliver your order #{$num}.",
+            'driver_delivery_assigned',
+        );
         $this->notifyVendorAndAdmins($order, $actorType,
             'قبل سائق التوصيل', 'Delivery Driver Accepted',
             "قبل سائق توصيل الطلب #{$num}.", "Delivery driver accepted order #{$num}.",
