@@ -21,6 +21,22 @@ class NotificationSmsService
         'driver_delivery_unassigned',
     ];
 
+    /**
+     * Client notification types allowed to go out via SMS — everything else the
+     * client gets stays push/in-app only. This is the allowlist from the
+     * client's sms-notifications spreadsheet (rows marked with a 1 in the
+     * "التعديل" column). Driver/vendor/admin notifications are unaffected —
+     * they still follow the deewan.notification_sms.types config.
+     */
+    private const CLIENT_SMS_ALLOWED_TYPES = [
+        'order_reviewed',              // المغسلة عدّلت الطلب (بانتظار الموافقة)
+        'driver_on_the_way_pickup',    // السائق في الطريق للاستلام
+        'order_picked_up',             // تم استلام الطلب من العميل
+        'driver_on_the_way_delivery',  // السائق في الطريق للتوصيل
+        'waiting_client_receipt',      // الطلب جاهز (فرع) / السائق في موقع التسليم
+        'order_delivered',             // تم التوصيل
+    ];
+
     public function __construct(protected DeewanSmsService $deewanSms) {}
 
     /**
@@ -81,6 +97,10 @@ class NotificationSmsService
     {
         $notificationType = (string) ($data['notification_type'] ?? '');
         if ($notificationType !== '' && in_array($notificationType, self::PUSH_ONLY_TYPES, true)) {
+            return false;
+        }
+
+        if ($userType === 'client' && ! in_array($notificationType, self::CLIENT_SMS_ALLOWED_TYPES, true)) {
             return false;
         }
 
