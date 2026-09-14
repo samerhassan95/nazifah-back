@@ -37,6 +37,53 @@ class NotificationSmsService
         'order_delivered',             // تم التوصيل
     ];
 
+    /**
+     * SMS-only wording, deliberately separate from the push/in-app body text —
+     * the client's "sms client (2).xlsx" (Sheet1) spells out different, more
+     * detailed copy for the SMS channel specifically. Only types allowed to
+     * send SMS at all (CLIENT_SMS_ALLOWED_TYPES) are covered here; everything
+     * else keeps using the push body as its SMS body, unaffected.
+     */
+    private const CLIENT_SMS_TEXT = [
+        'order_reviewed' => [
+            'ar' => 'تم تعديل طلبك رقم {order_number} من قِبل المغسلة. يرجى مراجعة التعديلات والموافقة عليها.',
+            'en' => 'Your order number {order_number} has been modified by the laundry. Please review the changes and approve them.',
+        ],
+        'driver_on_the_way_pickup' => [
+            'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للاستلام.',
+            'en' => 'The driver is on the way to pick up your order number {order_number}.',
+        ],
+        'order_picked_up' => [
+            'ar' => 'تم استلام طلبك رقم {order_number} من السائق.',
+            'en' => 'Your order number {order_number} has been picked up by the driver.',
+        ],
+        'driver_on_the_way_delivery' => [
+            'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للتسليم.',
+            'en' => 'The driver is on the way to deliver order number {order_number}.',
+        ],
+        'order_delivered' => [
+            'ar' => 'تم توصيل طلبك رقم {order_number} بنجاح. نتمنى أن تنال خدمتنا رضاك.',
+            'en' => 'The delivery has been completed successfully. Order number {order_number}. Thank you for using Nathefah.',
+        ],
+    ];
+
+    /**
+     * waiting_client_receipt is one notification type shared by two different
+     * scenarios (see SendOrderStatusNotification::onWaitingClientReceipt) — a
+     * branch self-pickup order being ready vs. a delivery driver having
+     * arrived — and the spreadsheet gives each its own SMS wording.
+     */
+    private const WAITING_CLIENT_RECEIPT_SMS_TEXT = [
+        'branch' => [
+            'ar' => 'طلبك رقم {order_number} جاهز للاستلام من الفرع. نسعد بخدمتك!',
+            'en' => "Your order number {order_number} is ready for pickup at the branch. We're happy to serve you.",
+        ],
+        'driver' => [
+            'ar' => 'وصل السائق إلى موقع تسليم طلبك رقم {order_number}. يرجى استلام الطلب.',
+            'en' => 'The driver has arrived at the delivery location. Please receive order number {order_number}.',
+        ],
+    ];
+
     public function __construct(protected DeewanSmsService $deewanSms) {}
 
     /**
@@ -65,10 +112,14 @@ class NotificationSmsService
         $lang = method_exists($user, 'getNotificationLang')
             ? $user->getNotificationLang()
             : (property_exists($user, 'lang') ? $user->lang : 'ar');
+        $lang = is_string($lang) ? $lang : 'ar';
 
-        $body = NotificationLocale::pick($bodyAr, $bodyEn, is_string($lang) ? $lang : 'ar');
+        $body = ($userType === 'client'
+            ? $this->resolveClientSmsText((string) ($data['notification_type'] ?? ''), $data, $lang)
+            : null)
+            ?? NotificationLocale::pick($bodyAr, $bodyEn, $lang);
         if (trim($body) === '') {
-            $body = NotificationLocale::pick($titleAr, $titleEn, is_string($lang) ? $lang : 'ar');
+            $body = NotificationLocale::pick($titleAr, $titleEn, $lang);
         }
 
         if (trim($body) === '') {
@@ -88,6 +139,29 @@ class NotificationSmsService
             } catch (\Throwable) {
             }
         }
+    }
+
+    /**
+     * SMS-specific wording for a client notification type, or null to fall
+     * back to the push body. waiting_client_receipt has two scenarios sharing
+     * one type — distinguished by the delivery_at_vendor flag passed in $data.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function resolveClientSmsText(string $type, array $data, string $lang): ?string
+    {
+        if ($type === 'waiting_client_receipt') {
+            $variant = ((bool) ($data['delivery_at_vendor'] ?? false)) ? 'branch' : 'driver';
+            $template = self::WAITING_CLIENT_RECEIPT_SMS_TEXT[$variant];
+        } elseif (isset(self::CLIENT_SMS_TEXT[$type])) {
+            $template = self::CLIENT_SMS_TEXT[$type];
+        } else {
+            return null;
+        }
+
+        $text = $lang === 'en' ? $template['en'] : $template['ar'];
+
+        return str_replace('{order_number}', (string) ($data['order_number'] ?? ''), $text);
     }
 
     /**

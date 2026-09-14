@@ -248,6 +248,7 @@ class SendOrderStatusNotification
                 "طلبك #{$num} جاهز، يمكنك استلامه من الفرع.",
                 "Your order #{$num} is ready — you can pick it up from the branch.",
                 'waiting_client_receipt',
+                ['delivery_at_vendor' => true],
             );
             $this->notifyVendorAndAdmins($order, $actorType,
                 'الطلب جاهز للاستلام', 'Order Ready for Pickup',
