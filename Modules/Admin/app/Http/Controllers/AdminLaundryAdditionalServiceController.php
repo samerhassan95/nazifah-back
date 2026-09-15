@@ -121,6 +121,7 @@ class AdminLaundryAdditionalServiceController extends Controller
             'Price' => (float) $service->price,
             'is_active' => (bool) $service->is_active,
             'icon_id' => $service->icon_id,
+            'service_ids' => $service->services->pluck('id'),
             'Pieces' => $pieces,
         ];
 
@@ -135,17 +136,14 @@ class AdminLaundryAdditionalServiceController extends Controller
     {
         $validated = $request->validate([
             'vendor_id' => 'required|exists:vendors,id',
-            'service_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'icon_id' => 'nullable|exists:icons,id',
             'service_name' => 'required|array',
             'service_name.ar' => 'required|string|max:255',
             'service_name.en' => 'required|string|max:255',
             'Service_description' => 'nullable|array',
             'Service_description.ar' => 'nullable|string',
             'Service_description.en' => 'nullable|string',
-            'Category' => 'nullable|string',
             'Price' => 'required|numeric|min:0',
-            'icon_id' => 'required|exists:icons,id',
-            'Pieces' => 'nullable|array',
             'service_ids' => 'nullable|array',
             'service_ids.*' => 'exists:services,id',
         ]);
@@ -158,14 +156,6 @@ class AdminLaundryAdditionalServiceController extends Controller
             'icon_id' => $validated['icon_id'] ?? null,
             'is_active' => true,
         ];
-
-        // Handle logo upload (this is for the image field)
-        if ($request->hasFile('service_logo')) {
-            $serviceData['image'] = $this->uploadFilesService->uploadImage(
-                $request->file('service_logo'),
-                'additional-services/images'
-            );
-        }
 
         $service = ServiceAddition::create($serviceData);
 
@@ -190,17 +180,16 @@ class AdminLaundryAdditionalServiceController extends Controller
         }
 
         $validated = $request->validate([
-            'service_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'icon_id' => 'nullable|exists:icons,id',
             'service_name' => 'sometimes|array',
             'service_name.ar' => 'sometimes|string|max:255',
             'service_name.en' => 'sometimes|string|max:255',
             'Service_description' => 'nullable|array',
             'Service_description.ar' => 'nullable|string',
             'Service_description.en' => 'nullable|string',
-            'Category' => 'nullable|string',
             'Price' => 'sometimes|numeric|min:0',
-            'icon_id' => 'sometimes|required|exists:icons,id',
-            'Pieces' => 'nullable|array',
+            'service_ids' => 'nullable|array',
+            'service_ids.*' => 'exists:services,id',
         ]);
 
         $serviceData = [];
@@ -217,13 +206,17 @@ class AdminLaundryAdditionalServiceController extends Controller
             $serviceData['price'] = $validated['Price'];
         }
 
-        if (isset($validated['icon_id'])) {
-            $serviceData['icon_id'] = $validated['icon_id'];
+        if ($request->has('icon_id')) {
+            $serviceData['icon_id'] = $validated['icon_id'] ?? null;
         }
 
         $service->update($serviceData);
 
-        return successResponse($this->formatAdditionalService($service->fresh()), 'Additional service updated successfully');
+        if ($request->has('service_ids')) {
+            $service->services()->sync($validated['service_ids'] ?? []);
+        }
+
+        return successResponse($this->formatAdditionalService($service->fresh(['services', 'pieces'])), 'Additional service updated successfully');
     }
 
     /**
@@ -282,6 +275,7 @@ class AdminLaundryAdditionalServiceController extends Controller
             'Price' => (float) $service->price,
             'is_active' => (bool) $service->is_active,
             'icon_id' => $service->icon_id,
+            'service_ids' => $service->services->pluck('id'),
             'Pieces' => $pieces,
         ];
     }

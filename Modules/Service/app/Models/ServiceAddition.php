@@ -31,6 +31,7 @@ class ServiceAddition extends Model
     protected $fillable = [
         'vendor_id',
         'name',
+        'description',
         'price',
         'icon_id',
         'is_active',
@@ -38,6 +39,7 @@ class ServiceAddition extends Model
 
     public $translatable = [
         'name',
+        'description',
     ];
 
     protected $casts = [
