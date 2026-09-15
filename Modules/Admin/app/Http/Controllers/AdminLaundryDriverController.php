@@ -47,12 +47,15 @@ class AdminLaundryDriverController extends Controller
             $locale = app()->getLocale();
 
             return [
+                'id' => $driver->id,
                 'Driver_image' => $driver->image,
                 'Driver_name' => $driver->getTranslation('full_name', $locale) ?? $driver->full_name,
                 'Phone' => $driver->phone,
                 'Email' => $driver->email,
+                'National_id' => $driver->id_number,
 
                 'Driver_status' => $driver->is_available ? 'active' : 'in_active',
+                'branch_id' => $driver->branch_id,
                 'Branch' => $driver->branch ? ($driver->branch->getTranslation('name', $locale) ?? $driver->branch->name) : 'N/A',
             ];
         });
@@ -75,12 +78,15 @@ class AdminLaundryDriverController extends Controller
         }
 
         $driverData = [
+            'id' => $driver->id,
             'Driver_image' => $driver->image,
             'Driver_name' => $driver->getTranslation('full_name', 'ar') ?? $driver->full_name,
             'Phone' => $driver->phone,
 
             'Email' => $driver->email,
+            'National_id' => $driver->id_number,
             'Driver_status' => $driver->is_available ? 'active' : 'in_active',
+            'branch_id' => $driver->branch_id,
             'Branch' => $driver->branch ? ($driver->branch->getTranslation('name', 'ar') ?? $driver->branch->name) : 'N/A',
         ];
 
@@ -99,15 +105,20 @@ class AdminLaundryDriverController extends Controller
             'Phone' => 'required|string|unique:drivers,phone',
 
             'Email' => 'required|email|unique:drivers,email',
+            'National_id' => 'required|string|unique:drivers,id_number',
             'branch_id' => 'required|exists:branches,id',
         ]);
+
+        $branch = \Modules\Branch\Models\Branch::find($validated['branch_id']);
 
         $driverData = [
             'full_name' => ['ar' => $validated['Driver_name'], 'en' => $validated['Driver_name']],
             'phone' => $validated['Phone'],
 
             'email' => $validated['Email'],
+            'id_number' => $validated['National_id'],
             'branch_id' => $validated['branch_id'],
+            'vendor_id' => $branch?->vendor_id,
             'is_available' => true,
         ];
 
@@ -142,6 +153,7 @@ class AdminLaundryDriverController extends Controller
             'Phone' => 'sometimes|string|unique:drivers,phone,'.$id,
 
             'Email' => 'sometimes|email|unique:drivers,email,'.$id,
+            'National_id' => 'sometimes|string|unique:drivers,id_number,'.$id,
             'branch_id' => 'nullable|exists:branches,id',
         ]);
 
@@ -159,8 +171,14 @@ class AdminLaundryDriverController extends Controller
             $driverData['email'] = $validated['Email'];
         }
 
+        if (isset($validated['National_id'])) {
+            $driverData['id_number'] = $validated['National_id'];
+        }
+
         if (isset($validated['branch_id'])) {
             $driverData['branch_id'] = $validated['branch_id'];
+            $branch = \Modules\Branch\Models\Branch::find($validated['branch_id']);
+            $driverData['vendor_id'] = $branch?->vendor_id;
         }
 
         // Handle image upload
@@ -198,12 +216,15 @@ class AdminLaundryDriverController extends Controller
     private function formatDriver($driver): array
     {
         return [
+            'id' => $driver->id,
             'Driver_image' => $driver->image,
             'Driver_name' => $driver->getTranslation('full_name', 'ar') ?? $driver->full_name,
             'Phone' => $driver->phone,
 
             'Email' => $driver->email,
+            'National_id' => $driver->id_number,
             'Driver_status' => $driver->is_available ? 'active' : 'in_active',
+            'branch_id' => $driver->branch_id,
             'Branch' => $driver->branch ? ($driver->branch->getTranslation('name', 'ar') ?? $driver->branch->name) : 'N/A',
         ];
     }
