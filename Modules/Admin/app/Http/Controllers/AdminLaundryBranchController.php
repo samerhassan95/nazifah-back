@@ -7,14 +7,17 @@ use App\Services\UploadFilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Branch\Models\Branch;
+use Modules\Branch\Services\BranchWorkingHoursService;
 use Modules\Vendor\Models\Vendor;
 
 class AdminLaundryBranchController extends Controller
 {
     protected $uploadFilesService;
 
-    public function __construct(UploadFilesService $uploadFilesService)
-    {
+    public function __construct(
+        UploadFilesService $uploadFilesService,
+        protected BranchWorkingHoursService $workingHoursService
+    ) {
         $this->uploadFilesService = $uploadFilesService;
     }
 
@@ -285,6 +288,52 @@ class AdminLaundryBranchController extends Controller
         $branch->delete();
 
         return successResponse(null, 'Branch deleted successfully');
+    }
+
+    /**
+     * Get a branch's working hours.
+     * GET /admin/laundries/branches/{id}/working-hours
+     */
+    public function getWorkingHours(int $id): JsonResponse
+    {
+        $branch = Branch::with('workingHourShifts')->find($id);
+        if (! $branch) {
+            return notFoundResponse('Branch not found');
+        }
+
+        return successResponse([
+            'branch_id' => $branch->id,
+            'working_hours' => $branch->getApiWorkingHours(),
+        ], 'Working hours retrieved successfully');
+    }
+
+    /**
+     * Replace a branch's full working-hours schedule.
+     * PUT /admin/laundries/branches/{id}/working-hours
+     */
+    public function saveWorkingHours(Request $request, int $id): JsonResponse
+    {
+        $branch = Branch::find($id);
+        if (! $branch) {
+            return notFoundResponse('Branch not found');
+        }
+
+        $validated = $request->validate([
+            'working_hours' => ['required', 'array'],
+        ]);
+
+        $errors = $this->workingHoursService->validate($validated['working_hours']);
+        if ($errors !== []) {
+            return validationErrorResponse($errors);
+        }
+
+        $this->workingHoursService->sync($branch, $validated['working_hours']);
+        $branch->load('workingHourShifts');
+
+        return successResponse([
+            'branch_id' => $branch->id,
+            'working_hours' => $branch->getApiWorkingHours(),
+        ], 'Working hours updated successfully');
     }
 
     /**
