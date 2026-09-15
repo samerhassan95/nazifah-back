@@ -44,9 +44,11 @@ class AdminLaundryController extends Controller
         $laundryInfo = [
             'name' => $vendor->getTranslatedName($lang) ?: ($vendor->name ?? ''),
             'logo' => $vendor->logo ? (str_starts_with($vendor->logo, 'http') ? $vendor->logo : config('app.url').$vendor->logo) : null,
-            'phone' => $vendor->phone,
             'email' => $vendor->email,
             'vat_number' => $vendor->vat_number,
+            'official_number' => $vendor->official_number,
+            'phone' => $vendor->phone,
+            'delivery_price_per_km' => (float) $vendor->delivery_price_per_km,
             'attachments' => $attachments,
         ];
 
