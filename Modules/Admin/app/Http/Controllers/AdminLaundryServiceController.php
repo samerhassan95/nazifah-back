@@ -36,7 +36,6 @@ class AdminLaundryServiceController extends Controller
                 'Service_name' => $service->getTranslation('service_name', $locale),
                 'Service_description' => $service->getTranslation('description', $locale),
                 'Category' => $service->category ? $service->category->getTranslation('name', $locale) : null,
-                'Price' => (float) $service->price,
                 'is_active' => (bool) $service->is_active,
             ];
         });
@@ -76,7 +75,6 @@ class AdminLaundryServiceController extends Controller
                 'ar' => $service->category->getTranslation('name', 'ar'),
                 'en' => $service->category->getTranslation('name', 'en'),
             ] : null,
-            'Price' => (float) $service->price,
             'is_active' => (bool) $service->is_active,
         ];
 
@@ -90,7 +88,7 @@ class AdminLaundryServiceController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'service_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'icon_id' => 'nullable|exists:icons,id',
             'service_name' => 'required|array',
             'service_name.ar' => 'required|string|max:255',
             'service_name.en' => 'required|string|max:255',
@@ -98,24 +96,15 @@ class AdminLaundryServiceController extends Controller
             'service_description.ar' => 'nullable|string',
             'service_description.en' => 'nullable|string',
             'category_id' => 'required|exists:categories,id',
-            'price' => 'required|numeric|min:0',
         ]);
 
         $serviceData = [
             'service_name' => $validated['service_name'],
             'description' => $validated['service_description'] ?? null,
             'category_id' => $validated['category_id'],
-            'price' => $validated['price'],
+            'icon_id' => $validated['icon_id'] ?? null,
             'is_active' => true,
         ];
-
-        // Handle logo upload
-        if ($request->hasFile('service_logo')) {
-            $serviceData['image'] = $this->uploadFilesService->uploadImage(
-                $request->file('service_logo'),
-                'services/images'
-            );
-        }
 
         $service = Service::create($serviceData);
         $locale = app()->getLocale();
@@ -140,7 +129,7 @@ class AdminLaundryServiceController extends Controller
         }
 
         $validated = $request->validate([
-            'service_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'icon_id' => 'nullable|exists:icons,id',
             'service_name' => 'sometimes|array',
             'service_name.ar' => 'sometimes|string|max:255',
             'service_name.en' => 'sometimes|string|max:255',
@@ -148,8 +137,6 @@ class AdminLaundryServiceController extends Controller
             'service_description.ar' => 'nullable|string',
             'service_description.en' => 'nullable|string',
             'category_id' => 'sometimes|exists:categories,id',
-            'price' => 'sometimes|numeric|min:0',
-            'branches' => 'nullable|array',
         ]);
 
         $serviceData = [];
@@ -166,8 +153,8 @@ class AdminLaundryServiceController extends Controller
             $serviceData['category_id'] = $validated['category_id'];
         }
 
-        if (isset($validated['price'])) {
-            $serviceData['price'] = $validated['price'];
+        if ($request->has('icon_id')) {
+            $serviceData['icon_id'] = $validated['icon_id'];
         }
 
         $service->update($serviceData);
@@ -218,7 +205,6 @@ class AdminLaundryServiceController extends Controller
                 'ar' => $service->category->getTranslation('name', 'ar'),
                 'en' => $service->category->getTranslation('name', 'en'),
             ] : null,
-            'Price' => (float) $service->price,
             'is_active' => (bool) $service->is_active,
         ];
     }
