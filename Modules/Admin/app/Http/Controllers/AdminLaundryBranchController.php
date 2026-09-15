@@ -42,12 +42,40 @@ class AdminLaundryBranchController extends Controller
             ->latest()
             ->paginate($perPage);
 
-        // Header Stats for the Vendor
+        // Header Stats for the Vendor: total branches + the top branch by
+        // orders, by revenue, and by rating.
+        $branchesStatsQuery = Branch::where('vendor_id', $vendorId)
+            ->withCount('orders')
+            ->withSum(['orders as revenue' => function ($q) {
+                $q->whereHas('paymentTransactions', function ($q2) {
+                    $q2->where('status', 'completed');
+                });
+            }], 'final_amount');
+
+        $topOrdersBranch = (clone $branchesStatsQuery)->orderByDesc('orders_count')->first();
+        $topRevenueBranch = (clone $branchesStatsQuery)->orderByDesc('revenue')->first();
+        $topRatingBranch = Branch::where('vendor_id', $vendorId)
+            ->whereNotNull('rating')
+            ->orderByDesc('rating')
+            ->first();
+
         $states = [
-            'vendor_id' => $vendor->id,
-            'vendor_name' => $vendor->getTranslation('name', $lang),
             'total_branches' => $branches->total(),
-            'active_branches' => Branch::where('vendor_id', $vendorId)->where('is_active', true)->count(),
+            'top_orders_branch' => $topOrdersBranch ? [
+                'id' => $topOrdersBranch->id,
+                'name' => $topOrdersBranch->getTranslation('name', $lang),
+                'orders_count' => (int) $topOrdersBranch->orders_count,
+            ] : null,
+            'top_revenue_branch' => $topRevenueBranch ? [
+                'id' => $topRevenueBranch->id,
+                'name' => $topRevenueBranch->getTranslation('name', $lang),
+                'revenue' => (float) ($topRevenueBranch->revenue ?? 0),
+            ] : null,
+            'top_rating_branch' => $topRatingBranch ? [
+                'id' => $topRatingBranch->id,
+                'name' => $topRatingBranch->getTranslation('name', $lang),
+                'rating' => (float) $topRatingBranch->rating,
+            ] : null,
         ];
 
         $branchesData = collect($branches->items())->map(fn ($branch) => $this->formatBranch($branch));
