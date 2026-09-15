@@ -61,21 +61,9 @@ class AdminLaundryBranchController extends Controller
 
         $states = [
             'total_branches' => $branches->total(),
-            'top_orders_branch' => $topOrdersBranch ? [
-                'id' => $topOrdersBranch->id,
-                'name' => $topOrdersBranch->getTranslation('name', $lang),
-                'orders_count' => (int) $topOrdersBranch->orders_count,
-            ] : null,
-            'top_revenue_branch' => $topRevenueBranch ? [
-                'id' => $topRevenueBranch->id,
-                'name' => $topRevenueBranch->getTranslation('name', $lang),
-                'revenue' => (float) ($topRevenueBranch->revenue ?? 0),
-            ] : null,
-            'top_rating_branch' => $topRatingBranch ? [
-                'id' => $topRatingBranch->id,
-                'name' => $topRatingBranch->getTranslation('name', $lang),
-                'rating' => (float) $topRatingBranch->rating,
-            ] : null,
+            'Top_orders' => (int) ($topOrdersBranch->orders_count ?? 0),
+            'Top_revenues' => (float) ($topRevenueBranch->revenue ?? 0),
+            'Top_rated' => (float) ($topRatingBranch->rating ?? 0),
         ];
 
         $branchesData = collect($branches->items())->map(fn ($branch) => $this->formatBranch($branch));
@@ -110,9 +98,15 @@ class AdminLaundryBranchController extends Controller
             'address' => 'required|array',
             'address.ar' => 'required|string',
             'address.en' => 'required|string',
+            'national_address' => 'nullable|string',
             'Phone' => 'required|string',
+            'land_phone' => 'nullable|string',
             'lat' => 'required|numeric|between:-90,90',
             'lng' => 'required|numeric|between:-180,180',
+            'home_pickup' => 'nullable|boolean',
+            'self_dropoff' => 'nullable|boolean',
+            'home_delivery' => 'nullable|boolean',
+            'self_pickup' => 'nullable|boolean',
         ]);
 
         $branch = new Branch;
@@ -126,7 +120,15 @@ class AdminLaundryBranchController extends Controller
         $branch->setTranslation('description', 'ar', $validated['description']['ar']);
         $branch->setTranslation('description', 'en', $validated['description']['en']);
 
+        $branch->national_address = $validated['national_address'] ?? null;
         $branch->phone_number = $validated['Phone'];
+        $branch->land_phone = $validated['land_phone'] ?? null;
+        $branch->latitude = $validated['lat'];
+        $branch->longitude = $validated['lng'];
+        $branch->home_pickup = $request->boolean('home_pickup');
+        $branch->self_dropoff = $request->boolean('self_dropoff');
+        $branch->home_delivery = $request->boolean('home_delivery');
+        $branch->self_pickup = $request->boolean('self_pickup');
         $branch->is_active = true;
 
         if ($request->hasFile('Branch_logo')) {
@@ -174,10 +176,18 @@ class AdminLaundryBranchController extends Controller
             'address' => 'sometimes|array',
             'address.ar' => 'sometimes|string',
             'address.en' => 'sometimes|string',
+            'national_address' => 'sometimes|nullable|string',
             'description' => 'sometimes|array',
             'description.ar' => 'sometimes|string',
             'description.en' => 'sometimes|string',
             'Phone' => 'sometimes|string',
+            'land_phone' => 'sometimes|nullable|string',
+            'lat' => 'sometimes|numeric|between:-90,90',
+            'lng' => 'sometimes|numeric|between:-180,180',
+            'home_pickup' => 'sometimes|boolean',
+            'self_dropoff' => 'sometimes|boolean',
+            'home_delivery' => 'sometimes|boolean',
+            'self_pickup' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean',
         ]);
 
@@ -201,8 +211,25 @@ class AdminLaundryBranchController extends Controller
             $branch->setTranslation('description', 'en', $validated['description']['en']);
         }
 
+        if ($request->has('national_address')) {
+            $branch->national_address = $validated['national_address'];
+        }
         if ($request->has('Phone')) {
             $branch->phone_number = $validated['Phone'];
+        }
+        if ($request->has('land_phone')) {
+            $branch->land_phone = $validated['land_phone'];
+        }
+        if ($request->has('lat')) {
+            $branch->latitude = $validated['lat'];
+        }
+        if ($request->has('lng')) {
+            $branch->longitude = $validated['lng'];
+        }
+        foreach (['home_pickup', 'self_dropoff', 'home_delivery', 'self_pickup'] as $deliveryFlag) {
+            if ($request->has($deliveryFlag)) {
+                $branch->{$deliveryFlag} = $request->boolean($deliveryFlag);
+            }
         }
         if ($request->has('is_active')) {
             $branch->is_active = $validated['is_active'];
@@ -292,6 +319,12 @@ class AdminLaundryBranchController extends Controller
             'National_Address' => $branch->national_address,
             'Phone' => $branch->phone_number,
             'Land_Phone' => $branch->land_phone,
+            'Latitude' => $branch->latitude !== null ? (float) $branch->latitude : null,
+            'Longitude' => $branch->longitude !== null ? (float) $branch->longitude : null,
+            'Home_Pickup' => (bool) $branch->home_pickup,
+            'Self_Dropoff' => (bool) $branch->self_dropoff,
+            'Home_Delivery' => (bool) $branch->home_delivery,
+            'Self_Pickup' => (bool) $branch->self_pickup,
             'Is_Active' => (bool) $branch->is_active,
             'Created_at' => $branch->created_at ? $branch->created_at->format('Y-m-d') : null,
         ];
