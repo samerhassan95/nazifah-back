@@ -169,7 +169,7 @@ class AdminLaundryPieceController extends Controller
             'service_ids' => 'nullable|array',
             'service_ids.*.service_id' => 'required_with:service_ids|exists:services,id',
             'service_ids.*.price' => 'required_with:service_ids|numeric|min:0',
-            'icon_id' => 'required|exists:icons,id',
+            'icon_id' => 'nullable|exists:icons,id',
             'piece_name' => 'required|array',
             'piece_name.ar' => 'required|string|max:255',
             'piece_name.en' => 'required|string|max:255',
