@@ -29,6 +29,7 @@ class NotificationSmsService
      * they still follow the deewan.notification_sms.types config.
      */
     private const CLIENT_SMS_ALLOWED_TYPES = [
+        'order_placed',                // تم استلام الطلب (بعد إتمام الدفع)
         'order_reviewed',              // المغسلة عدّلت الطلب (بانتظار الموافقة)
         'driver_on_the_way_pickup',    // السائق في الطريق للاستلام
         'order_picked_up',             // تم استلام الطلب من العميل
@@ -45,25 +46,29 @@ class NotificationSmsService
      * else keeps using the push body as its SMS body, unaffected.
      */
     private const CLIENT_SMS_TEXT = [
+        'order_placed' => [
+            'ar' => 'تم استلام طلبك رقم {order_number} بنجاح. شكرًا لاختيارك نظيفة.',
+            'en' => 'Your order number {order_number} has been received successfully. Thank you for choosing Nathefah.',
+        ],
         'order_reviewed' => [
             'ar' => 'تم تعديل طلبك رقم {order_number} من قِبل المغسلة. يرجى مراجعة التعديلات والموافقة عليها.',
             'en' => 'Your order number {order_number} has been modified by the laundry. Please review the changes and approve them.',
         ],
         'driver_on_the_way_pickup' => [
-            'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للاستلام.',
-            'en' => 'The driver is on the way to pick up your order number {order_number}.',
+            'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للاستلام يرجى تأكيد جاهزيتك للتسليم.',
+            'en' => 'Order number {order_number}: the driver is on the way to pick up your items. Please confirm you are ready for the handover.',
         ],
         'order_picked_up' => [
-            'ar' => 'تم استلام طلبك رقم {order_number} من السائق.',
-            'en' => 'Your order number {order_number} has been picked up by the driver.',
+            'ar' => 'تم استلام طلبك رقم {order_number} من السائق، يرجى تأكيد تسليم الطلب.',
+            'en' => 'Your order number {order_number} has been picked up by the driver. Please confirm the handover.',
         ],
         'driver_on_the_way_delivery' => [
-            'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للتسليم.',
-            'en' => 'The driver is on the way to deliver order number {order_number}.',
+            'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للتسليم، يرجى تأكيد جاهزيتك لاستلام الطلب.',
+            'en' => 'Order number {order_number}: the driver is on the way to deliver your order. Please confirm you are ready to receive it.',
         ],
         'order_delivered' => [
-            'ar' => 'تم توصيل طلبك رقم {order_number} بنجاح. نتمنى أن تنال خدمتنا رضاك.',
-            'en' => 'The delivery has been completed successfully. Order number {order_number}. Thank you for using Nathefah.',
+            'ar' => 'تم توصيل طلبك رقم {order_number} بنجاح. يرجى تأكيد استلام الطلب.',
+            'en' => 'Your order number {order_number} has been delivered successfully. Please confirm receipt of your order.',
         ],
     ];
 
