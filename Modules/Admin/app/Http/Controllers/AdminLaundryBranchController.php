@@ -289,7 +289,9 @@ class AdminLaundryBranchController extends Controller
                 'en' => $branch->getTranslation('location', 'en'),
                 'current' => $branch->getTranslation('location', $lang),
             ],
+            'National_Address' => $branch->national_address,
             'Phone' => $branch->phone_number,
+            'Land_Phone' => $branch->land_phone,
             'Is_Active' => (bool) $branch->is_active,
             'Created_at' => $branch->created_at ? $branch->created_at->format('Y-m-d') : null,
         ];
