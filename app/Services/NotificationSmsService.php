@@ -51,8 +51,8 @@ class NotificationSmsService
             'en' => 'Your order number {order_number} has been received successfully. Thank you for choosing Nathefah.',
         ],
         'order_reviewed' => [
-            'ar' => 'تم تعديل طلبك رقم {order_number} من قِبل المغسلة. يرجى مراجعة التعديلات والموافقة عليها.',
-            'en' => 'Your order number {order_number} has been modified by the laundry. Please review the changes and approve them.',
+            'ar' => "تم تعديل طلبك رقم {order_number} من قِبل المغسلة.\nيرجى مراجعة التعديلات واختيار الإجراء المناسب.",
+            'en' => 'Your order number {order_number} has been modified by the laundry. Please review the changes and choose the appropriate action.',
         ],
         'driver_on_the_way_pickup' => [
             'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للاستلام يرجى تأكيد جاهزيتك للتسليم.',
