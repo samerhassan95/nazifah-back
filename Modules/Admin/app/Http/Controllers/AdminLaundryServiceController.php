@@ -56,7 +56,7 @@ class AdminLaundryServiceController extends Controller
 
         $services->setCollection($servicesData);
 
-        return successResponse($services, __('vendor::vendor.services_retrieved_successfully'));
+        return successResponse($services, __('vendor.services_retrieved_successfully'));
     }
 
     /**
@@ -68,7 +68,7 @@ class AdminLaundryServiceController extends Controller
         $service = Service::with(['category', 'pieces'])->find($id);
 
         if (! $service) {
-            return notFoundResponse(__('service::service.not_found'));
+            return notFoundResponse(__('service.not_found'));
         }
 
         $locale = app()->getLocale();
@@ -92,7 +92,7 @@ class AdminLaundryServiceController extends Controller
             'is_active' => (bool) $service->is_active,
         ];
 
-        return successResponse($serviceData, __('vendor::vendor.service_retrieved_successfully'));
+        return successResponse($serviceData, __('vendor.service_retrieved_successfully'));
     }
 
     /**
@@ -109,17 +109,13 @@ class AdminLaundryServiceController extends Controller
             'service_description' => 'nullable|array',
             'service_description.ar' => 'nullable|string',
             'service_description.en' => 'nullable|string',
-            'category_id' => 'nullable|integer',
+            'category_id' => 'required|exists:categories,id',
         ]);
-
-        $categoryId = isset($validated['category_id']) && DB::table('categories')->where('id', $validated['category_id'])->exists() 
-            ? $validated['category_id'] 
-            : null;
 
         $serviceData = [
             'service_name' => $validated['service_name'],
             'description' => $validated['service_description'] ?? null,
-            'category_id' => $categoryId,
+            'category_id' => $validated['category_id'],
             'icon_id' => $validated['icon_id'] ?? null,
             'is_active' => true,
         ];
@@ -129,7 +125,7 @@ class AdminLaundryServiceController extends Controller
 
         return successResponse(
             $this->formatService($service, $locale),
-            __('service::service.created_successfully'),
+            __('service.created_successfully'),
             201
         );
     }
@@ -143,7 +139,7 @@ class AdminLaundryServiceController extends Controller
         $service = Service::find($id);
 
         if (! $service) {
-            return notFoundResponse(__('service::service.not_found'));
+            return notFoundResponse(__('service.not_found'));
         }
 
         $validated = $request->validate([
@@ -181,7 +177,7 @@ class AdminLaundryServiceController extends Controller
 
         return successResponse(
             $this->formatService($service->fresh(), $locale),
-            __('service::service.updated_successfully')
+            __('service.updated_successfully')
         );
     }
 
@@ -194,12 +190,12 @@ class AdminLaundryServiceController extends Controller
         $service = Service::find($id);
 
         if (! $service) {
-            return notFoundResponse(__('service::service.not_found'));
+            return notFoundResponse(__('service.not_found'));
         }
 
         $service->delete();
 
-        return successResponse(null, __('service::service.deleted_successfully'));
+        return successResponse(null, __('service.deleted_successfully'));
     }
 
     /**
