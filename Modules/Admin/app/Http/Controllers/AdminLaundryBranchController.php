@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Services\UploadFilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Modules\Branch\Models\Branch;
 use Modules\Branch\Services\BranchWorkingHoursService;
 use Modules\Driver\Models\Driver;
 use Modules\Order\Models\Order;
 use Modules\Piece\Models\Piece;
+use Modules\Service\Models\Service;
 use Modules\Service\Models\ServiceAddition;
 use Modules\Vendor\Models\Vendor;
 
@@ -465,5 +467,172 @@ class AdminLaundryBranchController extends Controller
             'Is_Active' => (bool) $branch->is_active,
             'Created_at' => $branch->created_at ? $branch->created_at->format('Y-m-d') : null,
         ];
+    }
+
+    /**
+     * Assign services from vendor catalog to a specific branch.
+     * POST /admin/laundries/branches/{id}/services
+     */
+    public function assignServices(Request $request, int $id): JsonResponse
+    {
+        $branch = Branch::find($id);
+        if (! $branch) {
+            return notFoundResponse('Branch not found');
+        }
+
+        $validated = $request->validate([
+            'service_ids' => 'required_without:services|array',
+            'service_ids.*' => 'exists:services,id',
+            'services' => 'required_without:service_ids|array',
+            'services.*' => 'exists:services,id',
+        ]);
+
+        $serviceIds = $validated['service_ids'] ?? $validated['services'] ?? [];
+        $serviceIds = array_unique($serviceIds);
+
+        $now = now();
+        foreach ($serviceIds as $serviceId) {
+            // Ensure vendor_service record exists for vendor catalog
+            DB::table('vendor_service')->insertOrIgnore([
+                'vendor_id' => $branch->vendor_id,
+                'service_id' => $serviceId,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            // Assign to branch_service
+            DB::table('branch_service')->insertOrIgnore([
+                'branch_id' => $branch->id,
+                'service_id' => $serviceId,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        return successResponse(
+            null,
+            'Services assigned to branch successfully'
+        );
+    }
+
+    /**
+     * Assign additional services from vendor catalog to a specific branch.
+     * POST /admin/laundries/branches/{id}/additional-services
+     */
+    public function assignAdditionalServices(Request $request, int $id): JsonResponse
+    {
+        $branch = Branch::find($id);
+        if (! $branch) {
+            return notFoundResponse('Branch not found');
+        }
+
+        $validated = $request->validate([
+            'additional_services' => 'required|array|min:1',
+            'additional_services.*.service_addition_id' => 'required|exists:service_additions,id',
+            'additional_services.*.price' => 'required|numeric|min:0',
+        ]);
+
+        $now = now();
+        foreach ($validated['additional_services'] as $item) {
+            $additionId = $item['service_addition_id'];
+            $price = $item['price'];
+
+            // Verify addition belongs to branch's vendor
+            $addition = ServiceAddition::where('id', $additionId)
+                ->where('vendor_id', $branch->vendor_id)
+                ->first();
+
+            if (! $addition) {
+                return errorResponse("Additional service ID {$additionId} does not belong to vendor {$branch->vendor_id}", null, 422);
+            }
+
+            DB::table('branch_service_addition')->updateOrInsert(
+                [
+                    'branch_id' => $branch->id,
+                    'service_addition_id' => $additionId,
+                ],
+                [
+                    'price' => $price,
+                    'updated_at' => $now,
+                    'created_at' => $now,
+                ]
+            );
+        }
+
+        return successResponse(
+            null,
+            'Additional services assigned to branch successfully'
+        );
+    }
+
+    /**
+     * Assign pieces with pricing to a specific branch.
+     * POST /admin/laundries/branches/{id}/pieces
+     */
+    public function assignPieces(Request $request, int $id): JsonResponse
+    {
+        $branch = Branch::find($id);
+        if (! $branch) {
+            return notFoundResponse('Branch not found');
+        }
+
+        $validated = $request->validate([
+            'pieces' => 'required|array|min:1',
+            'pieces.*.piece_id' => 'required|exists:pieces,id',
+            'pieces.*.services' => 'nullable|array',
+            'pieces.*.services.*.service_id' => 'required_with:pieces.*.services|exists:services,id',
+            'pieces.*.services.*.price' => 'required_with:pieces.*.services|numeric|min:0',
+            'pieces.*.service_id' => 'nullable|exists:services,id',
+            'pieces.*.price' => 'nullable|numeric|min:0',
+        ]);
+
+        $now = now();
+        foreach ($validated['pieces'] as $item) {
+            $pieceId = $item['piece_id'];
+
+            // Check piece belongs to vendor
+            $piece = Piece::where('id', $pieceId)
+                ->where('vendor_id', $branch->vendor_id)
+                ->first();
+
+            if (! $piece) {
+                return errorResponse("Piece ID {$pieceId} does not belong to vendor {$branch->vendor_id}", null, 422);
+            }
+
+            if (! empty($item['services'])) {
+                foreach ($item['services'] as $svc) {
+                    DB::table('service_piece')->updateOrInsert(
+                        [
+                            'service_id' => $svc['service_id'],
+                            'piece_id' => $pieceId,
+                            'branch_id' => $branch->id,
+                        ],
+                        [
+                            'price' => $svc['price'],
+                            'updated_at' => $now,
+                            'created_at' => $now,
+                        ]
+                    );
+                }
+            } elseif (isset($item['service_id'], $item['price'])) {
+                DB::table('service_piece')->updateOrInsert(
+                    [
+                        'service_id' => $item['service_id'],
+                        'piece_id' => $pieceId,
+                        'branch_id' => $branch->id,
+                    ],
+                    [
+                        'price' => $item['price'],
+                        'updated_at' => $now,
+                        'created_at' => $now,
+                    ]
+                );
+            }
+        }
+
+        return successResponse(
+            null,
+            'Pieces pricing assigned to branch successfully'
+        );
     }
 }

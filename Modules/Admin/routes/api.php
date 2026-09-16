@@ -430,6 +430,9 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
             Route::get('{id}/working-hours', [AdminLaundryBranchController::class, 'getWorkingHours']);
             Route::put('{id}/working-hours', [AdminLaundryBranchController::class, 'saveWorkingHours']);
             Route::get('{id}/detail', [AdminLaundryBranchController::class, 'detail']);
+            Route::post('{id}/services', [AdminLaundryBranchController::class, 'assignServices']);
+            Route::post('{id}/additional-services', [AdminLaundryBranchController::class, 'assignAdditionalServices']);
+            Route::post('{id}/pieces', [AdminLaundryBranchController::class, 'assignPieces']);
         });
 
         // Orders
