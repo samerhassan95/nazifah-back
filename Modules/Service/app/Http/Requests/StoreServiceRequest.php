@@ -21,7 +21,7 @@ class StoreServiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category_id' => 'required|integer|exists:categories,id',
+            'category_id' => 'nullable|integer|exists:categories,id',
             'service_name' => ['required', 'array'],
             'service_name.ar' => ['required', 'string', 'max:255'],
             'service_name.en' => ['required', 'string', 'max:255'],
