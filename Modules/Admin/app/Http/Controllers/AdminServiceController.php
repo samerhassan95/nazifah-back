@@ -71,8 +71,12 @@ class AdminServiceController extends Controller
             'icon_id' => 'required|exists:icons,id',
         ]);
 
+        $categoryId = isset($validated['category_id']) && DB::table('categories')->where('id', $validated['category_id'])->exists() 
+            ? $validated['category_id'] 
+            : null;
+
         $serviceData = [
-            'category_id' => $validated['category_id'],
+            'category_id' => $categoryId,
             'service_name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'discount_price' => $validated['discount_price'] ?? null,

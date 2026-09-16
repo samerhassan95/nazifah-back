@@ -112,10 +112,14 @@ class AdminLaundryServiceController extends Controller
             'category_id' => 'nullable|integer',
         ]);
 
+        $categoryId = isset($validated['category_id']) && DB::table('categories')->where('id', $validated['category_id'])->exists() 
+            ? $validated['category_id'] 
+            : null;
+
         $serviceData = [
             'service_name' => $validated['service_name'],
             'description' => $validated['service_description'] ?? null,
-            'category_id' => $validated['category_id'],
+            'category_id' => $categoryId,
             'icon_id' => $validated['icon_id'] ?? null,
             'is_active' => true,
         ];
