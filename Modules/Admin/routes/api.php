@@ -466,6 +466,7 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
         Route::prefix('pieces')->group(function () {
             Route::get('/', [AdminLaundryPieceController::class, 'index']);
             Route::post('/', [AdminLaundryPieceController::class, 'store']);
+            Route::get('form-options', [AdminLaundryPieceController::class, 'formOptions']);
             Route::get('{id}', [AdminLaundryPieceController::class, 'show']);
             Route::put('{id}', [AdminLaundryPieceController::class, 'update']);
             Route::delete('{id}', [AdminLaundryPieceController::class, 'destroy']);

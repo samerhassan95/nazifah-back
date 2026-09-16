@@ -90,6 +90,45 @@ class AdminLaundryPieceController extends Controller
     }
 
     /**
+     * Everything the Add/Edit Piece form's selects need in one call: the
+     * service catalog (for the service+price rows), this vendor's additional
+     * services, and this vendor's branches - three separate list endpoints
+     * the form would otherwise have to fetch one by one.
+     * GET /laundries/pieces/form-options?vendor_id=
+     */
+    public function formOptions(Request $request): JsonResponse
+    {
+        $vendorId = $request->input('vendor_id');
+
+        if (! $vendorId) {
+            return errorResponse('Vendor ID is required', null, 400);
+        }
+
+        $locale = app()->getLocale();
+
+        $services = Service::where('is_active', true)->get()->map(fn ($service) => [
+            'id' => $service->id,
+            'name' => $service->getTranslation('service_name', $locale),
+        ]);
+
+        $additionalServices = ServiceAddition::where('vendor_id', $vendorId)->get()->map(fn ($addition) => [
+            'id' => $addition->id,
+            'name' => $addition->getTranslation('name', $locale),
+        ]);
+
+        $branches = Branch::where('vendor_id', $vendorId)->get()->map(fn ($branch) => [
+            'id' => $branch->id,
+            'name' => $branch->getTranslation('name', $locale),
+        ]);
+
+        return successResponse([
+            'services' => $services,
+            'additional_services' => $additionalServices,
+            'branches' => $branches,
+        ], 'Piece form options retrieved successfully');
+    }
+
+    /**
      * Get single piece
      * GET /laundries/pieces/:id
      */
