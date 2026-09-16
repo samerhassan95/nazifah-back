@@ -36,9 +36,12 @@ class AdminLaundryDriverController extends Controller
             return notFoundResponse('Vendor not found');
         }
 
-        // Get drivers associated with this vendor (via branches)
-        $drivers = Driver::whereHas('branch', function ($q) use ($vendorId) {
-            $q->where('vendor_id', $vendorId);
+        // Get drivers associated with this vendor (directly or via branches)
+        $drivers = Driver::where(function ($q) use ($vendorId) {
+            $q->where('vendor_id', $vendorId)
+                ->orWhereHas('branch', function ($b) use ($vendorId) {
+                    $b->where('vendor_id', $vendorId);
+                });
         })
             ->with('branch')
             ->paginate($request->input('per_page', 15));

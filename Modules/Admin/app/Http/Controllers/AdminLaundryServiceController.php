@@ -23,8 +23,22 @@ class AdminLaundryServiceController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $services = Service::with(['category'])
-            ->paginate($request->input('per_page', 15));
+        $vendorId = $request->input('vendor_id');
+        $branchId = $request->input('branch_id');
+
+        $query = Service::with(['category']);
+
+        if ($branchId) {
+            $query->whereHas('branches', fn ($q) => $q->where('branches.id', $branchId));
+        } elseif ($vendorId) {
+            $query->where(function ($q) use ($vendorId) {
+                $q->whereHas('vendors', fn ($v) => $v->where('vendors.id', $vendorId))
+                    ->orWhereHas('branches', fn ($b) => $b->where('branches.vendor_id', $vendorId))
+                    ->orWhereHas('pieces', fn ($p) => $p->where('pieces.vendor_id', $vendorId));
+            });
+        }
+
+        $services = $query->paginate($request->input('per_page', 15));
 
         $servicesData = $services->getCollection()->map(function ($service) {
             $locale = app()->getLocale();

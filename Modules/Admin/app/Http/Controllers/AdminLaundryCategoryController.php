@@ -35,16 +35,22 @@ class AdminLaundryCategoryController extends Controller
                 return notFoundResponse('Vendor not found');
             }
 
+            $vendorServiceIds = Service::where(function ($q) use ($vendorId) {
+                $q->whereHas('vendors', fn ($v) => $v->where('vendors.id', $vendorId))
+                    ->orWhereHas('branches', fn ($b) => $b->where('branches.vendor_id', $vendorId))
+                    ->orWhereHas('pieces', fn ($p) => $p->where('pieces.vendor_id', $vendorId));
+            })->pluck('id');
+
             // Get category IDs from services that belong to this vendor
-            $categoryIds = Service::where('vendor_id', $vendorId)
+            $categoryIds = Service::whereIn('id', $vendorServiceIds)
                 ->whereNotNull('category_id')
                 ->pluck('category_id')
                 ->unique();
 
             // Get categories with their services for this vendor
             $categories = Category::whereIn('id', $categoryIds)
-                ->with(['services' => function ($query) use ($vendorId) {
-                    $query->where('vendor_id', $vendorId);
+                ->with(['services' => function ($query) use ($vendorServiceIds) {
+                    $query->whereIn('services.id', $vendorServiceIds);
                 }, 'iconRelation'])
                 ->paginate($request->input('per_page', 15));
         } else {
@@ -93,8 +99,14 @@ class AdminLaundryCategoryController extends Controller
         $services = [];
 
         if ($vendorId) {
+            $vendorServiceIds = Service::where(function ($q) use ($vendorId) {
+                $q->whereHas('vendors', fn ($v) => $v->where('vendors.id', $vendorId))
+                    ->orWhereHas('branches', fn ($b) => $b->where('branches.vendor_id', $vendorId))
+                    ->orWhereHas('pieces', fn ($p) => $p->where('pieces.vendor_id', $vendorId));
+            })->pluck('id');
+
             $services = Service::where('category_id', $category->id)
-                ->where('vendor_id', $vendorId)
+                ->whereIn('id', $vendorServiceIds)
                 ->get()
                 ->map(function ($service) {
                     return [

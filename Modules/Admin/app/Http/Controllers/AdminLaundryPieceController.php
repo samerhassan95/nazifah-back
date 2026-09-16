@@ -106,7 +106,18 @@ class AdminLaundryPieceController extends Controller
 
         $locale = app()->getLocale();
 
-        $services = Service::where('is_active', true)->get()->map(fn ($service) => [
+        $vendorServices = Service::where('is_active', true)
+            ->where(function ($q) use ($vendorId) {
+                $q->whereHas('vendors', fn ($v) => $v->where('vendors.id', $vendorId))
+                    ->orWhereHas('branches', fn ($b) => $b->where('branches.vendor_id', $vendorId))
+                    ->orWhereHas('pieces', fn ($p) => $p->where('pieces.vendor_id', $vendorId));
+            })->get();
+
+        $servicesToUse = $vendorServices->isNotEmpty()
+            ? $vendorServices
+            : Service::where('is_active', true)->get();
+
+        $services = $servicesToUse->map(fn ($service) => [
             'id' => $service->id,
             'name' => $service->getTranslation('service_name', $locale),
         ]);
