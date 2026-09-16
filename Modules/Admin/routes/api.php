@@ -429,6 +429,7 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
             Route::delete('{id}', [AdminLaundryBranchController::class, 'destroy']);
             Route::get('{id}/working-hours', [AdminLaundryBranchController::class, 'getWorkingHours']);
             Route::put('{id}/working-hours', [AdminLaundryBranchController::class, 'saveWorkingHours']);
+            Route::get('{id}/detail', [AdminLaundryBranchController::class, 'detail']);
         });
 
         // Orders

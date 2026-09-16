@@ -8,6 +8,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Branch\Models\Branch;
 use Modules\Branch\Services\BranchWorkingHoursService;
+use Modules\Driver\Models\Driver;
+use Modules\Order\Models\Order;
+use Modules\Piece\Models\Piece;
+use Modules\Service\Models\ServiceAddition;
 use Modules\Vendor\Models\Vendor;
 
 class AdminLaundryBranchController extends Controller
@@ -334,6 +338,90 @@ class AdminLaundryBranchController extends Controller
             'branch_id' => $branch->id,
             'working_hours' => $branch->getApiWorkingHours(),
         ], 'Working hours updated successfully');
+    }
+
+    /**
+     * Full branch detail page: branch info, working hours, stats, the
+     * branch's own drivers/services (with live ratings), and the vendor's
+     * pieces/additional services catalog. Composes several existing
+     * endpoints into one call for the branch detail screen.
+     * GET /admin/laundries/branches/{id}/detail
+     */
+    public function detail(int $id): JsonResponse
+    {
+        $branch = Branch::with('vendor')->find($id);
+        if (! $branch) {
+            return notFoundResponse('Branch not found');
+        }
+
+        $locale = app()->getLocale();
+
+        $stats = [
+            'orders_balance' => (float) Order::where('branch_id', $id)
+                ->whereHas('paymentTransactions', fn ($q) => $q->where('status', 'completed'))
+                ->sum('final_amount'),
+            'total_drivers' => Driver::where('branch_id', $id)->count(),
+            'total_orders' => Order::where('branch_id', $id)->count(),
+        ];
+
+        $drivers = Driver::where('branch_id', $id)->get()->map(fn ($driver) => [
+            'id' => $driver->id,
+            'Driver_image' => $driver->image,
+            'Driver_name' => $driver->getTranslation('full_name', $locale) ?? $driver->full_name,
+            'Phone' => $driver->phone,
+        ]);
+
+        $services = $branch->services()->where('services.is_active', true)->get()->map(function ($service) use ($branch) {
+            $rating = Order::whereHas('items.service', function ($q) use ($service) {
+                $q->where('services.id', $service->id);
+            })->where('branch_id', $branch->id)->whereNotNull('rating')->avg('rating') ?? 0;
+
+            $iconPath = null;
+            if ($service->pivot->icon_id) {
+                $icon = \Modules\Admin\Models\Icon::find($service->pivot->icon_id);
+                $iconPath = $icon ? $icon->full_path : null;
+            }
+            if (! $iconPath && $service->iconRelation) {
+                $iconPath = $service->iconRelation->full_path;
+            }
+
+            return [
+                'service_id' => $service->id,
+                'name' => $service->getTranslation('service_name', app()->getLocale()),
+                'icon' => $iconPath,
+                'rating' => round((float) $rating, 2),
+            ];
+        })->values();
+
+        $pieces = Piece::with('iconRelation')->where('vendor_id', $branch->vendor_id)->get()->map(fn ($piece) => [
+            'id' => $piece->id,
+            'name' => $piece->getTranslation('name', $locale),
+            'icon' => $piece->iconRelation?->full_path,
+        ]);
+
+        $additionalServices = ServiceAddition::where('vendor_id', $branch->vendor_id)->get()->map(function ($addition) use ($locale) {
+            $rating = Order::whereHas('items.additionalServicesRelation', function ($q) use ($addition) {
+                $q->where('service_additions.id', $addition->id);
+            })->whereNotNull('rating')->avg('rating') ?? 0;
+
+            return [
+                'id' => $addition->id,
+                'name' => $addition->getTranslation('name', $locale),
+                'price' => (float) $addition->price,
+                'rating' => round((float) $rating, 2),
+                'icon' => $addition->iconRelation?->full_path,
+            ];
+        });
+
+        return successResponse([
+            'branch' => $this->formatBranch($branch),
+            'stats' => $stats,
+            'working_hours' => $branch->getApiWorkingHours(),
+            'drivers' => $drivers,
+            'services' => $services,
+            'pieces' => $pieces,
+            'additional_services' => $additionalServices,
+        ], 'Branch detail retrieved successfully');
     }
 
     /**
