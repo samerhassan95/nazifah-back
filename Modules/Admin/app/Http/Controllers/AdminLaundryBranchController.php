@@ -71,8 +71,11 @@ class AdminLaundryBranchController extends Controller
         $states = [
             'total_branches' => $branches->total(),
             'Top_orders' => (int) ($topOrdersBranch->orders_count ?? 0),
+            'Top_orders_branch' => $topOrdersBranch ? $topOrdersBranch->getTranslation('name', $lang) : null,
             'Top_revenues' => (float) ($topRevenueBranch->revenue ?? 0),
+            'Top_revenues_branch' => $topRevenueBranch ? $topRevenueBranch->getTranslation('name', $lang) : null,
             'Top_rated' => (float) ($topRatingBranch->rating ?? 0),
+            'Top_rated_branch' => $topRatingBranch ? $topRatingBranch->getTranslation('name', $lang) : null,
         ];
 
         $branchesData = collect($branches->items())->map(fn ($branch) => $this->formatBranch($branch));
