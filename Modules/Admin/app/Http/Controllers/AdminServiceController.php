@@ -53,7 +53,7 @@ class AdminServiceController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'category_id' => 'nullable|exists:categories,id',
+            'category_id' => 'nullable|integer',
             'name' => 'required|array',
             'name.ar' => 'required|string|max:255',
             'name.en' => 'required|string|max:255',
