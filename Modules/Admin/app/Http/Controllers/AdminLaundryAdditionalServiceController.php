@@ -145,7 +145,7 @@ class AdminLaundryAdditionalServiceController extends Controller
             'Service_description.en' => 'nullable|string',
             'Price' => 'required|numeric|min:0',
             'service_ids' => 'nullable|array',
-            'service_ids.*' => 'exists:services,id',
+            'service_ids.*' => 'nullable|exists:services,id',
         ]);
 
         $serviceData = [
@@ -189,7 +189,7 @@ class AdminLaundryAdditionalServiceController extends Controller
             'Service_description.en' => 'nullable|string',
             'Price' => 'sometimes|numeric|min:0',
             'service_ids' => 'nullable|array',
-            'service_ids.*' => 'exists:services,id',
+            'service_ids.*' => 'nullable|exists:services,id',
         ]);
 
         $serviceData = [];
