@@ -109,7 +109,7 @@ class AdminLaundryServiceController extends Controller
             'service_description' => 'nullable|array',
             'service_description.ar' => 'nullable|string',
             'service_description.en' => 'nullable|string',
-            'category_id' => 'required|exists:categories,id',
+            'category_id' => 'nullable|exists:categories,id',
         ]);
 
         $serviceData = [
