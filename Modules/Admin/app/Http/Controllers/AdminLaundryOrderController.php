@@ -76,6 +76,8 @@ class AdminLaundryOrderController extends Controller
                 'Driver_name'  => $order->driver ? ($order->driver->getTranslation('full_name', 'ar') ?? $order->driver->full_name ?? 'N/A') : 'N/A',
                 'Pieces_count' => $order->items()->count(),
                 'Branch'       => $order->branch?->getTranslation('name', 'ar') ?? $order->branch?->name ?? 'N/A',
+                'Order_value'  => (float) $order->final_amount,
+                'order_value'  => (float) $order->final_amount,
                 'Order_date'   => $order->created_at ? $order->created_at->format('d M Y') : null,
                 'Order_status' => $this->mapOrderStatus($order->status),
             ];
