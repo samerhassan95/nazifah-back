@@ -27,6 +27,11 @@ class BranchService
 
     public function createBranch(array $data): Branch
     {
+        if (isset($data['phone']) && ! isset($data['phone_number'])) {
+            $data['phone_number'] = $data['phone'];
+        }
+        unset($data['phone']);
+
         return $this->branchRepository->create($data);
     }
 
@@ -37,6 +42,11 @@ class BranchService
         if (! $branch) {
             return null;
         }
+
+        if (isset($data['phone']) && ! isset($data['phone_number'])) {
+            $data['phone_number'] = $data['phone'];
+        }
+        unset($data['phone']);
 
         $this->branchRepository->update($branch, $data);
 

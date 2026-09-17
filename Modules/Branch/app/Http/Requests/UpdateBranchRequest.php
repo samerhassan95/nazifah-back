@@ -15,13 +15,24 @@ class UpdateBranchRequest extends FormRequest
         return $this->user() instanceof \Modules\Admin\Models\Admin;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('phone') && ! $this->has('phone_number')) {
+            $this->merge([
+                'phone_number' => $this->input('phone'),
+            ]);
+        } elseif ($this->has('phone_number') && ! $this->has('phone')) {
+            $this->merge([
+                'phone' => $this->input('phone_number'),
+            ]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      */
     public function rules(): array
     {
-        $id = $this->route('id') ?? $this->route(strtolower('Branch'));
-
         return [
             'vendor_id' => 'sometimes|integer|exists:vendors,id',
             'name' => ['sometimes', 'array'],
@@ -34,7 +45,8 @@ class UpdateBranchRequest extends FormRequest
             'description.ar' => ['nullable', 'string'],
             'description.en' => ['nullable', 'string'],
             'address' => 'nullable|string|max:1000',
-            'phone' => 'sometimes|string|unique:users,phone,'.$id,
+            'phone' => 'nullable|string',
+            'phone_number' => 'nullable|string',
             'latitude' => 'sometimes|required|numeric|between:-90,90',
             'longitude' => 'sometimes|required|numeric|between:-180,180',
             'is_active' => 'sometimes|boolean',

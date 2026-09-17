@@ -15,6 +15,19 @@ class StoreBranchRequest extends FormRequest
         return $this->user() instanceof \Modules\Admin\Models\Admin;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('phone') && ! $this->has('phone_number')) {
+            $this->merge([
+                'phone_number' => $this->input('phone'),
+            ]);
+        } elseif ($this->has('phone_number') && ! $this->has('phone')) {
+            $this->merge([
+                'phone' => $this->input('phone_number'),
+            ]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      */
@@ -32,7 +45,8 @@ class StoreBranchRequest extends FormRequest
             'description.ar' => ['nullable', 'string'],
             'description.en' => ['nullable', 'string'],
             'address' => 'nullable|string|max:1000',
-            'phone' => 'required|string|unique:users,phone',
+            'phone' => 'nullable|string',
+            'phone_number' => 'nullable|string',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
             'is_active' => 'sometimes|boolean',

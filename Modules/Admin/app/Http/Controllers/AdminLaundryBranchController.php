@@ -98,6 +98,26 @@ class AdminLaundryBranchController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        // Normalize input fields before validation
+        if (! $request->has('Phone')) {
+            $phoneVal = $request->input('phone') ?? $request->input('phone_number');
+            if ($phoneVal !== null) {
+                $request->merge(['Phone' => (string) $phoneVal]);
+            }
+        }
+        if (! $request->has('land_phone') && $request->has('landline')) {
+            $request->merge(['land_phone' => (string) $request->input('landline')]);
+        }
+        if (! $request->has('lat') && $request->has('latitude')) {
+            $request->merge(['lat' => $request->input('latitude')]);
+        }
+        if (! $request->has('lng') && $request->has('longitude')) {
+            $request->merge(['lng' => $request->input('longitude')]);
+        }
+        if (! $request->hasFile('Branch_logo') && $request->hasFile('logo')) {
+            $request->files->set('Branch_logo', $request->file('logo'));
+        }
+
         $validated = $request->validate([
             'vendor_id' => 'required|exists:vendors,id',
             'Branch_logo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
@@ -129,18 +149,22 @@ class AdminLaundryBranchController extends Controller
         $branch->setTranslation('name', 'en', $validated['name']['en']);
         $branch->setTranslation('location', 'ar', $validated['address']['ar']);
         $branch->setTranslation('location', 'en', $validated['address']['en']);
-        $branch->setTranslation('description', 'ar', $validated['description']['ar']);
-        $branch->setTranslation('description', 'en', $validated['description']['en']);
+        $branch->setTranslation('description', 'ar', $validated['description']['ar'] ?? '');
+        $branch->setTranslation('description', 'en', $validated['description']['en'] ?? '');
 
         $branch->national_address = $validated['national_address'] ?? null;
         $branch->phone_number = $validated['Phone'];
         $branch->land_phone = $validated['land_phone'] ?? null;
         $branch->latitude = $validated['lat'];
         $branch->longitude = $validated['lng'];
-        $branch->home_pickup = $request->boolean('home_pickup');
-        $branch->self_dropoff = $request->boolean('self_dropoff');
-        $branch->home_delivery = $request->boolean('home_delivery');
-        $branch->self_pickup = $request->boolean('self_pickup');
+
+        $deliveryLaundry = $request->input('delivery_to_laundry');
+        $deliveryCustomer = $request->input('delivery_to_customer');
+
+        $branch->home_pickup = $request->boolean('home_pickup') || $deliveryLaundry === 'home_pickup';
+        $branch->self_dropoff = $request->boolean('self_dropoff') || $deliveryLaundry === 'self_dropoff';
+        $branch->home_delivery = $request->boolean('home_delivery') || $deliveryCustomer === 'home_delivery';
+        $branch->self_pickup = $request->boolean('self_pickup') || $deliveryCustomer === 'self_pickup';
         $branch->is_active = true;
 
         if ($request->hasFile('Branch_logo')) {
@@ -180,6 +204,26 @@ class AdminLaundryBranchController extends Controller
             return notFoundResponse('Branch not found');
         }
 
+        // Normalize input fields before validation
+        if (! $request->has('Phone')) {
+            $phoneVal = $request->input('phone') ?? $request->input('phone_number');
+            if ($phoneVal !== null) {
+                $request->merge(['Phone' => (string) $phoneVal]);
+            }
+        }
+        if (! $request->has('land_phone') && $request->has('landline')) {
+            $request->merge(['land_phone' => (string) $request->input('landline')]);
+        }
+        if (! $request->has('lat') && $request->has('latitude')) {
+            $request->merge(['lat' => $request->input('latitude')]);
+        }
+        if (! $request->has('lng') && $request->has('longitude')) {
+            $request->merge(['lng' => $request->input('longitude')]);
+        }
+        if (! $request->hasFile('Branch_logo') && $request->hasFile('logo')) {
+            $request->files->set('Branch_logo', $request->file('logo'));
+        }
+
         $validated = $request->validate([
             'Branch_logo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'name' => 'sometimes|array',
@@ -206,21 +250,15 @@ class AdminLaundryBranchController extends Controller
         // Dynamic Translation Updates
         if ($request->has('name')) {
             $branch->setTranslation('name', 'ar', $validated['name']['ar']);
-        }
-        if ($request->has('name')) {
             $branch->setTranslation('name', 'en', $validated['name']['en']);
         }
         if ($request->has('address')) {
             $branch->setTranslation('location', 'ar', $validated['address']['ar']);
-        }
-        if ($request->has('address')) {
             $branch->setTranslation('location', 'en', $validated['address']['en']);
         }
         if ($request->has('description')) {
-            $branch->setTranslation('description', 'ar', $validated['description']['ar']);
-        }
-        if ($request->has('description')) {
-            $branch->setTranslation('description', 'en', $validated['description']['en']);
+            $branch->setTranslation('description', 'ar', $validated['description']['ar'] ?? '');
+            $branch->setTranslation('description', 'en', $validated['description']['en'] ?? '');
         }
 
         if ($request->has('national_address')) {
@@ -238,11 +276,23 @@ class AdminLaundryBranchController extends Controller
         if ($request->has('lng')) {
             $branch->longitude = $validated['lng'];
         }
-        foreach (['home_pickup', 'self_dropoff', 'home_delivery', 'self_pickup'] as $deliveryFlag) {
-            if ($request->has($deliveryFlag)) {
-                $branch->{$deliveryFlag} = $request->boolean($deliveryFlag);
-            }
+
+        $deliveryLaundry = $request->input('delivery_to_laundry');
+        $deliveryCustomer = $request->input('delivery_to_customer');
+
+        if ($deliveryLaundry !== null || $request->has('home_pickup')) {
+            $branch->home_pickup = $request->boolean('home_pickup') || $deliveryLaundry === 'home_pickup';
         }
+        if ($deliveryLaundry !== null || $request->has('self_dropoff')) {
+            $branch->self_dropoff = $request->boolean('self_dropoff') || $deliveryLaundry === 'self_dropoff';
+        }
+        if ($deliveryCustomer !== null || $request->has('home_delivery')) {
+            $branch->home_delivery = $request->boolean('home_delivery') || $deliveryCustomer === 'home_delivery';
+        }
+        if ($deliveryCustomer !== null || $request->has('self_pickup')) {
+            $branch->self_pickup = $request->boolean('self_pickup') || $deliveryCustomer === 'self_pickup';
+        }
+
         if ($request->has('is_active')) {
             $branch->is_active = $validated['is_active'];
         }

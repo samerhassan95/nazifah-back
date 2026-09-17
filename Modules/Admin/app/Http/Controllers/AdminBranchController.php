@@ -95,6 +95,7 @@ class AdminBranchController extends Controller
         } elseif (isset($validated['phone'])) {
             $validated['phone_number'] = $validated['phone'];
         }
+        unset($validated['phone']);
 
         // Normalize location (accept address or location)
         if (isset($validated['location'])) {
@@ -148,6 +149,7 @@ class AdminBranchController extends Controller
         } elseif (isset($validated['phone'])) {
             $validated['phone_number'] = $validated['phone'];
         }
+        unset($validated['phone']);
 
         if (isset($validated['location']) || $request->has('address')) {
             $validated['location'] = $validated['location'] ?? $request->input('address');
