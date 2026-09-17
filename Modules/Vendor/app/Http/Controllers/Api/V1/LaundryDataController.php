@@ -4,7 +4,6 @@ namespace Modules\Vendor\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Services\UploadFilesService;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -80,6 +79,9 @@ class LaundryDataController extends Controller
             'phone' => $vendor->phone,
             'email' => $vendor->email,
             'vat_number' => $vendor->vat_number,
+            'official_number' => $vendor->official_number,
+            'landline' => $vendor->official_number,
+            'delivery_price_per_km' => (float) ($vendor->delivery_price_per_km ?? 0),
             'attachments' => [], // Could be expanded to include vendor documents
         ];
     }
@@ -228,8 +230,9 @@ class LaundryDataController extends Controller
                 'name' => $this->getTranslatableValue($branch, 'name', $lang),
                 'Email' => $vendor->email ?? null,
                 'Phone' => $branch->phone_number,
-                'lat' => (float) $branch->latitude,
-                'lng' => (float) $branch->longitude,
+                'Landline' => $branch->land_phone ?? $branch->landline ?? $vendor->official_number,
+                'lat' => (float) ($branch->latitude ?? 0),
+                'lng' => (float) ($branch->longitude ?? 0),
                 'address_details' => $this->getTranslatableValue($branch, 'location', $lang) ?? '',
             ];
         })->toArray();
@@ -238,17 +241,23 @@ class LaundryDataController extends Controller
     /**
      * Read a translatable attribute using the requested locale with fallbacks.
      */
-    private function getTranslatableValue(Model $model, string $attribute, string $lang): ?string
+    private function getTranslatableValue(object $model, string $attribute, string $lang): ?string
     {
-        if (! method_exists($model, 'getTranslations')) {
-            return is_string($model->{$attribute} ?? null) ? $model->{$attribute} : null;
+        if (method_exists($model, 'getTranslations')) {
+            $translations = $model->getTranslations($attribute);
+
+            return $translations[$lang]
+                ?? $translations['en']
+                ?? $translations['ar']
+                ?? (is_string($model->{$attribute} ?? null) ? $model->{$attribute} : null);
         }
 
-        $translations = $model->getTranslations($attribute);
+        $value = $model->{$attribute} ?? null;
 
-        return $translations[$lang]
-            ?? $translations['en']
-            ?? $translations['ar']
-            ?? (is_string($model->{$attribute} ?? null) ? $model->{$attribute} : null);
+        if (is_array($value)) {
+            return $value[$lang] ?? $value['en'] ?? $value['ar'] ?? null;
+        }
+
+        return is_string($value) ? $value : null;
     }
 }

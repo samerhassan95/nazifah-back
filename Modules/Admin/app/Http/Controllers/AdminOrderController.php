@@ -526,6 +526,14 @@ class AdminOrderController extends Controller
         // Determine progress based on order status
         $progressData = $this->getOrderProgress($order->status);
 
+        $actualStatus = $order->status ?? 'pending';
+        $statusLabel = OrderStatus::tryFrom($actualStatus)?->localizedLabel(
+            $order->payment_method,
+            $actualStatus === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at,
+            (bool) $order->delivery_at_vendor,
+            false,
+        ) ?? ($order->status_label ?? $actualStatus);
+
         // Use stored order totals so all order APIs return same amounts
         $subtotal = (float) $order->total_amount;
         $deliveryFee = (float) $order->delivery_fee;
@@ -533,62 +541,122 @@ class AdminOrderController extends Controller
         $tax = (float) $order->tax_amount;
         $finalTotal = (float) $order->final_amount;
 
-        return successResponse([
+        $pickupLocation = $order->pickupAddress ? [
+            'lat' => $order->pickupAddress->latitude !== null ? (float) $order->pickupAddress->latitude : null,
+            'lang' => $order->pickupAddress->longitude !== null ? (float) $order->pickupAddress->longitude : null,
+            'address' => $order->pickupAddress->address_text ?? $order->pickupAddress->street_name ?? null,
+        ] : null;
+
+        $deliveryLocation = $order->deliveryAddress ? [
+            'lat' => $order->deliveryAddress->latitude !== null ? (float) $order->deliveryAddress->latitude : null,
+            'lang' => $order->deliveryAddress->longitude !== null ? (float) $order->deliveryAddress->longitude : null,
+            'address' => $order->deliveryAddress->address_text ?? $order->deliveryAddress->street_name ?? null,
+        ] : null;
+
+        $paymentBreakdown = method_exists($order, 'paymentBreakdownForApi')
+            ? $order->paymentBreakdownForApi()
+            : [];
+
+        $orderInvoice = [
+            'pieces' => $acceptedItems->map(function ($item) {
+                return [
+                    'piece_count' => $item['Piece_count'],
+                    'piece_name' => $item['Piece_name'],
+                    'service' => $item['name_operation'] ?: ($item['Services'][0]['service_name'] ?? ''),
+                    'additional_services' => $item['Item_details']['Services'][0]['Additional_services'] ?? [],
+                    'price' => $item['Item_details']['Price'],
+                ];
+            })->values()->toArray(),
+            'deleviery_price' => $deliveryFee,
+            'delivery_price' => $deliveryFee,
+            'total_price' => $subtotal,
+            'total_tax' => $tax,
+            'total_price_after_tax' => $finalTotal,
+            'discount_amount' => $discount,
+            'final_amount' => $finalTotal,
+        ];
+
+        $orderInfo = [
+            'branch_id' => $order->branch_id,
+            'status' => $actualStatus,
+            'status_label' => $statusLabel,
+            'order_status' => $actualStatus,
+            'order_status_label' => $statusLabel,
+            'order_code' => $order->order_number ?? '',
+            'order_number' => $order->order_number ?? '',
+            'order_price' => $subtotal,
+            'total_price' => $subtotal,
+            'total_price_after_tax' => $finalTotal,
+            'final_amount' => $finalTotal,
+            'client_location' => $order->deliveryAddress?->street_name ?? $order->deliveryAddress?->address_text ?? '',
+            'client_address' => $order->deliveryAddress?->street_name ?? $order->deliveryAddress?->address_text ?? '',
+            'laundry_name' => $order->branch?->vendor?->name ?? '',
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
+        ];
+
+        $paymentPayload = [
+            'payment_way' => $order->payment_method ?? 'cash_on_delivery',
+            'payment_method' => $order->payment_method ?? 'cash_on_delivery',
+            'payment_status' => $paymentStatus,
+            'payment_status_label' => \App\Support\PaymentStatusPresenter::label($paymentStatus),
+            'payment_breakdown' => $paymentBreakdown,
+        ];
+
+        $trackOrder = [
+            'client_location' => [
+                'lat' => $order->deliveryAddress?->latitude ?? null,
+                'lang' => $order->deliveryAddress?->longitude ?? null,
+                'address' => $deliveryLocation['address'] ?? null,
+            ],
+            'laundry_location' => [
+                'lat' => $order->branch?->latitude ?? null,
+                'lang' => $order->branch?->longitude ?? null,
+                'address' => $order->branch?->address_text ?? $order->branch?->name ?? null,
+            ],
+            'delivery_location' => $deliveryLocation,
+            'pickup_location' => $pickupLocation,
+            'delievry_location' => $deliveryLocation,
+        ];
+
+        $response = [
             'laundry_name' => $order->branch?->vendor?->name ?? '',
             'driver_name' => $order->driver?->full_name ?? '',
             'client_name' => $order->client?->full_name ?? '',
-            'order_invoice' => [
-                'pieces' => $acceptedItems->map(function ($item) {
-                    return [
-                        'piece_count' => $item['Piece_count'],
-                        'piece_name' => $item['Piece_name'],
-                        'service' => $item['name_operation'] ?: ($item['Services'][0]['service_name'] ?? ''),
-                        'additional_services' => $item['Item_details']['Services'][0]['Additional_services'] ?? [],
-                        'price' => $item['Item_details']['Price'],
-                    ];
-                })->values()->toArray(),
-                'deleviery_price' => $deliveryFee,
-                'total_price' => $subtotal,
-                'total_tax' => $tax,
-                'total_price_after_tax' => $finalTotal,
-            ],
-            'order_info' => [
-                'branch_id' => $order->branch_id,
-                'status' => $order->status,
-                'status_label' => $order->status_label,
-                'order_code' => $order->order_number ?? '',
-                'order_price' => $subtotal,
-                'total_price_after_tax' => $finalTotal,
-                'client_location' => $order->deliveryAddress?->street_name ?? '',
-                'laundry_name' => $order->branch?->vendor?->name ?? '',
-            ],
+            'status' => $actualStatus,
+            'status_label' => $statusLabel,
+            'order_status' => $actualStatus,
+            'order_status_label' => $statusLabel,
+            'order_invoice' => $orderInvoice,
+            'Order_invoice' => $orderInvoice,
+            'order_info' => $orderInfo,
+            'Order_info' => $orderInfo,
             'order_details' => $acceptedItems->values()->toArray(),
+            'Order_details' => $acceptedItems->values()->toArray(),
             'rejected_details' => $rejectedItems->values()->toArray(),
+            'Rejected_details' => $rejectedItems->values()->toArray(),
             'progress' => $progressData,
-            'payment' => [
-                'payment_way' => $order->payment_method ?? 'cash_on_delivery',
-                'payment_status' => $paymentStatus,
-                'payment_status_label' => \App\Support\PaymentStatusPresenter::label($paymentStatus),
-            ],
+            'Progress' => $progressData,
+            'payment' => $paymentPayload,
+            'Payment' => $paymentPayload,
             'pickup_methods' => [
                 'pick_up' => $order->pickup_at_vendor ? 'vendor' : 'client',
+                'pick_up_method' => $order->pickup_at_vendor ? 'vendor' : 'client',
                 'delievry' => $order->delivery_at_vendor ? 'vendor' : 'client',
+                'delivery' => $order->delivery_at_vendor ? 'vendor' : 'client',
             ],
-            'track_order' => [
-                'client_location' => [
-                    'lat' => $order->deliveryAddress?->latitude ?? null,
-                    'lang' => $order->deliveryAddress?->longitude ?? null,
-                ],
-                'laundry_location' => [
-                    'lat' => $order->branch?->latitude ?? null,
-                    'lang' => $order->branch?->longitude ?? null,
-                ],
-                'delievry_location' => [
-                    'lat' => $order->pickupAddress?->latitude ?? null,
-                    'lang' => $order->pickupAddress?->longitude ?? null,
-                ],
+            'track_order' => $trackOrder,
+            'Track_order' => $trackOrder,
+            'pickup_address' => $pickupLocation,
+            'delivery_address' => $deliveryLocation,
+            'delivery_info' => [
+                'pickup' => $pickupLocation,
+                'delivery' => $deliveryLocation,
             ],
-        ], 'Order details retrieved successfully');
+            'payment_breakdown' => $paymentBreakdown,
+        ];
+
+        return successResponse($response, 'Order details retrieved successfully');
     }
 
     /**

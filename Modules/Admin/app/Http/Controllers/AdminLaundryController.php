@@ -47,8 +47,9 @@ class AdminLaundryController extends Controller
             'email' => $vendor->email,
             'vat_number' => $vendor->vat_number,
             'official_number' => $vendor->official_number,
+            'landline' => $vendor->official_number,
             'phone' => $vendor->phone,
-            'delivery_price_per_km' => (float) $vendor->delivery_price_per_km,
+            'delivery_price_per_km' => (float) ($vendor->delivery_price_per_km ?? 0),
             'attachments' => $attachments,
         ];
 
@@ -178,6 +179,7 @@ class AdminLaundryController extends Controller
                     'name' => $this->getTranslatableValue($branch, 'name', $lang),
                     'Email' => $vendor->email ?? null,
                     'Phone' => $branch->phone_number,
+                    'Landline' => $branch->land_phone ?? $branch->landline ?? $vendor->official_number,
                     'lat' => (float) ($branch->latitude ?? 0),
                     'lng' => (float) ($branch->longitude ?? 0),
                     'address_details' => $this->getTranslatableValue($branch, 'location', $lang),
@@ -221,13 +223,23 @@ class AdminLaundryController extends Controller
         ], 'Laundry data retrieved successfully');
     }
 
-    private function getTranslatableValue(Branch $branch, string $attribute, string $lang): ?string
+    private function getTranslatableValue(object $branch, string $attribute, string $lang): ?string
     {
-        $translations = $branch->getTranslations($attribute);
+        if (method_exists($branch, 'getTranslations')) {
+            $translations = $branch->getTranslations($attribute);
 
-        return $translations[$lang]
-            ?? $translations['en']
-            ?? $translations['ar']
-            ?? (is_string($branch->{$attribute} ?? null) ? $branch->{$attribute} : null);
+            return $translations[$lang]
+                ?? $translations['en']
+                ?? $translations['ar']
+                ?? (is_string($branch->{$attribute} ?? null) ? $branch->{$attribute} : null);
+        }
+
+        $value = $branch->{$attribute} ?? null;
+
+        if (is_array($value)) {
+            return $value[$lang] ?? $value['en'] ?? $value['ar'] ?? null;
+        }
+
+        return is_string($value) ? $value : null;
     }
 }

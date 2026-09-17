@@ -2,6 +2,7 @@
 
 namespace Modules\Admin\Http\Controllers;
 
+use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -67,8 +68,16 @@ class AdminLaundryOrderController extends Controller
             'Deleted_orders' => $deletedOrders,
         ];
 
-        // Format orders
+        // Format orders with the actual lifecycle status instead of coarse summary buckets.
         $ordersData = collect($orders->items())->map(function ($order) {
+            $normalizedStatus = $order->status ?? 'pending';
+            $statusLabel = OrderStatus::fromString($normalizedStatus)?->localizedLabel(
+                $order->payment_method,
+                $normalizedStatus === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at,
+                (bool) $order->delivery_at_vendor,
+                false,
+            ) ?? $normalizedStatus;
+
             return [
                 'id'           => $order->id,
                 'Order_code'   => $order->order_number,
@@ -79,7 +88,9 @@ class AdminLaundryOrderController extends Controller
                 'Order_value'  => (float) $order->final_amount,
                 'order_value'  => (float) $order->final_amount,
                 'Order_date'   => $order->created_at ? $order->created_at->format('d M Y') : null,
-                'Order_status' => $this->mapOrderStatus($order->status),
+                'Order_status' => $normalizedStatus,
+                'order_status' => $normalizedStatus,
+                'status_label' => $statusLabel,
             ];
         });
 
@@ -89,21 +100,4 @@ class AdminLaundryOrderController extends Controller
         ], 'Orders retrieved successfully');
     }
 
-    /**
-     * Map order status to required format
-     */
-    private function mapOrderStatus($status): string
-    {
-        $statusMap = [
-            'completed' => 'completed',
-            'delivered' => 'completed',
-            'cancelled' => 'deleted',
-            'pending' => 'under_processing',
-            'confirmed' => 'under_processing',
-            'picked_up' => 'under_processing',
-            'delivered_to_branch' => 'under_processing',
-        ];
-
-        return $statusMap[$status] ?? 'under_processing';
-    }
 }
