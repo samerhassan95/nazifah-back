@@ -713,6 +713,45 @@ class AdminOrderController extends Controller
                 ];
             })->values()->toArray();
 
+        $latestLog = end($statusLogs) ?: null;
+        $deliveryTitle = $latestLog['title'] ?? $statusLabel;
+        $deliverySubtitle = $latestLog['sub_title'] ?? $estimatedArrivalText;
+
+        if (in_array($actualStatus, ['on_way_to_pickup', 'on_way_to_delivery'], true)) {
+            $deliveryTitle = $lang === 'ar' ? 'السائق في طريقه إلى العميل' : 'Driver on the way to client';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'السائق يقترب من موقع العميل لاستلام/تسليم الطلب وبانتظار تأكيد العميل جاهزيته لتسليم الطلب.'
+                : 'Driver is approaching client location for pickup/delivery and awaiting client confirmation.';
+        } elseif (in_array($actualStatus, ['driver_pickup_assigned', 'driver_delivery_assigned'], true)) {
+            $deliveryTitle = $lang === 'ar' ? 'تم تعيين السائق' : 'Driver Assigned';
+            $deliverySubtitle = $lang === 'ar' ? 'تم تعيين سائق للطلب وبانتظار قبول الطلب والانطلاق.' : 'Driver assigned, awaiting driver acceptance.';
+        } elseif (in_array($actualStatus, ['driver_pickup_accepted', 'driver_delivery_accepted'], true)) {
+            $deliveryTitle = $lang === 'ar' ? 'قبل السائق الطلب' : 'Driver Accepted';
+            $deliverySubtitle = $lang === 'ar' ? 'قبل السائق الطلب وهو بصدد الانطلاق للموقع.' : 'Driver accepted and preparing to head to location.';
+        } elseif ($actualStatus === 'picked_up') {
+            $deliveryTitle = $lang === 'ar' ? 'تم استلام الطلب من العميل' : 'Picked Up from Client';
+            $deliverySubtitle = $lang === 'ar' ? 'تم استلام الشحنة بنجاح وجاري نقلها إلى المغسلة.' : 'Order picked up successfully and heading to branch.';
+        } elseif (in_array($actualStatus, ['delivered_to_branch', 'preparing'], true)) {
+            $deliveryTitle = $lang === 'ar' ? 'الطلب في المغسلة' : 'Order at Branch';
+            $deliverySubtitle = $lang === 'ar' ? 'تم تسليم الطلب للمغسلة ويجري تجهيز الملابس والغسيل.' : 'Order arrived at branch and being prepared.';
+        } elseif ($actualStatus === 'ready') {
+            $deliveryTitle = $lang === 'ar' ? 'الطلب جاهز' : 'Order Ready';
+            $deliverySubtitle = $lang === 'ar' ? 'تم الانتهاء من الغسيل والطلب جاهز للتوصيل.' : 'Laundry finished and order ready for delivery.';
+        } elseif (in_array($actualStatus, ['delivered', 'completed'], true)) {
+            $deliveryTitle = $lang === 'ar' ? 'تم توصيل الطلب' : 'Order Delivered';
+            $deliverySubtitle = $lang === 'ar' ? 'تم تسليم الطلب للعميل واكتمال عملية التوصيل بنجاح.' : 'Order delivered successfully to client.';
+        }
+
+        $deliveryStatusPayload = [
+            'status' => $actualStatus,
+            'title' => $deliveryTitle,
+            'subtitle' => $deliverySubtitle,
+            'delivery_status_title' => $deliveryTitle,
+            'delivery_status_subtitle' => $deliverySubtitle,
+            'estimated_arrival_minutes' => $estimatedMinutes,
+            'estimated_arrival_text' => $estimatedArrivalText,
+        ];
+
         $trackOrder = [
             'progress_percentage' => $progressPercentage,
             'estimated_arrival_minutes' => $estimatedMinutes,
@@ -737,6 +776,7 @@ class AdminOrderController extends Controller
             'delivery_location' => $deliveryLocation,
             'status_logs' => $statusLogs,
             'status_history' => $statusLogs,
+            'delivery_status' => $deliveryStatusPayload,
         ];
 
         $response = [
@@ -758,6 +798,9 @@ class AdminOrderController extends Controller
             'progress' => $progressData,
             'status_logs' => $statusLogs,
             'status_history' => $statusLogs,
+            'delivery_status' => $deliveryStatusPayload,
+            'delivery_status_title' => $deliveryTitle,
+            'delivery_status_subtitle' => $deliverySubtitle,
             'payment' => $paymentPayload,
             'pickup_methods' => [
                 'pick_up' => $order->pickup_at_vendor ? 'vendor' : 'client',
