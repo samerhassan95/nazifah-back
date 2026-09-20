@@ -415,8 +415,10 @@ class AdminOrderController extends Controller
         }
 
         $order = Order::with([
-            'client',
+            'client.addresses',
             'driver',
+            'pickupDriver',
+            'deliveryDriver',
             'branch.vendor',
             'items.piece',
             'items.service',
@@ -424,6 +426,7 @@ class AdminOrderController extends Controller
             'pickupAddress',
             'deliveryAddress',
             'latestPayment',
+            'statusLogs',
         ])->find($orderId);
 
         if (! $order) {
@@ -595,6 +598,76 @@ class AdminOrderController extends Controller
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
         ];
 
+        // Active driver selection based on current order status
+        $activeDriver = null;
+        if (in_array($actualStatus, ['driver_pickup_accepted', 'on_way_to_pickup', 'picked_up'], true)) {
+            $activeDriver = $order->pickupDriver ?? $order->driver;
+        } elseif (in_array($actualStatus, ['driver_delivery_accepted', 'on_way_to_delivery', 'waiting_client_receipt', 'delivered'], true)) {
+            $activeDriver = $order->deliveryDriver ?? $order->driver;
+        } else {
+            $activeDriver = $order->driver ?? $order->deliveryDriver ?? $order->pickupDriver;
+        }
+
+        $driverData = $activeDriver ? [
+            'id' => $activeDriver->id,
+            'name' => method_exists($activeDriver, 'getTranslation') ? ($activeDriver->getTranslation('full_name', $lang) ?? $activeDriver->full_name) : $activeDriver->full_name,
+            'full_name' => method_exists($activeDriver, 'getTranslation') ? ($activeDriver->getTranslation('full_name', $lang) ?? $activeDriver->full_name) : $activeDriver->full_name,
+            'phone' => $activeDriver->phone,
+            'avatar' => $activeDriver->image,
+            'image' => $activeDriver->image,
+            'rating' => (float) ($activeDriver->rating ?? 4.5),
+            'latitude' => $activeDriver->latitude !== null ? (float) $activeDriver->latitude : null,
+            'longitude' => $activeDriver->longitude !== null ? (float) $activeDriver->longitude : null,
+            'lat' => $activeDriver->latitude !== null ? (float) $activeDriver->latitude : null,
+            'lng' => $activeDriver->longitude !== null ? (float) $activeDriver->longitude : null,
+        ] : null;
+
+        $clientAddressObj = $order->deliveryAddress ?? $order->pickupAddress;
+        $clientName = $order->client ? (method_exists($order->client, 'getTranslation') ? ($order->client->getTranslation('full_name', $lang) ?? $order->client->full_name) : $order->client->full_name) : '';
+
+        $clientData = $order->client ? [
+            'id' => $order->client->id,
+            'name' => $clientName,
+            'full_name' => $clientName,
+            'phone' => $order->client->phone,
+            'avatar' => $order->client->avatar ?? $order->client->image ?? null,
+            'image' => $order->client->avatar ?? $order->client->image ?? null,
+            'rating' => (float) ($order->client->rating ?? 4.5),
+            'address' => $clientAddressObj?->street_name ?? $clientAddressObj?->address_text ?? null,
+            'latitude' => $clientAddressObj?->latitude !== null ? (float) $clientAddressObj->latitude : null,
+            'longitude' => $clientAddressObj?->longitude !== null ? (float) $clientAddressObj->longitude : null,
+            'lat' => $clientAddressObj?->latitude !== null ? (float) $clientAddressObj->latitude : null,
+            'lng' => $clientAddressObj?->longitude !== null ? (float) $clientAddressObj->longitude : null,
+        ] : null;
+
+        $statusProgressMap = [
+            'pending' => 10,
+            'confirmed' => 25,
+            'driver_pickup_assigned' => 30,
+            'driver_pickup_accepted' => 35,
+            'on_way_to_pickup' => 45,
+            'picked_up' => 50,
+            'delivered_to_branch' => 60,
+            'preparing' => 70,
+            'ready' => 80,
+            'driver_delivery_assigned' => 85,
+            'driver_delivery_accepted' => 88,
+            'on_way_to_delivery' => 92,
+            'waiting_client_receipt' => 95,
+            'delivered' => 100,
+            'completed' => 100,
+            'cancelled' => 0,
+            'rejected' => 0,
+        ];
+        $progressPercentage = $statusProgressMap[$actualStatus] ?? 50;
+
+        $estimatedMinutes = 15;
+        if ($activeDriver && $activeDriver->latitude && $activeDriver->longitude && $clientAddressObj && $clientAddressObj->latitude && $clientAddressObj->longitude) {
+            $distKm = $this->calculateDistance((float) $activeDriver->latitude, (float) $activeDriver->longitude, (float) $clientAddressObj->latitude, (float) $clientAddressObj->longitude);
+            $estimatedMinutes = max(5, min(60, (int) round($distKm * 2 + 5)));
+        }
+        $estimatedArrivalText = $lang === 'ar' ? "سيصل خلال {$estimatedMinutes} دقيقة" : "Will arrive in {$estimatedMinutes} minutes";
+
         $paymentPayload = [
             'payment_way' => $order->payment_method ?? 'cash_on_delivery',
             'payment_method' => $order->payment_method ?? 'cash_on_delivery',
@@ -604,14 +677,38 @@ class AdminOrderController extends Controller
         ];
 
         $trackOrder = [
+            'progress_percentage' => $progressPercentage,
+            'progress_percent' => $progressPercentage,
+            'estimated_arrival_minutes' => $estimatedMinutes,
+            'estimated_arrival_text' => $estimatedArrivalText,
+            'estimated_delivery_time' => $estimatedArrivalText,
+            'driver' => $driverData,
+            'Driver' => $driverData,
+            'client' => $clientData,
+            'Client' => $clientData,
+            'driver_location' => $driverData ? [
+                'lat' => $driverData['lat'],
+                'lang' => $driverData['lng'],
+                'lng' => $driverData['lng'],
+                'latitude' => $driverData['lat'],
+                'longitude' => $driverData['lng'],
+            ] : null,
             'client_location' => [
-                'lat' => $order->deliveryAddress?->latitude ?? null,
-                'lang' => $order->deliveryAddress?->longitude ?? null,
+                'lat' => $order->deliveryAddress?->latitude !== null ? (float) $order->deliveryAddress->latitude : null,
+                'lang' => $order->deliveryAddress?->longitude !== null ? (float) $order->deliveryAddress->longitude : null,
+                'lng' => $order->deliveryAddress?->longitude !== null ? (float) $order->deliveryAddress->longitude : null,
                 'address' => $deliveryLocation['address'] ?? null,
             ],
             'laundry_location' => [
-                'lat' => $order->branch?->latitude ?? null,
-                'lang' => $order->branch?->longitude ?? null,
+                'lat' => $order->branch?->latitude !== null ? (float) $order->branch->latitude : null,
+                'lang' => $order->branch?->longitude !== null ? (float) $order->branch->longitude : null,
+                'lng' => $order->branch?->longitude !== null ? (float) $order->branch->longitude : null,
+                'address' => $order->branch?->address_text ?? $order->branch?->name ?? null,
+            ],
+            'branch_location' => [
+                'lat' => $order->branch?->latitude !== null ? (float) $order->branch->latitude : null,
+                'lang' => $order->branch?->longitude !== null ? (float) $order->branch->longitude : null,
+                'lng' => $order->branch?->longitude !== null ? (float) $order->branch->longitude : null,
                 'address' => $order->branch?->address_text ?? $order->branch?->name ?? null,
             ],
             'delivery_location' => $deliveryLocation,
@@ -621,12 +718,23 @@ class AdminOrderController extends Controller
 
         $response = [
             'laundry_name' => $order->branch?->vendor?->name ?? '',
-            'driver_name' => $order->driver?->full_name ?? '',
-            'client_name' => $order->client?->full_name ?? '',
+            'driver_name' => $driverData['name'] ?? $order->driver?->full_name ?? '',
+            'client_name' => $clientName,
             'status' => $actualStatus,
             'status_label' => $statusLabel,
             'order_status' => $actualStatus,
             'order_status_label' => $statusLabel,
+            'driver' => $driverData,
+            'Driver' => $driverData,
+            'client' => $clientData,
+            'Client' => $clientData,
+            'tracking' => $trackOrder,
+            'Tracking' => $trackOrder,
+            'track_order' => $trackOrder,
+            'Track_order' => $trackOrder,
+            'estimated_arrival_text' => $estimatedArrivalText,
+            'estimated_arrival_minutes' => $estimatedMinutes,
+            'progress_percentage' => $progressPercentage,
             'order_invoice' => $orderInvoice,
             'Order_invoice' => $orderInvoice,
             'order_info' => $orderInfo,
@@ -645,8 +753,6 @@ class AdminOrderController extends Controller
                 'delievry' => $order->delivery_at_vendor ? 'vendor' : 'client',
                 'delivery' => $order->delivery_at_vendor ? 'vendor' : 'client',
             ],
-            'track_order' => $trackOrder,
-            'Track_order' => $trackOrder,
             'pickup_address' => $pickupLocation,
             'delivery_address' => $deliveryLocation,
             'delivery_info' => [
@@ -657,6 +763,22 @@ class AdminOrderController extends Controller
         ];
 
         return successResponse($response, 'Order details retrieved successfully');
+    }
+
+    /**
+     * Calculate distance between two coordinates using Haversine formula
+     */
+    private function calculateDistance(float $lat1, float $lon1, float $lat2, float $lon2): float
+    {
+        $earthRadius = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+             sin($dLon / 2) * sin($dLon / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadius * $c;
     }
 
     /**
