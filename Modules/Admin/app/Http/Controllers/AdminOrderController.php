@@ -9,6 +9,7 @@ use App\Exceptions\InvalidStatusTransitionException;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ErrorResponse;
 use App\Services\OrderStatusService;
+use App\Support\OrderStatusLogPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Admin\Http\Resources\OrderResource;
@@ -676,6 +677,29 @@ class AdminOrderController extends Controller
             'payment_breakdown' => $paymentBreakdown,
         ];
 
+        $statusLogs = $order->statusLogs()
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($log) use ($order, $lang) {
+                $at = $log->created_at?->copy()->timezone('Asia/Riyadh');
+                $title = OrderStatusLogPresenter::title($log->status, $order->payment_method, (bool) $order->delivery_at_vendor);
+                $subTitle = OrderStatusLogPresenter::localizeNote($log->notes);
+
+                return [
+                    'id' => $log->id,
+                    'status' => $log->status,
+                    'status_label' => $title,
+                    'title' => $title,
+                    'sub_title' => $subTitle,
+                    'notes' => $subTitle,
+                    'status_date' => $at?->format('Y-m-d'),
+                    'status_time' => $at?->format('H:i:s'),
+                    'date_formatted' => $at ? ($lang === 'ar' ? $at->locale('ar')->translatedFormat('j F') : $at->format('j M')) : '',
+                    'time_formatted' => $at ? ($lang === 'ar' ? $at->locale('ar')->translatedFormat('g:i A') : $at->format('g:i A')) : '',
+                    'created_at' => $log->created_at?->toIso8601String(),
+                ];
+            })->values()->toArray();
+
         $trackOrder = [
             'progress_percentage' => $progressPercentage,
             'estimated_arrival_minutes' => $estimatedMinutes,
@@ -698,6 +722,8 @@ class AdminOrderController extends Controller
             ],
             'pickup_location' => $pickupLocation,
             'delivery_location' => $deliveryLocation,
+            'status_logs' => $statusLogs,
+            'status_history' => $statusLogs,
         ];
 
         $response = [
@@ -717,6 +743,8 @@ class AdminOrderController extends Controller
             'order_details' => $acceptedItems->values()->toArray(),
             'rejected_details' => $rejectedItems->values()->toArray(),
             'progress' => $progressData,
+            'status_logs' => $statusLogs,
+            'status_history' => $statusLogs,
             'payment' => $paymentPayload,
             'pickup_methods' => [
                 'pick_up' => $order->pickup_at_vendor ? 'vendor' : 'client',
