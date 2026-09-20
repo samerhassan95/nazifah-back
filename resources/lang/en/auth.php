@@ -31,6 +31,8 @@ return [
     'account_banned' => 'Your account has been banned. Please contact support.',
     'account_not_found' => 'Account not found. Please register first.',
     'phone_already_registered' => 'Phone number is already registered. Please login.',
+    'new_phone_same_as_current' => 'This is already your current phone number.',
+    'new_phone_already_taken' => 'This phone number is already used by another account.',
 
     // Session & Rate Limiting
     'invalid_session' => 'Invalid or expired session',
@@ -64,9 +66,12 @@ return [
     'otp_sms_verify_account' => 'Your account verification code is: :otp. Valid for :minutes minutes.',
     'otp_sms_reset_password' => 'Your password reset code is: :otp. Valid for :minutes minutes.',
     'otp_sms_forgot_password' => 'Your password recovery code is: :otp. Valid for :minutes minutes.',
+    'otp_sms_change_phone' => 'Your phone number change code is: :otp. Valid for :minutes minutes.',
 
     // Additional User Actions
     'profile_updated' => 'Profile updated successfully',
+    'phone_change_otp_sent' => 'A verification code has been sent to the new phone number',
+    'phone_changed_successfully' => 'Phone number changed successfully',
     'account_deleted' => 'Account deleted successfully',
     'fingerprint_registered' => 'Fingerprint registered successfully',
     'fingerprint_removed' => 'Fingerprint removed successfully',

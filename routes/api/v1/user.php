@@ -169,6 +169,12 @@ Route::middleware(['auth:client', 'banned'])->group(function () {
 
         Route::post('/remove-fingerprint', [AuthController::class, 'removeFingerprint'])
             ->name('user.auth.remove-fingerprint');
+
+        // Change Phone Number (request OTP on the new number, then verify it)
+        Route::post('/change-phone/request', [AuthController::class, 'requestPhoneChange'])
+            ->name('user.auth.change-phone.request');
+        Route::post('/change-phone/verify', [AuthController::class, 'verifyPhoneChange'])
+            ->name('user.auth.change-phone.verify');
     });
 
     // ========================================================================

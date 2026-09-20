@@ -450,6 +450,142 @@ class AuthController extends Controller
     }
 
     /**
+     * Request to change the authenticated client's phone number: validates the
+     * new number isn't already taken, then sends an OTP to it. The number is
+     * only actually changed once verifyPhoneChange() confirms that OTP.
+     */
+    public function requestPhoneChange(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/'],
+        ], [
+            'phone.required' => __('auth.phone_required'),
+            'phone.regex' => __('auth.phone_invalid'),
+        ]);
+
+        if ($validator->fails()) {
+            return validationErrorResponse($validator->errors());
+        }
+
+        $user = $request->user();
+        $newPhone = normalizePhone($request->phone);
+
+        if ($newPhone === normalizePhone($user->phone)) {
+            return ErrorResponse::make(__('auth.new_phone_same_as_current'), null, 422);
+        }
+
+        if (Client::where('phone', $newPhone)->where('id', '!=', $user->id)->exists()) {
+            return ErrorResponse::make(__('auth.new_phone_already_taken'), null, 422);
+        }
+
+        try {
+            // Reuse an active, unverified session already tied to this client
+            // and target phone, instead of spawning a fresh one on every retry.
+            $session = AuthSession::where('phone', $newPhone)
+                ->where('client_id', $user->id)
+                ->where('is_verified', false)
+                ->where('expires_at', '>', now())
+                ->first();
+
+            if (! $session) {
+                $session = AuthSession::create([
+                    'session_key' => AuthSession::generateSessionKey(),
+                    'phone' => $newPhone,
+                    'client_id' => $user->id,
+                    'is_verified' => false,
+                    'expires_at' => now()->addHours(24),
+                ]);
+            }
+
+            if (! $session->canSendOtp()) {
+                $secondsRemaining = $session->getSecondsUntilReset();
+
+                return ErrorResponse::make(
+                    __('auth.rate_limit_exceeded'),
+                    [
+                        'retry_after' => $secondsRemaining,
+                        'message' => __('auth.rate_limit_message', ['seconds' => $secondsRemaining]),
+                    ],
+                    429
+                );
+            }
+
+            $otp = $session->generateOtp();
+
+            $otpSent = true;
+            if (config('deewan.otp_channel') === 'sms') {
+                $otpSent = $this->deewanSms->sendOtp($newPhone, $otp, 'change_phone', app()->getLocale());
+            }
+
+            return successResponse([
+                'send_otp' => $otpSent,
+                'session_key' => $session->session_key,
+                'phone' => $newPhone,
+                'remaining_attempts' => $session->getRemainingAttempts(),
+                'otp' => ! app()->environment('production') ? $otp : null,
+            ], $otpSent ? __('auth.phone_change_otp_sent') : __('auth.send_otp_failed'));
+        } catch (\Exception $e) {
+            if (str_contains($e->getMessage(), 'Rate limit exceeded')) {
+                return ErrorResponse::make(__('auth.rate_limit_exceeded'), null, 429);
+            }
+
+            return ErrorResponse::make(__('auth.send_otp_failed'), null, 500);
+        }
+    }
+
+    /**
+     * Confirm the OTP sent by requestPhoneChange() and apply the new phone
+     * number to the authenticated client.
+     */
+    public function verifyPhoneChange(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'session_key' => ['required', 'string', 'size:64'],
+            'otp_code' => ['required', 'string', 'size:5'],
+        ]);
+
+        if ($validator->fails()) {
+            return ErrorResponse::make(__('auth.validation_error'), $validator->errors(), 422);
+        }
+
+        $user = $request->user();
+
+        $session = AuthSession::where('session_key', $request->session_key)
+            ->where('client_id', $user->id)
+            ->first();
+
+        if (! $session) {
+            return ErrorResponse::make(__('auth.invalid_session'), null, 404);
+        }
+
+        if (! $session->isValid()) {
+            return ErrorResponse::make(__('auth.session_expired'), null, 401);
+        }
+
+        if (! $session->verifyOtp($request->otp_code)) {
+            return ErrorResponse::make(__('auth.invalid_otp'), null, 401);
+        }
+
+        // Re-check in case someone else registered this number while the OTP
+        // was in flight.
+        if (Client::where('phone', $session->phone)->where('id', '!=', $user->id)->exists()) {
+            return ErrorResponse::make(__('auth.new_phone_already_taken'), null, 422);
+        }
+
+        $user->update(['phone' => $session->phone]);
+        $session->delete();
+
+        return successResponse([
+            'user' => [
+                'id' => $user->id,
+                'phone' => $user->phone,
+                'full_name' => $user->full_name,
+                'email' => $user->email,
+            ],
+        ], __('auth.phone_changed_successfully'));
+    }
+
+    /**
      * Logout user
      */
     public function logout(Request $request): JsonResponse

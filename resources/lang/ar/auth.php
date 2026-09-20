@@ -31,6 +31,8 @@ return [
     'account_banned' => 'تم حظر حسابك. يرجى التواصل مع الدعم.',
     'account_not_found' => 'الحساب غير موجود. يرجى التسجيل أولاً.',
     'phone_already_registered' => 'رقم الهاتف مسجل بالفعل. يرجى تسجيل الدخول.',
+    'new_phone_same_as_current' => 'هذا هو رقم هاتفك الحالي بالفعل.',
+    'new_phone_already_taken' => 'رقم الهاتف هذا مستخدم بالفعل في حساب آخر.',
 
     // Session & Rate Limiting
     'invalid_session' => 'جلسة غير صالحة أو منتهية الصلاحية',
@@ -64,9 +66,12 @@ return [
     'otp_sms_verify_account' => 'رمز التحقق من الحساب: :otp. صالح لمدة :minutes دقائق.',
     'otp_sms_reset_password' => 'رمز إعادة تعيين كلمة المرور: :otp. صالح لمدة :minutes دقائق.',
     'otp_sms_forgot_password' => 'رمز استعادة كلمة المرور: :otp. صالح لمدة :minutes دقائق.',
+    'otp_sms_change_phone' => 'رمز تغيير رقم الهاتف: :otp. صالح لمدة :minutes دقائق.',
 
     // Additional User Actions
     'profile_updated' => 'تم تحديث الملف الشخصي بنجاح',
+    'phone_change_otp_sent' => 'تم إرسال رمز التحقق إلى رقم الهاتف الجديد',
+    'phone_changed_successfully' => 'تم تغيير رقم الهاتف بنجاح',
     'account_deleted' => 'تم حذف الحساب بنجاح',
     'fingerprint_registered' => 'تم تسجيل البصمة بنجاح',
     'fingerprint_removed' => 'تم إزالة البصمة بنجاح',
