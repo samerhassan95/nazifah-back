@@ -162,7 +162,7 @@ class UserNotificationService
         $payload = [
             'title' => NotificationLocale::pick($titleAr, $titleEn, $lang),
             'body' => NotificationLocale::pick($bodyAr, $bodyEn, $lang),
-            'sound' => $useNewOrderSound ? self::NEW_ORDER_SOUND : 'default',
+            'sound' => $useNewOrderSound ? self::NEW_ORDER_SOUND : 'notification.wav',
         ];
 
         if ($useNewOrderSound) {

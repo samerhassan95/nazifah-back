@@ -23,7 +23,7 @@ class FirebaseService
         $notificationPayload = $notification ?? [
             'title' => (string) ($data['title'] ?? 'Notification'),
             'body' => (string) ($data['body'] ?? ''),
-            'sound' => 'default',
+            'sound' => 'notification.wav',
         ];
 
         return $this->admin->sendToDevice(
@@ -43,7 +43,7 @@ class FirebaseService
         $notificationPayload = $notification ?? [
             'title' => (string) ($data['title'] ?? 'Notification'),
             'body' => (string) ($data['body'] ?? ''),
-            'sound' => 'default',
+            'sound' => 'notification.wav',
         ];
 
         $stringData = $this->stringifyData($data);
@@ -67,7 +67,7 @@ class FirebaseService
         $notificationPayload = $notification ?? [
             'title' => (string) ($data['title'] ?? 'Notification'),
             'body' => (string) ($data['body'] ?? ''),
-            'sound' => 'default',
+            'sound' => 'notification.wav',
         ];
 
         return $this->admin->sendToTopic($topic, $notificationPayload, $this->stringifyData($data));

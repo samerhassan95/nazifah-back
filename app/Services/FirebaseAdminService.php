@@ -81,31 +81,32 @@ class FirebaseAdminService
                 $message['data'] = $this->stringifyData($data);
             }
 
-            if (isset($notification['sound']) || isset($notification['badge']) || isset($notification['channel_id'])) {
-                $androidNotification = [
-                    'sound' => (string) ($notification['sound'] ?? 'default'),
+            $sound = (string) ($notification['sound'] ?? 'notification.wav');
+            if ($sound === 'default' || $sound === '') {
+                $sound = 'notification.wav';
+            }
+
+            $message['android'] = [
+                'priority' => 'HIGH',
+                'notification' => [
+                    'sound' => $sound,
                     'channel_id' => (string) ($notification['channel_id'] ?? 'default'),
-                ];
+                ],
+            ];
 
-                $message['android'] = [
-                    'priority' => 'HIGH',
-                    'notification' => $androidNotification,
-                ];
+            $aps = [
+                'sound' => $sound,
+            ];
+
+            if (isset($notification['badge'])) {
+                $aps['badge'] = (int) $notification['badge'];
             }
 
-            if (isset($notification['badge']) || isset($notification['sound'])) {
-                $message['apns'] = [
-                    'payload' => [
-                        'aps' => [
-                            'sound' => (string) ($notification['sound'] ?? 'default'),
-                        ],
-                    ],
-                ];
-
-                if (isset($notification['badge'])) {
-                    $message['apns']['payload']['aps']['badge'] = (int) $notification['badge'];
-                }
-            }
+            $message['apns'] = [
+                'payload' => [
+                    'aps' => $aps,
+                ],
+            ];
 
             $client = new Client;
             $response = $client->post(
@@ -192,6 +193,33 @@ class FirebaseAdminService
                 $message['data'] = $this->stringifyData($data);
             }
 
+            $sound = (string) ($notification['sound'] ?? 'notification.wav');
+            if ($sound === 'default' || $sound === '') {
+                $sound = 'notification.wav';
+            }
+
+            $message['android'] = [
+                'priority' => 'HIGH',
+                'notification' => [
+                    'sound' => $sound,
+                    'channel_id' => (string) ($notification['channel_id'] ?? 'default'),
+                ],
+            ];
+
+            $aps = [
+                'sound' => $sound,
+            ];
+
+            if (isset($notification['badge'])) {
+                $aps['badge'] = (int) $notification['badge'];
+            }
+
+            $message['apns'] = [
+                'payload' => [
+                    'aps' => $aps,
+                ],
+            ];
+
             $client = new Client;
             $response = $client->post(
                 "https://fcm.googleapis.com/v1/projects/{$this->projectId}/messages:send",
@@ -219,7 +247,7 @@ class FirebaseAdminService
         $notification = [
             'title' => $orderData['title'] ?? __('notification.new_order'),
             'body' => $orderData['body'] ?? '',
-            'sound' => 'default',
+            'sound' => 'notification.wav',
             'badge' => '1',
         ];
 
@@ -239,7 +267,7 @@ class FirebaseAdminService
         $notification = [
             'title' => $messageData['sender_name'] ?? __('notification.new_message'),
             'body' => $messageData['message'] ?? '',
-            'sound' => 'default',
+            'sound' => 'notification.wav',
             'badge' => '1',
         ];
 
