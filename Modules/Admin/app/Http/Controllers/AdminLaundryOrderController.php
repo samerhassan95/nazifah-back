@@ -68,9 +68,19 @@ class AdminLaundryOrderController extends Controller
             'Deleted_orders' => $deletedOrders,
         ];
 
+        $isAr = app()->getLocale() === 'ar';
+        $orderItems = collect($orders->items());
+        $orderItems->each->loadMissing(['pickupAddress', 'deliveryAddress']);
+
         // Format orders with the actual lifecycle status instead of coarse summary buckets.
-        $ordersData = collect($orders->items())->map(function ($order) {
+        $ordersData = $orderItems->map(function ($order) use ($isAr) {
             $normalizedStatus = $order->status ?? 'pending';
+
+            // Two independent handoff modes shown side by side on the order card:
+            // how the laundry receives the items, and how the client gets them back.
+            $pickupSelf = (bool) $order->pickup_at_vendor;
+            $deliverySelf = (bool) $order->delivery_at_vendor;
+            $addressModel = $order->deliveryAddress ?? $order->pickupAddress;
             $statusLabel = OrderStatus::fromString($normalizedStatus)?->localizedLabel(
                 $order->payment_method,
                 $normalizedStatus === OrderStatus::COMPLETED->value && ! $order->client_delivery_handoff_at,
@@ -91,6 +101,24 @@ class AdminLaundryOrderController extends Controller
                 'Order_status' => $normalizedStatus,
                 'order_status' => $normalizedStatus,
                 'status_label' => $statusLabel,
+                'Distance'          => (float) ($order->distance ?? 0),
+                'Pickup_distance'   => (float) ($order->pickup_distance ?? 0),
+                'Delivery_distance' => (float) ($order->delivery_distance ?? 0),
+                'Pickup_at_vendor'   => $pickupSelf,
+                'Delivery_at_vendor' => $deliverySelf,
+                'Pickup_method' => [
+                    'type'  => $pickupSelf ? 'self' : 'driver',
+                    'label' => $pickupSelf
+                        ? ($isAr ? 'توصيل ذاتي إلى المغسلة' : 'Self drop-off at the laundry')
+                        : ($isAr ? 'استلام من المنزل' : 'Pickup from home'),
+                ],
+                'Delivery_method' => [
+                    'type'  => $deliverySelf ? 'self' : 'driver',
+                    'label' => $deliverySelf
+                        ? ($isAr ? 'استلام ذاتي من المغسلة' : 'Self pickup from the laundry')
+                        : ($isAr ? 'توصيل إلى المنزل' : 'Delivery to home'),
+                ],
+                'Address' => $addressModel?->street_name ?? $addressModel?->address_text ?? null,
             ];
         });
 
