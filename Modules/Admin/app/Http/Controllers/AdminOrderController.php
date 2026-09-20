@@ -493,8 +493,16 @@ class AdminOrderController extends Controller
                 $joinedServices = implode('، ', $serviceNames);
                 $quantity = (int) $primary->quantity;
 
+                $pieceImage = $primary->piece?->iconRelation?->full_path
+                    ?: ($primary->piece?->iconRelation?->path ? asset($primary->piece->iconRelation->path) : '')
+                    ?: ($primary->image ?? '');
+
                 $itemData = [
-                    'icon' => $primary->piece?->icon->path ?? '',
+                    'icon' => $pieceImage,
+                    'image' => $pieceImage,
+                    'piece_image' => $pieceImage,
+                    'Piece_logo' => $pieceImage,
+                    'piece_logo' => $pieceImage,
                     'Piece_count' => $quantity,
                     'Piece_name' => $pieceName,
                     'Total_without_tax' => round($totalPrice, 2),
@@ -510,7 +518,7 @@ class AdminOrderController extends Controller
                             'Additional_services' => $additionalServices,
                         ]],
                         'Comment' => $primary->notes ?? '',
-                        'Image' => $primary->image ?? '',
+                        'Image' => $primary->image ?: $pieceImage,
                     ],
                     'name_operation' => $joinedServices,
                 ];
@@ -563,9 +571,14 @@ class AdminOrderController extends Controller
 
         $orderInvoice = [
             'pieces' => $acceptedItems->map(function ($item) {
+                $img = $item['piece_image'] ?? $item['Piece_logo'] ?? $item['image'] ?? $item['icon'] ?? $item['Item_details']['Image'] ?? '';
                 return [
                     'piece_count' => $item['Piece_count'],
                     'piece_name' => $item['Piece_name'],
+                    'piece_image' => $img,
+                    'piece_logo' => $img,
+                    'image' => $img,
+                    'icon' => $img,
                     'service' => $item['name_operation'] ?: ($item['Services'][0]['service_name'] ?? ''),
                     'additional_services' => $item['Item_details']['Services'][0]['Additional_services'] ?? [],
                     'price' => $item['Item_details']['Price'],
