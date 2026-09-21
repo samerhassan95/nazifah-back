@@ -4,9 +4,14 @@ namespace Modules\Admin\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Services\UploadFilesService;
+use App\Support\CatalogActivePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Admin\Models\Icon;
+use Modules\Branch\Models\Branch;
+use Modules\Order\Models\Order;
 use Modules\Service\Models\Service;
+use Modules\Service\Support\ServiceVendorOffering;
 
 class AdminLaundryServiceController extends Controller
 {
@@ -20,15 +25,26 @@ class AdminLaundryServiceController extends Controller
     /**
      * Get services for a laundry
      * GET /laundries/services
+     *
+     * - ?vendor_id=X            → the laundry's services (per-laundry name/description/icon/active flag)
+     * - ?vendor_id=X&scope=available → catalog services the laundry does not have yet
+     *                                  (services from Categories & Services plus any created from the laundry screens)
+     * - ?branch_id=X            → services linked to that branch
+     * - no filters              → the full services catalog
      */
     public function index(Request $request): JsonResponse
     {
         $vendorId = $request->input('vendor_id');
         $branchId = $request->input('branch_id');
+        $scope = $request->input('scope');
 
         $query = Service::with(['category']);
 
-        if ($branchId) {
+        if ($scope === 'available' && $vendorId) {
+            $query->where('services.is_active', true)
+                ->whereDoesntHave('vendors', fn ($v) => $v->where('vendors.id', $vendorId))
+                ->orderBy('services.id');
+        } elseif ($branchId) {
             $query->whereHas('branches', fn ($q) => $q->where('branches.id', $branchId));
         } elseif ($vendorId) {
             $query->where(function ($q) use ($vendorId) {
@@ -40,8 +56,13 @@ class AdminLaundryServiceController extends Controller
 
         $services = $query->paginate($request->input('per_page', 15));
 
-        $servicesData = $services->getCollection()->map(function ($service) {
-            $locale = app()->getLocale();
+        $locale = app()->getLocale();
+        $vendorBranchIds = $vendorId ? Branch::where('vendor_id', $vendorId)->pluck('id')->all() : [];
+
+        $servicesData = $services->getCollection()->map(function ($service) use ($vendorId, $locale, $vendorBranchIds, $scope) {
+            if ($vendorId) {
+                return $this->formatVendorService($service, (int) $vendorId, $locale, $vendorBranchIds, $scope === 'available');
+            }
 
             return [
                 'id' => $service->id,
@@ -98,10 +119,14 @@ class AdminLaundryServiceController extends Controller
     /**
      * Create service
      * POST /laundries/services
+     *
+     * The service is always created in the shared catalog (so it also shows up under
+     * Categories & Services). When vendor_id is sent it is added to that laundry as well.
      */
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'vendor_id' => 'nullable|exists:vendors,id',
             'icon_id' => 'nullable|exists:icons,id',
             'service_name' => 'required|array',
             'service_name.ar' => 'required|string|max:255',
@@ -121,12 +146,75 @@ class AdminLaundryServiceController extends Controller
         ];
 
         $service = Service::create($serviceData);
+
+        if (! empty($validated['vendor_id'])) {
+            ServiceVendorOffering::upsert((int) $validated['vendor_id'], $service, ['is_active' => true]);
+        }
+
         $locale = app()->getLocale();
 
         return successResponse(
             $this->formatService($service, $locale),
             __('service.created_successfully'),
             201
+        );
+    }
+
+    /**
+     * Add an existing catalog service to a laundry
+     * POST /laundries/services/attach
+     */
+    public function attachToVendor(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'vendor_id' => 'required|exists:vendors,id',
+            'service_id' => 'required|exists:services,id',
+        ]);
+
+        $vendorId = (int) $validated['vendor_id'];
+        $service = Service::with('category')->find($validated['service_id']);
+
+        if (! $service->is_active) {
+            return errorResponse(__('service.not_found'), null, 422);
+        }
+
+        $alreadyAdded = ServiceVendorOffering::find($vendorId, $service->id) !== null;
+
+        if (! $alreadyAdded) {
+            ServiceVendorOffering::upsert($vendorId, $service, ['is_active' => true]);
+        }
+
+        $branchIds = Branch::where('vendor_id', $vendorId)->pluck('id')->all();
+
+        return successResponse(
+            $this->formatVendorService($service, $vendorId, app()->getLocale(), $branchIds),
+            __('service.created_successfully'),
+            $alreadyAdded ? 200 : 201
+        );
+    }
+
+    /**
+     * Turn a service on/off for one laundry
+     * POST /laundries/services/:id/toggle-status  (body: vendor_id)
+     */
+    public function toggleForVendor(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'vendor_id' => 'required|exists:vendors,id',
+        ]);
+
+        $vendorId = (int) $validated['vendor_id'];
+        $service = Service::with('category')->find($id);
+
+        if (! $service || ServiceVendorOffering::toggleActive($vendorId, $id) === null) {
+            return notFoundResponse(__('service.not_found'));
+        }
+
+        $branchIds = Branch::where('vendor_id', $vendorId)->pluck('id')->all();
+
+        return successResponse(
+            $this->formatVendorService($service, $vendorId, app()->getLocale(), $branchIds),
+            __('service.updated_successfully')
         );
     }
 
@@ -196,6 +284,35 @@ class AdminLaundryServiceController extends Controller
         $service->delete();
 
         return successResponse(null, __('service.deleted_successfully'));
+    }
+
+    /**
+     * A service as one laundry sees it: the laundry's own name/description/icon when it
+     * overrides them, otherwise the catalog values, plus its active flags and rating.
+     */
+    private function formatVendorService(Service $service, int $vendorId, string $locale, array $branchIds, bool $availableOnly = false): array
+    {
+        $iconId = ServiceVendorOffering::iconIdForVendor($vendorId, $service);
+        $icon = $iconId ? Icon::find($iconId) : null;
+        $iconPath = $icon ? ($icon->full_path ?? $icon->path) : ($service->iconRelation?->full_path ?? $service->iconRelation?->path);
+
+        $rating = empty($branchIds) ? 0 : (Order::whereHas('items.service', fn ($q) => $q->where('services.id', $service->id))
+            ->whereIn('branch_id', $branchIds)
+            ->whereNotNull('rating')
+            ->avg('rating') ?? 0);
+
+        return array_merge([
+            'id' => $service->id,
+            'category_id' => $service->category_id,
+            'icon' => $this->uploadFilesService->getFullUrl($iconPath),
+            'Service_name' => ServiceVendorOffering::displayNameForVendor($service, $vendorId, $locale),
+            'Service_description' => ServiceVendorOffering::descriptionForVendor($service, $vendorId, $locale),
+            'Category' => $service->category ? $service->category->getTranslation('name', $locale) : null,
+            'rating' => round((float) $rating, 2),
+            'vendor_id' => $vendorId,
+            'in_vendor_catalog' => ServiceVendorOffering::find($vendorId, $service->id) !== null,
+            'source' => $availableOnly ? 'available_for_vendor' : 'vendor_catalog',
+        ], CatalogActivePresenter::service($service, null, null, $vendorId));
     }
 
     /**

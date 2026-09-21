@@ -19,6 +19,7 @@ class ServiceResource extends JsonResource
             'id' => $this->id,
             'category_id' => $this->category_id,
             'service_name' => $isDetailView ? ['ar' => $this->getTranslation('service_name', 'ar'), 'en' => $this->getTranslation('service_name', 'en')] : $this->getTranslation('service_name', $locale),
+            'description' => $isDetailView ? ['ar' => $this->getTranslation('description', 'ar'), 'en' => $this->getTranslation('description', 'en')] : ($this->getTranslation('description', $locale) ?: null),
             'price' => (float) $this->price,
             'icon_id' => $this->icon_id,
             'icon' => $this->icon,

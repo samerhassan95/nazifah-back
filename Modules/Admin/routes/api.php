@@ -442,6 +442,8 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
         Route::prefix('services')->group(function () {
             Route::get('/', [AdminLaundryServiceController::class, 'index']);
             Route::post('/', [AdminLaundryServiceController::class, 'store']);
+            Route::post('attach', [AdminLaundryServiceController::class, 'attachToVendor']);
+            Route::post('{id}/toggle-status', [AdminLaundryServiceController::class, 'toggleForVendor']);
             Route::get('{id}', [AdminLaundryServiceController::class, 'show']);
             Route::put('{id}', [AdminLaundryServiceController::class, 'update']);
             Route::delete('{id}', [AdminLaundryServiceController::class, 'destroy']);
