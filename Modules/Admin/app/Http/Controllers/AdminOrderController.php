@@ -556,12 +556,14 @@ class AdminOrderController extends Controller
         $pickupLocation = $order->pickupAddress ? [
             'lat' => $order->pickupAddress->latitude !== null ? (float) $order->pickupAddress->latitude : null,
             'lang' => $order->pickupAddress->longitude !== null ? (float) $order->pickupAddress->longitude : null,
+            'lng' => $order->pickupAddress->longitude !== null ? (float) $order->pickupAddress->longitude : null,
             'address' => $order->pickupAddress->address_text ?? $order->pickupAddress->street_name ?? null,
         ] : null;
 
         $deliveryLocation = $order->deliveryAddress ? [
             'lat' => $order->deliveryAddress->latitude !== null ? (float) $order->deliveryAddress->latitude : null,
             'lang' => $order->deliveryAddress->longitude !== null ? (float) $order->deliveryAddress->longitude : null,
+            'lng' => $order->deliveryAddress->longitude !== null ? (float) $order->deliveryAddress->longitude : null,
             'address' => $order->deliveryAddress->address_text ?? $order->deliveryAddress->street_name ?? null,
         ] : null;
 
@@ -675,9 +677,47 @@ class AdminOrderController extends Controller
         ];
         $progressPercentage = $statusProgressMap[$actualStatus] ?? 50;
 
+        // Which leg the driver is on decides where the map and the ETA should point:
+        // pickup leg -> pickup address, drop-off leg -> the laundry branch, delivery leg -> delivery address.
+        $trackingPhase = match (true) {
+            in_array($actualStatus, ['driver_pickup_assigned', 'driver_pickup_accepted', 'on_way_to_pickup'], true) => 'pickup',
+            $actualStatus === 'picked_up' => 'to_branch',
+            in_array($actualStatus, ['driver_delivery_assigned', 'driver_delivery_accepted', 'on_way_to_delivery', 'waiting_client_receipt'], true) => 'delivery',
+            default => null,
+        };
+
+        $trackingTarget = null;
+        if ($trackingPhase === 'pickup' || $trackingPhase === 'delivery') {
+            $targetAddress = $trackingPhase === 'pickup'
+                ? ($order->pickupAddress ?? $clientAddressObj)
+                : ($order->deliveryAddress ?? $clientAddressObj);
+            if ($targetAddress && $targetAddress->latitude !== null && $targetAddress->longitude !== null) {
+                $trackingTarget = [
+                    'type' => $trackingPhase === 'pickup' ? 'pickup_address' : 'delivery_address',
+                    'lat' => (float) $targetAddress->latitude,
+                    'lng' => (float) $targetAddress->longitude,
+                    'address' => $targetAddress->street_name ?? $targetAddress->address_text ?? null,
+                ];
+            }
+        } elseif ($trackingPhase === 'to_branch' && $order->branch && $order->branch->latitude !== null && $order->branch->longitude !== null) {
+            $trackingTarget = [
+                'type' => 'branch',
+                'lat' => (float) $order->branch->latitude,
+                'lng' => (float) $order->branch->longitude,
+                'address' => $order->branch->name ?? null,
+            ];
+        }
+
+        // Outside an active driver leg keep the previous behaviour (measure toward the client).
+        $etaTarget = $trackingTarget ?? (($clientAddressObj && $clientAddressObj->latitude && $clientAddressObj->longitude)
+            ? ['lat' => (float) $clientAddressObj->latitude, 'lng' => (float) $clientAddressObj->longitude]
+            : null);
+
         $estimatedMinutes = 15;
-        if ($activeDriver && $activeDriver->latitude && $activeDriver->longitude && $clientAddressObj && $clientAddressObj->latitude && $clientAddressObj->longitude) {
-            $distKm = $this->calculateDistance((float) $activeDriver->latitude, (float) $activeDriver->longitude, (float) $clientAddressObj->latitude, (float) $clientAddressObj->longitude);
+        $distanceRemainingKm = null;
+        if ($activeDriver && $activeDriver->latitude && $activeDriver->longitude && $etaTarget) {
+            $distKm = $this->calculateDistance((float) $activeDriver->latitude, (float) $activeDriver->longitude, $etaTarget['lat'], $etaTarget['lng']);
+            $distanceRemainingKm = round($distKm, 2);
             $estimatedMinutes = max(5, min(60, (int) round($distKm * 2 + 5)));
         }
         $estimatedArrivalText = $lang === 'ar' ? "سيصل خلال {$estimatedMinutes} دقيقة" : "Will arrive in {$estimatedMinutes} minutes";
@@ -756,6 +796,14 @@ class AdminOrderController extends Controller
             'progress_percentage' => $progressPercentage,
             'estimated_arrival_minutes' => $estimatedMinutes,
             'estimated_arrival_text' => $estimatedArrivalText,
+            'phase' => $trackingPhase,
+            'is_live' => $trackingPhase !== null && $driverData !== null && $driverData['lat'] !== null && $driverData['lng'] !== null,
+            'destination' => $trackingTarget,
+            'distance_remaining_km' => $distanceRemainingKm,
+            'route' => ($driverData && $driverData['lat'] !== null && $driverData['lng'] !== null && $trackingTarget) ? [
+                'origin' => ['lat' => $driverData['lat'], 'lng' => $driverData['lng']],
+                'destination' => ['lat' => $trackingTarget['lat'], 'lng' => $trackingTarget['lng']],
+            ] : null,
             'driver' => $driverData,
             'client' => $clientData,
             'driver_location' => $driverData ? [
