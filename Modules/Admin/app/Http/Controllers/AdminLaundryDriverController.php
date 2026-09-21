@@ -7,7 +7,9 @@ use App\Http\Responses\ErrorResponse;
 use App\Services\UploadFilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Modules\Admin\Services\DriverService;
+use Modules\Branch\Models\Branch;
 use Modules\Driver\Models\Driver;
 use Modules\Vendor\Models\Vendor;
 
@@ -56,7 +58,7 @@ class AdminLaundryDriverController extends Controller
                 'Phone' => $driver->phone,
                 'Email' => $driver->email,
                 'National_id' => $driver->id_number,
-
+                'ID_image' => $this->uploadFilesService->getFullUrl($driver->image_document),
                 'Driver_status' => $driver->is_available ? 'active' : 'in_active',
                 'branch_id' => $driver->branch_id,
                 'Branch' => $driver->branch ? ($driver->branch->getTranslation('name', $locale) ?? $driver->branch->name) : 'N/A',
@@ -88,6 +90,7 @@ class AdminLaundryDriverController extends Controller
 
             'Email' => $driver->email,
             'National_id' => $driver->id_number,
+            'ID_image' => $this->uploadFilesService->getFullUrl($driver->image_document),
             'Driver_status' => $driver->is_available ? 'active' : 'in_active',
             'branch_id' => $driver->branch_id,
             'Branch' => $driver->branch ? ($driver->branch->getTranslation('name', 'ar') ?? $driver->branch->name) : 'N/A',
@@ -103,25 +106,30 @@ class AdminLaundryDriverController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            // The driver belongs to the laundry; a branch is optional and can be assigned later.
+            'vendor_id' => 'required_without:branch_id|nullable|exists:vendors,id',
+            'branch_id' => 'nullable|exists:branches,id',
             'Driver_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'ID_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'Driver_name' => 'required|string',
             'Phone' => 'required|string|unique:drivers,phone',
-
-            'Email' => 'required|email|unique:drivers,email',
             'National_id' => 'required|string|unique:drivers,id_number',
-            'branch_id' => 'required|exists:branches,id',
         ]);
 
-        $branch = \Modules\Branch\Models\Branch::find($validated['branch_id']);
+        $branch = ! empty($validated['branch_id']) ? Branch::find($validated['branch_id']) : null;
+
+        if ($branch && ! empty($validated['vendor_id']) && (int) $branch->vendor_id !== (int) $validated['vendor_id']) {
+            throw ValidationException::withMessages([
+                'branch_id' => ['The selected branch does not belong to this laundry.'],
+            ]);
+        }
 
         $driverData = [
             'full_name' => ['ar' => $validated['Driver_name'], 'en' => $validated['Driver_name']],
             'phone' => $validated['Phone'],
-
-            'email' => $validated['Email'],
             'id_number' => $validated['National_id'],
-            'branch_id' => $validated['branch_id'],
-            'vendor_id' => $branch?->vendor_id,
+            'branch_id' => $branch?->id,
+            'vendor_id' => $branch?->vendor_id ?? $validated['vendor_id'],
             'is_available' => true,
         ];
 
@@ -130,6 +138,14 @@ class AdminLaundryDriverController extends Controller
             $driverData['image'] = $this->uploadFilesService->uploadImage(
                 $request->file('Driver_image'),
                 'drivers/images'
+            );
+        }
+
+        // National ID / identity document photo
+        if ($request->hasFile('ID_image')) {
+            $driverData['image_document'] = $this->uploadFilesService->uploadImage(
+                $request->file('ID_image'),
+                'drivers/documents'
             );
         }
 
@@ -152,10 +168,11 @@ class AdminLaundryDriverController extends Controller
 
         $validated = $request->validate([
             'Driver_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'ID_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'Driver_name' => 'sometimes|string',
             'Phone' => 'sometimes|string|unique:drivers,phone,'.$id,
 
-            'Email' => 'sometimes|email|unique:drivers,email,'.$id,
+            'Email' => 'sometimes|nullable|email|unique:drivers,email,'.$id,
             'National_id' => 'sometimes|string|unique:drivers,id_number,'.$id,
             'branch_id' => 'nullable|exists:branches,id',
         ]);
@@ -193,6 +210,14 @@ class AdminLaundryDriverController extends Controller
             );
         }
 
+        if ($request->hasFile('ID_image')) {
+            $driverData['image_document'] = $this->uploadFilesService->uploadImage(
+                $request->file('ID_image'),
+                'drivers/documents',
+                $driver->getRawOriginal('image_document')
+            );
+        }
+
         $driver = $this->driverService->update($id, $driverData);
 
         return successResponse($this->formatDriver($driver), 'Driver updated successfully');
@@ -226,6 +251,7 @@ class AdminLaundryDriverController extends Controller
 
             'Email' => $driver->email,
             'National_id' => $driver->id_number,
+            'ID_image' => $this->uploadFilesService->getFullUrl($driver->image_document),
             'Driver_status' => $driver->is_available ? 'active' : 'in_active',
             'branch_id' => $driver->branch_id,
             'Branch' => $driver->branch ? ($driver->branch->getTranslation('name', 'ar') ?? $driver->branch->name) : 'N/A',
