@@ -195,10 +195,23 @@ class AdminLaundryDriverController extends Controller
             $driverData['id_number'] = $validated['National_id'];
         }
 
-        if (isset($validated['branch_id'])) {
-            $driverData['branch_id'] = $validated['branch_id'];
-            $branch = \Modules\Branch\Models\Branch::find($validated['branch_id']);
-            $driverData['vendor_id'] = $branch?->vendor_id;
+        if (array_key_exists('branch_id', $validated)) {
+            if ($validated['branch_id'] === null) {
+                // The UI unassigns a driver by sending an empty branch_id (turned into null).
+                // Drop the branch but keep the driver in the laundry (vendor_id is NOT NULL).
+                $driverData['branch_id'] = null;
+            } else {
+                $branch = Branch::find($validated['branch_id']);
+
+                if ($driver->vendor_id && $branch && (int) $branch->vendor_id !== (int) $driver->vendor_id) {
+                    throw ValidationException::withMessages([
+                        'branch_id' => ['The selected branch does not belong to this driver\'s laundry.'],
+                    ]);
+                }
+
+                $driverData['branch_id'] = $branch?->id;
+                $driverData['vendor_id'] = $branch?->vendor_id ?? $driver->vendor_id;
+            }
         }
 
         // Handle image upload

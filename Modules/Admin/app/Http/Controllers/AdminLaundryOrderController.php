@@ -125,6 +125,15 @@ class AdminLaundryOrderController extends Controller
         return successResponse([
             'States' => $states,
             'Orders' => $ordersData,
+            // successResponse() moves this into the standard top-level `meta` block.
+            'pagination' => [
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'per_page' => $orders->perPage(),
+                'from' => $orders->firstItem(),
+                'to' => $orders->lastItem(),
+                'total' => $orders->total(),
+            ],
         ], 'Orders retrieved successfully');
     }
 
