@@ -86,29 +86,46 @@ class AdminLaundryWalletController extends Controller
             ];
         });
 
-        // 3. Get temporary withdrawal requests (Pending)
-        // Fix: Added ->get() before ->map()
-        $temporaryWithdrawalRequests = DB::table('vendor_withdrawal_requests')
+        // 3. Withdrawal requests for this vendor, joined to the bank account used.
+        // Field names match exactly what WalletTab.tsx reads (request.bank_name,
+        // request.iban, request.amount, request.created_at) - the previous shape
+        // (Iban/Amount/Date, no bank_name at all) never matched, it just went
+        // unnoticed because this table has had zero rows in it.
+        $withdrawalRequestsQuery = DB::table('vendor_withdrawal_requests')
             ->where('vendor_withdrawal_requests.vendor_id', $vendorId)
-            ->where('vendor_withdrawal_requests.status', 'pending')
             ->join('vendor_bank_accounts', 'vendor_withdrawal_requests.bank_account_id', '=', 'vendor_bank_accounts.id')
             ->select(
-                'vendor_withdrawal_requests.*',
+                'vendor_withdrawal_requests.id',
+                'vendor_withdrawal_requests.status',
+                'vendor_withdrawal_requests.amount',
+                'vendor_withdrawal_requests.created_at',
                 'vendor_bank_accounts.bank_name',
                 'vendor_bank_accounts.iban_number',
                 'vendor_bank_accounts.account_holder'
             )
-            ->orderBy('vendor_withdrawal_requests.created_at', 'desc')
-            ->get() // <--- Crucial fix here
-            ->map(function ($request) use ($vendor, $lang) {
-                return [
-                    'Logo' => $vendor->logo ? (str_starts_with($vendor->logo, 'http') ? $vendor->logo : config('app.url').$vendor->logo) : null,
-                    'laundry_name' => $vendor->getTranslation('name', $lang),
-                    'Iban' => $request->iban_number,
-                    'Amount' => (float) $request->amount,
-                    'Date' => $request->created_at ? date('d M Y', strtotime($request->created_at)) : null,
-                ];
-            });
+            ->orderBy('vendor_withdrawal_requests.created_at', 'desc');
+
+        $mapWithdrawalRequest = fn ($request) => [
+            'id' => $request->id,
+            'bank_name' => $request->bank_name,
+            'iban' => $request->iban_number,
+            'account_holder' => $request->account_holder,
+            'amount' => (float) $request->amount,
+            'created_at' => $request->created_at,
+            'status' => $request->status,
+        ];
+
+        // "طلبات السحب المعلّقة" - pending only, for the actionable accept/reject list.
+        $temporaryWithdrawalRequests = (clone $withdrawalRequestsQuery)
+            ->where('vendor_withdrawal_requests.status', 'pending')
+            ->get()
+            ->map($mapWithdrawalRequest);
+
+        // "سجل طلبات السحب" - full history regardless of status.
+        $withdrawalRequestsLog = $withdrawalRequestsQuery
+            ->limit(50)
+            ->get()
+            ->map($mapWithdrawalRequest);
 
         return successResponse([
             'States' => $states,
@@ -117,6 +134,7 @@ class AdminLaundryWalletController extends Controller
             // a table as `data`, so an object (current_page, data, ...) renders as empty.
             'withdrawal_orders_log' => $withdrawalOrdersLogPaginator->items(),
             'Temporary_withdrawal_requests' => $temporaryWithdrawalRequests,
+            'Withdrawal_requests_log' => $withdrawalRequestsLog,
         ], 'Wallet details retrieved successfully');
     }
 
