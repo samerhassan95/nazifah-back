@@ -112,7 +112,10 @@ class AdminLaundryWalletController extends Controller
 
         return successResponse([
             'States' => $states,
-            'withdrawal_orders_log' => $withdrawalOrdersLogPaginator,
+            // Plain array, not the paginator object - the frontend does
+            // `walletData.withdrawal_orders_log || []` and passes it straight into
+            // a table as `data`, so an object (current_page, data, ...) renders as empty.
+            'withdrawal_orders_log' => $withdrawalOrdersLogPaginator->items(),
             'Temporary_withdrawal_requests' => $temporaryWithdrawalRequests,
         ], 'Wallet details retrieved successfully');
     }
