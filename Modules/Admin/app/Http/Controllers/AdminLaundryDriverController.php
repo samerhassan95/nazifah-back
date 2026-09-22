@@ -76,24 +76,31 @@ class AdminLaundryDriverController extends Controller
      */
     public function show(Request $request, int $id): JsonResponse
     {
-        $driver = $this->driverService->find($id);
+        $driver = Driver::with('branch')->find($id);
 
         if (! $driver) {
             return ErrorResponse::make('Driver not found', null, 404);
         }
 
         $driverData = [
-            'id' => $driver->id,
-            'Driver_image' => $driver->image,
-            'Driver_name' => $driver->getTranslation('full_name', 'ar') ?? $driver->full_name,
-            'Phone' => $driver->phone,
-
-            'Email' => $driver->email,
-            'National_id' => $driver->id_number,
-            'ID_image' => $this->uploadFilesService->getFullUrl($driver->image_document),
+            'id'            => $driver->id,
+            'Driver_image'  => $this->uploadFilesService->getFullUrl($driver->image),
+            'Driver_name'   => [
+                'ar' => $driver->getTranslation('full_name', 'ar') ?? $driver->full_name,
+                'en' => $driver->getTranslation('full_name', 'en') ?? $driver->full_name,
+            ],
+            'Phone'         => $driver->phone,
+            'Email'         => $driver->email,
+            'National_id'   => $driver->id_number,
+            'ID_image'      => $this->uploadFilesService->getFullUrl($driver->image_document),
             'Driver_status' => $driver->is_available ? 'active' : 'in_active',
-            'branch_id' => $driver->branch_id,
-            'Branch' => $driver->branch ? ($driver->branch->getTranslation('name', 'ar') ?? $driver->branch->name) : 'N/A',
+            'vendor_id'     => $driver->vendor_id,
+            'branch_id'     => $driver->branch_id,
+            'Branch'        => $driver->branch ? [
+                'id' => $driver->branch->id,
+                'ar' => $driver->branch->getTranslation('name', 'ar') ?? $driver->branch->name,
+                'en' => $driver->branch->getTranslation('name', 'en') ?? $driver->branch->name,
+            ] : null,
         ];
 
         return successResponse($driverData, 'Driver retrieved successfully');
