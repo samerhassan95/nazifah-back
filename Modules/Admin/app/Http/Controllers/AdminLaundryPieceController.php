@@ -234,7 +234,7 @@ class AdminLaundryPieceController extends Controller
 
         $pieceData = [
             'vendor_id' => $validated['vendor_id'],
-            'name' => ['ar' => $validated['piece_name'], 'en' => $validated['piece_name']],
+            'name' => $validated['piece_name'],
             'icon_id' => $validated['icon_id'] ?? null,
             'is_active' => true,
         ];
@@ -313,7 +313,7 @@ class AdminLaundryPieceController extends Controller
         $pieceData = [];
 
         if (isset($validated['piece_name'])) {
-            $pieceData['name'] = ['ar' => $validated['piece_name'], 'en' => $validated['piece_name']];
+            $pieceData['name'] = $validated['piece_name'];
         }
 
         if (isset($validated['icon_id'])) {
