@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Modules\Order\Models\Order;
+use Modules\Payment\Models\PaymentTransaction;
 use Modules\Vendor\Models\Vendor;
 
 class AdminLaundryWalletController extends Controller
@@ -62,20 +63,26 @@ class AdminLaundryWalletController extends Controller
             'Total_withdrawal' => (float) $totalWithdrawal,
         ];
 
-        // 2. Get withdrawal orders log (Paginated)
-        // Fix: Use paginate() first, then map the items inside the lengthAwarePaginator
-        $withdrawalOrdersLogPaginator = DB::table('vendor_withdrawal_requests')
-            ->where('vendor_id', $vendorId)
+        // 2. Financial transactions (per-order payments) for this laundry - the "المعاملات المالية"
+        // table. Despite the key name (kept for frontend compatibility) this is not withdrawal
+        // history: it's every payment transaction on an order handled by one of this vendor's
+        // branches, which is what the table's columns (branch, order number, payment method) need.
+        $withdrawalOrdersLogPaginator = PaymentTransaction::with(['order.branch'])
+            ->whereHas('order', fn ($q) => $q->whereIn('branch_id', $branchIds))
             ->orderBy('created_at', 'desc')
             ->paginate($request->input('per_page', 15));
 
-        // Transform the paginated items
-        $withdrawalOrdersLogPaginator->getCollection()->transform(function ($request) use ($vendor) {
+        $withdrawalOrdersLogPaginator->getCollection()->transform(function ($transaction) use ($lang) {
+            $order = $transaction->order;
+            $processedAt = $transaction->paid_at ?? $transaction->created_at;
+
             return [
-                'Order_logo' => $vendor->logo ? (str_starts_with($vendor->logo, 'http') ? $vendor->logo : config('app.url').$vendor->logo) : null,
-                'Amount' => (float) $request->amount,
-                'Date' => $request->created_at ? date('d M Y', strtotime($request->created_at)) : null,
-                'Status' => $this->mapWithdrawalStatus($request->status),
+                'process_number' => $transaction->transaction_id,
+                'client_name' => $order?->branch ? $order->branch->getTranslation('name', $lang) : null,
+                'request_number' => $order?->order_number,
+                'process_date' => $processedAt ? $processedAt->format('Y-m-d') : null,
+                'total_price' => (float) $transaction->amount,
+                'payment_image' => $transaction->payment_method,
             ];
         });
 
@@ -192,18 +199,4 @@ class AdminLaundryWalletController extends Controller
         return (string) $amount;
     }
 
-    /**
-     * Map withdrawal status
-     */
-    private function mapWithdrawalStatus($status): string
-    {
-        $statusMap = [
-            'pending' => 'pending',
-            'approved' => 'completed',
-            'completed' => 'completed',
-            'rejected' => 'rejected',
-        ];
-
-        return $statusMap[$status] ?? $status;
-    }
 }
