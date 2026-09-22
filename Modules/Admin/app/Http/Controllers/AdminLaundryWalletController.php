@@ -83,6 +83,9 @@ class AdminLaundryWalletController extends Controller
                 'process_date' => $processedAt ? $processedAt->format('Y-m-d') : null,
                 'total_price' => (float) $transaction->amount,
                 'payment_image' => $transaction->payment_method,
+                // Needed by the actions column: GET/POST /orders/{order_id}/payments*
+                // take the numeric order id, not the order_number string above.
+                'order_id' => $order?->id,
             ];
         });
 
