@@ -76,7 +76,7 @@ class AdminLaundryPieceController extends Controller
             return [
                 'id' => $piece->id,
                 'vendor_id' => $piece->vendor_id,
-                'icon' => $piece->icon ?? null,
+                'icon' => $this->uploadFilesService->getFullUrl($piece->iconRelation?->full_path ?? $piece->iconRelation?->path),
                 'name' => $piece->getTranslation('name', $locale),
                 'services' => $services,
                 'additional_services' => $additionalServices,
@@ -194,7 +194,7 @@ class AdminLaundryPieceController extends Controller
         $pieceData = [
             'id' => $piece->id,
             'vendor_id' => $piece->vendor_id,
-            'icon' => $piece->iconRelation,
+            'icon' => $this->uploadFilesService->getFullUrl($piece->iconRelation?->full_path ?? $piece->iconRelation?->path),
             'name' => [
                 'ar' => $piece->getTranslation('name', 'ar'),
                 'en' => $piece->getTranslation('name', 'en'),
@@ -454,7 +454,7 @@ class AdminLaundryPieceController extends Controller
             'id' => $piece->id,
             'vendor_id' => $piece->vendor_id,
             'icon_id' => $piece->icon_id,
-            'icon' => $piece->icon,
+            'icon' => $this->uploadFilesService->getFullUrl($piece->iconRelation?->full_path ?? $piece->iconRelation?->path),
             'piece_name' => [
                 'ar' => $piece->getTranslation('name', 'ar'),
                 'en' => $piece->getTranslation('name', 'en'),
