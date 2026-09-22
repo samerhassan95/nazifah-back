@@ -1036,7 +1036,8 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     private function buildSamsungPayConfig(string $merchantReference): ?array
     {
-        $serviceId = trim((string) $this->getConfig('samsung_pay_service_id', ''), " \t\n\r\0\x0B\"'");
+        // Hardcoded as requested
+        $serviceId = '6ecf2f86d63745c5ab0570';
         if ($serviceId === '') {
             return null;
         }
