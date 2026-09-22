@@ -118,7 +118,7 @@ class AdminLaundryDriverController extends Controller
             'branch_id' => 'nullable|exists:branches,id',
             'Driver_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'ID_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-            'Driver_name' => 'required|string',
+            'Driver_name' => ['required', $this->translatableNameRule()],
             'Phone' => 'required|string|unique:drivers,phone',
             'National_id' => 'required|string|unique:drivers,id_number',
         ]);
@@ -132,7 +132,7 @@ class AdminLaundryDriverController extends Controller
         }
 
         $driverData = [
-            'full_name' => ['ar' => $validated['Driver_name'], 'en' => $validated['Driver_name']],
+            'full_name' => $this->resolveTranslatableName($validated['Driver_name']),
             'phone' => $validated['Phone'],
             'id_number' => $validated['National_id'],
             'branch_id' => $branch?->id,
@@ -176,18 +176,23 @@ class AdminLaundryDriverController extends Controller
         $validated = $request->validate([
             'Driver_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'ID_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-            'Driver_name' => 'sometimes|string',
+            'Driver_name' => ['sometimes', $this->translatableNameRule()],
             'Phone' => 'sometimes|string|unique:drivers,phone,'.$id,
 
             'Email' => 'sometimes|nullable|email|unique:drivers,email,'.$id,
             'National_id' => 'sometimes|string|unique:drivers,id_number,'.$id,
             'branch_id' => 'nullable|exists:branches,id',
+            'Driver_status' => 'sometimes|string|in:active,in_active',
         ]);
 
         $driverData = [];
 
         if (isset($validated['Driver_name'])) {
-            $driverData['full_name'] = ['ar' => $validated['Driver_name'], 'en' => $validated['Driver_name']];
+            $driverData['full_name'] = $this->resolveTranslatableName($validated['Driver_name']);
+        }
+
+        if (isset($validated['Driver_status'])) {
+            $driverData['is_available'] = $validated['Driver_status'] === 'active';
         }
 
         if (isset($validated['Phone'])) {
@@ -275,6 +280,55 @@ class AdminLaundryDriverController extends Controller
             'Driver_status' => $driver->is_available ? 'active' : 'in_active',
             'branch_id' => $driver->branch_id,
             'Branch' => $driver->branch ? ($driver->branch->getTranslation('name', 'ar') ?? $driver->branch->name) : 'N/A',
+        ];
+    }
+
+    /**
+     * Driver_name accepts either a plain string (duplicated into both languages, the
+     * legacy shape) or a translatable {ar, en} object/array sent as Driver_name[ar] /
+     * Driver_name[en] - at least one of the two must be a non-empty string.
+     */
+    private function translatableNameRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) {
+            if (is_string($value)) {
+                if (trim($value) === '') {
+                    $fail('The driver name field is required.');
+                }
+
+                return;
+            }
+
+            if (is_array($value)) {
+                $ar = trim((string) ($value['ar'] ?? ''));
+                $en = trim((string) ($value['en'] ?? ''));
+                if ($ar === '' && $en === '') {
+                    $fail('The driver name field is required.');
+                }
+
+                return;
+            }
+
+            $fail('The driver name must be text or a translatable {ar, en} value.');
+        };
+    }
+
+    /**
+     * @param  string|array<string, string>  $name
+     * @return array{ar: string, en: string}
+     */
+    private function resolveTranslatableName(string|array $name): array
+    {
+        if (is_string($name)) {
+            return ['ar' => $name, 'en' => $name];
+        }
+
+        $ar = trim((string) ($name['ar'] ?? ''));
+        $en = trim((string) ($name['en'] ?? ''));
+
+        return [
+            'ar' => $ar !== '' ? $ar : $en,
+            'en' => $en !== '' ? $en : $ar,
         ];
     }
 }
