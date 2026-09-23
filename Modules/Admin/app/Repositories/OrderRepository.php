@@ -10,7 +10,7 @@ class OrderRepository implements OrderRepositoryInterface
 {
     public function all(array $filters = []): LengthAwarePaginator
     {
-        $query = Order::with(['client', 'branch.vendor', 'driver', 'items', 'latestPayment']);
+        $query = Order::with(['client', 'branch.vendor', 'driver', 'items', 'latestPayment', 'pickupAddress', 'deliveryAddress']);
 
         if (isset($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -72,7 +72,7 @@ class OrderRepository implements OrderRepositoryInterface
 
     public function find(int $id): ?Order
     {
-        return Order::with(['client', 'branch.vendor', 'driver', 'items', 'latestPayment'])->find($id);
+        return Order::with(['client', 'branch.vendor', 'driver', 'items', 'latestPayment', 'pickupAddress', 'deliveryAddress'])->find($id);
     }
 
     public function create(array $data): Order
