@@ -206,14 +206,10 @@ class MoyasarGateway extends AbstractPaymentGateway
             // value sent is ignored. Upload the logo in the Moyasar Dashboard account
             // branding settings instead.
 
-            // Restrict only when the user picked STC Pay. credit_card / samsung_pay /
-            // empty omit the field so the hosted invoice shows every method enabled
-            // on the Moyasar account (orders and wallet must match).
+            // Restrict allowed payment methods so Samsung Pay is omitted on Moyasar hosted invoices.
             $paymentOption = $request->paymentOption ?? ($request->metadata['payment_option'] ?? null);
             $allowedMethods = $this->mapToMoyasarAllowedMethods($paymentOption);
-            if ($allowedMethods !== []) {
-                $payload['allowed_payment_methods'] = $allowedMethods;
-            }
+            $payload['allowed_payment_methods'] = $allowedMethods !== [] ? $allowedMethods : ['creditcard', 'stcpay', 'applepay'];
 
             // AUTHORIZATION (hold→capture) parity with APS. CONFIRM: Moyasar manual
             // capture must be enabled on the account, and the exact field for invoices
