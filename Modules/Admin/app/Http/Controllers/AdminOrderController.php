@@ -941,6 +941,7 @@ class AdminOrderController extends Controller
                 ->selectRaw('
                     DATE(created_at) as date_str,
                     COUNT(*) as total_orders,
+                    SUM(CASE WHEN status IN ("completed", "delivered") THEN 1 ELSE 0 END) as completed_orders,
                     SUM(CASE WHEN status = "cancelled" THEN 1 ELSE 0 END) as canceled_orders,
                     SUM(CASE WHEN status != "cancelled" THEN 1 ELSE 0 END) as new_orders
                 ')
@@ -960,6 +961,7 @@ class AdminOrderController extends Controller
                     'day'              => $curr->format('j'),
                     'total_orders'     => $item ? (int) $item->total_orders : 0,
                     'new_orders'       => $item ? (int) $item->new_orders : 0,
+                    'completed_orders' => $item ? (int) $item->completed_orders : 0,
                     'canceled_orders'  => $item ? (int) $item->canceled_orders : 0,
                     'cancelled_orders' => $item ? (int) $item->canceled_orders : 0,
                 ]);
@@ -977,6 +979,7 @@ class AdminOrderController extends Controller
                 ->selectRaw('
                     YEAR(created_at) as year,
                     COUNT(*) as total_orders,
+                    SUM(CASE WHEN status IN ("completed", "delivered") THEN 1 ELSE 0 END) as completed_orders,
                     SUM(CASE WHEN status = "cancelled" THEN 1 ELSE 0 END) as canceled_orders,
                     SUM(CASE WHEN status != "cancelled" THEN 1 ELSE 0 END) as new_orders
                 ')
@@ -990,6 +993,7 @@ class AdminOrderController extends Controller
                         'year'             => (int) $item->year,
                         'total_orders'     => (int) $item->total_orders,
                         'new_orders'       => (int) $item->new_orders,
+                        'completed_orders' => (int) $item->completed_orders,
                         'canceled_orders'  => (int) $item->canceled_orders,
                         'cancelled_orders' => (int) $item->canceled_orders,
                     ];
@@ -1014,6 +1018,7 @@ class AdminOrderController extends Controller
                 ->selectRaw('
                     MONTH(created_at) as month_num,
                     COUNT(*) as total_orders,
+                    SUM(CASE WHEN status IN ("completed", "delivered") THEN 1 ELSE 0 END) as completed_orders,
                     SUM(CASE WHEN status = "cancelled" THEN 1 ELSE 0 END) as canceled_orders,
                     SUM(CASE WHEN status != "cancelled" THEN 1 ELSE 0 END) as new_orders
                 ')
@@ -1035,6 +1040,7 @@ class AdminOrderController extends Controller
                     'year'             => $year,
                     'total_orders'     => $item ? (int) $item->total_orders : 0,
                     'new_orders'       => $item ? (int) $item->new_orders : 0,
+                    'completed_orders' => $item ? (int) $item->completed_orders : 0,
                     'canceled_orders'  => $item ? (int) $item->canceled_orders : 0,
                     'cancelled_orders' => $item ? (int) $item->canceled_orders : 0,
                 ]);
