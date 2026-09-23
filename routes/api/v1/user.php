@@ -218,6 +218,13 @@ Route::middleware(['auth:client', 'banned'])->group(function () {
         Route::post('/deposit/moyasar/confirm', [WalletController::class, 'confirmMoyasarDeposit'])
             ->name('user.wallet.deposit.moyasar-confirm');
 
+        // Confirm redirect/hosted-checkout deposits from the client after the
+        // gateway reports success. This is idempotent and returns 202 while
+        // Moyasar is still finalizing the payment.
+        Route::match(['get', 'post'], '/deposit/{transactionId}/confirm', [WalletController::class, 'verifyDeposit'])
+            ->where('transactionId', '.*')
+            ->name('user.wallet.deposit.confirm');
+
         // Verify deposit
         Route::get('/deposit/{transactionId}/verify', [WalletController::class, 'verifyDeposit'])
             ->name('user.wallet.deposit.verify');

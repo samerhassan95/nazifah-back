@@ -223,6 +223,31 @@ Labels come from the API (`*_label` fields) based on `Accept-Language`.
 
 ---
 
+## 5. Explicit confirmation after checkout
+
+The app must confirm the payment after Moyasar SDK/checkout reports success;
+it must not wait indefinitely for the browser redirect or webhook.
+
+For wallet deposits, call:
+
+```text
+GET|POST /api/v1/user/wallet/deposit/{transaction_id}/confirm
+```
+
+Poll this endpoint while the HTTP response is `202` and the payment status is
+`pending`. Stop the loading state when the response is `200` with a completed
+status, then refresh the wallet balance. A `400` response means the payment was
+rejected or could not be verified.
+
+For an order checkout, use:
+
+```text
+GET|POST /api/v1/user/orders/payment/confirm/{transaction_id}
+```
+
+This endpoint verifies the payment server-side, materializes the pending order,
+and returns the final order once payment is completed.
+
 ## 6. Flutter checklist
 
 ### Wallet top-up
