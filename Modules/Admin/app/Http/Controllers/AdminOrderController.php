@@ -920,28 +920,59 @@ class AdminOrderController extends Controller
             $filterType = 'monthly';
         }
 
-        $query = Order::query();
-
-        if ($request->filled('from_date')) {
-            $query->whereDate('created_at', '>=', $request->from_date);
-        }
-
-        if ($request->filled('to_date')) {
-            $query->whereDate('created_at', '<=', $request->to_date);
-        }
-
-        if ($request->filled('vendor_id')) {
-            $vendorId = $request->input('vendor_id');
-            $query->whereHas('branch', fn ($q) => $q->where('vendor_id', $vendorId));
-        }
-
         $arabicMonths = [
             1 => 'يناير', 2 => 'فبراير', 3 => 'مارس', 4 => 'أبريل',
             5 => 'مايو', 6 => 'يونيو', 7 => 'يوليو', 8 => 'أغسطس',
             9 => 'سبتمبر', 10 => 'أكتوبر', 11 => 'نوفمبر', 12 => 'ديسمبر',
         ];
 
-        if ($filterType === 'yearly') {
+        if ($filterType === 'daily') {
+            $startDate = $request->filled('from_date') ? \Carbon\Carbon::parse($request->from_date) : now()->startOfMonth();
+            $endDate = $request->filled('to_date') ? \Carbon\Carbon::parse($request->to_date) : now()->endOfMonth();
+
+            $query = Order::query()->whereBetween('created_at', [$startDate->startOfDay(), $endDate->endOfDay()]);
+
+            if ($request->filled('vendor_id')) {
+                $vendorId = $request->input('vendor_id');
+                $query->whereHas('branch', fn ($q) => $q->where('vendor_id', $vendorId));
+            }
+
+            $rawResults = $query
+                ->selectRaw('
+                    DATE(created_at) as date_str,
+                    COUNT(*) as total_orders,
+                    SUM(CASE WHEN status = "cancelled" THEN 1 ELSE 0 END) as canceled_orders,
+                    SUM(CASE WHEN status != "cancelled" THEN 1 ELSE 0 END) as new_orders
+                ')
+                ->groupBy('date_str')
+                ->get()
+                ->keyBy('date_str');
+
+            $data = collect();
+            $curr = $startDate->copy();
+            while ($curr->lte($endDate)) {
+                $dateKey = $curr->format('Y-m-d');
+                $item = $rawResults->get($dateKey);
+
+                $data->push([
+                    'period'           => $dateKey,
+                    'month'            => $curr->format('j M'),
+                    'day'              => $curr->format('j'),
+                    'total_orders'     => $item ? (int) $item->total_orders : 0,
+                    'new_orders'       => $item ? (int) $item->new_orders : 0,
+                    'canceled_orders'  => $item ? (int) $item->canceled_orders : 0,
+                    'cancelled_orders' => $item ? (int) $item->canceled_orders : 0,
+                ]);
+                $curr->addDay();
+            }
+        } elseif ($filterType === 'yearly') {
+            $query = Order::query();
+
+            if ($request->filled('vendor_id')) {
+                $vendorId = $request->input('vendor_id');
+                $query->whereHas('branch', fn ($q) => $q->where('vendor_id', $vendorId));
+            }
+
             $data = $query
                 ->selectRaw('
                     YEAR(created_at) as year,
@@ -954,52 +985,65 @@ class AdminOrderController extends Controller
                 ->get()
                 ->map(function ($item) {
                     return [
-                        'period' => (string) $item->year,
-                        'month' => (string) $item->year,
-                        'year' => (int) $item->year,
-                        'total_orders' => (int) $item->total_orders,
-                        'new_orders' => (int) $item->new_orders,
-                        'canceled_orders' => (int) $item->canceled_orders,
+                        'period'           => (string) $item->year,
+                        'month'            => (string) $item->year,
+                        'year'             => (int) $item->year,
+                        'total_orders'     => (int) $item->total_orders,
+                        'new_orders'       => (int) $item->new_orders,
+                        'canceled_orders'  => (int) $item->canceled_orders,
                         'cancelled_orders' => (int) $item->canceled_orders,
                     ];
                 });
         } else {
             // Monthly
-            $data = $query
+            $year = now()->year;
+            if ($request->filled('from_date')) {
+                $year = (int) date('Y', strtotime($request->from_date));
+            } elseif ($request->filled('to_date')) {
+                $year = (int) date('Y', strtotime($request->to_date));
+            }
+
+            $query = Order::query()->whereYear('created_at', $year);
+
+            if ($request->filled('vendor_id')) {
+                $vendorId = $request->input('vendor_id');
+                $query->whereHas('branch', fn ($q) => $q->where('vendor_id', $vendorId));
+            }
+
+            $rawResults = $query
                 ->selectRaw('
-                    DATE_FORMAT(created_at, "%Y-%m") as period,
                     MONTH(created_at) as month_num,
-                    MONTHNAME(created_at) as month_name,
-                    YEAR(created_at) as year,
                     COUNT(*) as total_orders,
                     SUM(CASE WHEN status = "cancelled" THEN 1 ELSE 0 END) as canceled_orders,
                     SUM(CASE WHEN status != "cancelled" THEN 1 ELSE 0 END) as new_orders
                 ')
-                ->groupBy('period', 'month_num', 'month_name', 'year')
-                ->orderBy('period')
+                ->groupBy('month_num')
                 ->get()
-                ->map(function ($item) use ($arabicMonths) {
-                    $mNum = (int) $item->month_num;
-                    $arMonth = $arabicMonths[$mNum] ?? $item->month_name;
+                ->keyBy('month_num');
 
-                    return [
-                        'period' => $item->period,
-                        'month' => $arMonth,
-                        'month_ar' => $arMonth,
-                        'month_en' => $item->month_name,
-                        'month_num' => $mNum,
-                        'year' => (int) $item->year,
-                        'total_orders' => (int) $item->total_orders,
-                        'new_orders' => (int) $item->new_orders,
-                        'canceled_orders' => (int) $item->canceled_orders,
-                        'cancelled_orders' => (int) $item->canceled_orders,
-                    ];
-                });
+            $data = collect();
+            for ($m = 1; $m <= 12; $m++) {
+                $item = $rawResults->get($m);
+                $arMonth = $arabicMonths[$m];
+                $period = sprintf('%d-%02d', $year, $m);
+
+                $data->push([
+                    'period'           => $period,
+                    'month'            => $arMonth,
+                    'month_ar'         => $arMonth,
+                    'month_num'        => $m,
+                    'year'             => $year,
+                    'total_orders'     => $item ? (int) $item->total_orders : 0,
+                    'new_orders'       => $item ? (int) $item->new_orders : 0,
+                    'canceled_orders'  => $item ? (int) $item->canceled_orders : 0,
+                    'cancelled_orders' => $item ? (int) $item->canceled_orders : 0,
+                ]);
+            }
         }
 
         return successResponse([
-            'filter_type' => $filterType,
-            'data' => $data,
+            'filter_type'    => $filterType,
+            'data'           => $data,
             'monthly_status' => $data,
         ], 'Orders status retrieved successfully');
     }
