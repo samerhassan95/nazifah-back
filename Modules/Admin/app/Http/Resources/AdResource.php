@@ -20,6 +20,7 @@ class AdResource extends JsonResource
             'description' => $isDetailView ? ['ar' => $this->getTranslation('description', 'ar'), 'en' => $this->getTranslation('description', 'en')] : $this->description,
             'image' => $uploadFilesService->getFullUrl($this->image),
             'type' => $this->type,
+            'applications' => $this->applications ?? [],
             'link' => $this->link,
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,

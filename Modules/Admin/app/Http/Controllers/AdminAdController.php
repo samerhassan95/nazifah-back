@@ -65,6 +65,7 @@ class AdminAdController extends Controller
                 'image' => $this->uploadFilesService->getFullUrl($ad->image),
                 'link' => $ad->link,
                 'type' => $ad->type,
+                'applications' => $ad->applications ?? [],
                 'start_date' => $ad->start_date,
                 'end_date' => $ad->end_date,
                 'is_active' => (bool) $ad->is_active,

@@ -20,6 +20,7 @@ class Ad extends Model
         'image',
         'link',
         'type',
+        'applications',
         'order',
         'start_date',
         'end_date',
@@ -33,6 +34,7 @@ class Ad extends Model
         'order' => 'integer',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'applications' => 'array',
     ];
 
     /**

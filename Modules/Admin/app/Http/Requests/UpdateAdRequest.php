@@ -3,6 +3,8 @@
 namespace Modules\Admin\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Modules\Notification\Enums\UserTargetType;
 
 class UpdateAdRequest extends FormRequest
 {
@@ -22,6 +24,13 @@ class UpdateAdRequest extends FormRequest
             'description' => ['nullable', 'array'],
             'description.ar' => ['nullable', 'string'],
             'description.en' => ['nullable', 'string'],
+            'applications' => ['sometimes', 'array', 'min:1'],
+            'applications.*' => [Rule::in([
+                UserTargetType::CLIENT->value,
+                UserTargetType::DRIVER->value,
+                UserTargetType::VENDOR->value,
+                UserTargetType::ALL->value,
+            ])],
             'image' => [
                 'sometimes',
                 'file',
