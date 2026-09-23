@@ -48,6 +48,7 @@ return [
     'embedded_payment_initialized' => 'Embedded payment initialized — render the moyasar.js form with `moyasar`.',
     'awaiting_moyasar_payment_confirmation' => 'Awaiting Moyasar payment confirmation (no payment id yet).',
     'could_not_retrieve_payment' => 'Could not retrieve the payment from Moyasar.',
+    'complete_your_payment' => 'Complete your payment',
     'moyasar_description_wallet' => 'Nathefah - Wallet Top-up',
     'moyasar_description_order' => 'Nathefah - Laundry Service Payment',
 

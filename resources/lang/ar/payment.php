@@ -48,6 +48,7 @@ return [
     'embedded_payment_initialized' => 'تم تهيئة الدفع المدمج — يرجى عرض نموذج ميسر.',
     'awaiting_moyasar_payment_confirmation' => 'في انتظار تأكيد الدفع من ميسر (لا يوجد معرف دفع حتى الآن).',
     'could_not_retrieve_payment' => 'تعذر استرجاع معلومات الدفع من ميسر.',
+    'complete_your_payment' => 'إتمام عملية الدفع',
     'moyasar_description_wallet' => 'نظيفة - شحن المحفظة',
     'moyasar_description_order' => 'نظيفة - دفع قيمة الخدمة',
 

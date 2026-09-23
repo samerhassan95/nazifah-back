@@ -95,7 +95,7 @@
             @else
                 <img src="https://back.nathefah.com/logo.jpeg" alt="Nathefah Logo" onerror="this.style.display='none'">
             @endif
-            <h1>{{ __('Complete your payment') }}</h1>
+            <h1>{{ __('payment.complete_your_payment') }}</h1>
             <p>{{ $moyasarConfig['description'] ?? 'Nathefah Order' }}</p>
         </div>
 
