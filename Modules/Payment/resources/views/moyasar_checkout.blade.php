@@ -133,8 +133,7 @@
 
             var methods = (config.methods || ['creditcard', 'stcpay']).filter(function (method) {
                 if (method === 'applepay') return isIos;
-                if (method === 'samsungpay') return !!config.samsung_pay;
-                return method !== 'mada';
+                return method !== 'mada' && method !== 'samsungpay';
             });
             if (methods.indexOf('creditcard') === -1 && methods.indexOf('stcpay') === -1) {
                 methods.push('creditcard');
@@ -161,9 +160,6 @@
             }
             if (config.apple_pay && methods.indexOf('applepay') !== -1) {
                 init.apple_pay = config.apple_pay;
-            }
-            if (config.samsung_pay && methods.indexOf('samsungpay') !== -1) {
-                init.samsung_pay = config.samsung_pay;
             }
 
             Moyasar.init(init);

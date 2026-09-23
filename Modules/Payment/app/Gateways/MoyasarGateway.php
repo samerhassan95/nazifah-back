@@ -274,7 +274,7 @@ class MoyasarGateway extends AbstractPaymentGateway
                     'redirect_url' => $hostedInvoiceUrl,
                     'raw_response' => $body,
                     'moyasar' => [
-                        'methods' => ['creditcard', 'stcpay', 'applepay', 'samsungpay'],
+                        'methods' => ['creditcard', 'stcpay', 'applepay'],
                         'supported_networks' => ['mada', 'visa', 'mastercard'],
                     ],
                     'available_methods' => [
@@ -284,7 +284,6 @@ class MoyasarGateway extends AbstractPaymentGateway
                         'mada',
                         'stc_pay',
                         'apple_pay',
-                        'samsung_pay',
                     ],
                 ]
             );
@@ -930,18 +929,12 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     private function defaultMoyasarMethods(): array
     {
-        $methods = ['creditcard', 'stcpay', 'applepay'];
-        if ($this->hasSamsungPayServiceId()) {
-            $methods[] = 'samsungpay';
-        }
-
-        return $methods;
+        return ['creditcard', 'stcpay', 'applepay'];
     }
 
     /**
-     * moyasar.js only accepts creditcard, stcpay, applepay, samsungpay.
+     * moyasar.js only accepts creditcard, stcpay, applepay.
      * `mada` is a card network, not a method — passing it makes the form hang.
-     * Samsung Pay without a Service ID loads Samsung's SDK and times out in the WebView.
      *
      * @param  list<string>  $methods
      * @return list<string>
@@ -954,15 +947,12 @@ class MoyasarGateway extends AbstractPaymentGateway
             if ($method === 'mada') {
                 $method = 'creditcard';
             }
-            if (in_array($method, ['creditcard', 'stcpay', 'applepay', 'samsungpay'], true)) {
+            if (in_array($method, ['creditcard', 'stcpay', 'applepay'], true)) {
                 $mapped[] = $method;
             }
         }
 
         $mapped = array_values(array_unique($mapped));
-        if (! $this->hasSamsungPayServiceId()) {
-            $mapped = array_values(array_filter($mapped, fn (string $method) => $method !== 'samsungpay'));
-        }
 
         return $mapped !== [] ? $mapped : ['creditcard', 'stcpay'];
     }
@@ -1019,13 +1009,6 @@ class MoyasarGateway extends AbstractPaymentGateway
                 'label' => 'Nathefah',
                 'validate_merchant_url' => 'https://api.moyasar.com/v1/applepay/initiate',
             ];
-        }
-
-        $samsungPay = $this->buildSamsungPayConfig($merchantReference);
-        if ($samsungPay !== null && in_array('samsungpay', $jsMethods, true)) {
-            $config['samsung_pay'] = $samsungPay;
-        } elseif (in_array('samsungpay', $methods, true) && $samsungPay === null) {
-            $this->log('warning', 'Samsung Pay is requested but MOYASAR_SAMSUNG_PAY_SERVICE_ID is empty — Moyasar will hide the Samsung Pay button. Set the Service ID from the Moyasar Dashboard.');
         }
 
         return $config;
