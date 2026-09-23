@@ -206,9 +206,17 @@ Route::middleware(['auth:client', 'banned'])->group(function () {
         Route::post('/deposit', [WalletController::class, 'addDeposit'])
             ->name('user.wallet.deposit');
 
-        // Add direct deposit to wallet (no payment gateway)
-        Route::post('/deposit/direct', [WalletController::class, 'addDirectDeposit'])
-            ->name('user.wallet.deposit.direct');
+        // SECURITY: the old '/deposit/direct' route (WalletController::addDirectDeposit)
+        // credited wallet_balance with whatever "amount" the client sent, with NO
+        // payment verification at all — any authenticated client could top up their
+        // own wallet for free. Route removed; the controller method is left in place
+        // only as a record, it must never be re-routed as-is.
+
+        // Confirm a deposit completed via a gateway's native mobile SDK (Samsung
+        // Pay, Apple Pay...) — verifies the payment_id with Moyasar server-side
+        // before crediting, the client-sent amount is never trusted.
+        Route::post('/deposit/moyasar/confirm', [WalletController::class, 'confirmMoyasarDeposit'])
+            ->name('user.wallet.deposit.moyasar-confirm');
 
         // Verify deposit
         Route::get('/deposit/{transactionId}/verify', [WalletController::class, 'verifyDeposit'])

@@ -501,6 +501,123 @@ class WalletController extends Controller
     }
 
     /**
+     * Confirm a wallet top-up completed via a gateway's native mobile SDK
+     * (Samsung Pay, Apple Pay, etc.) — the app gets a Moyasar payment_id
+     * directly from the SDK's own success callback, with no
+     * PaymentTransaction row created via addDeposit() first.
+     *
+     * The amount/payment_method the client sends are informational only and
+     * are never trusted for crediting: the wallet is credited with whatever
+     * amount Moyasar itself reports for that payment_id, verified
+     * server-to-server, exactly like verifyDeposit() does for the
+     * redirect-based flow.
+     */
+    public function confirmMoyasarDeposit(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'payment_id' => ['required', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return validationErrorResponse($validator->errors());
+        }
+
+        $user = $request->user();
+        $paymentId = (string) $request->payment_id;
+
+        try {
+            // A payment_id can only ever be claimed by the account that owns
+            // it. If it's already attached to a PaymentTransaction, reuse
+            // that row (and let creditIfNotAlready()'s own idempotency
+            // handle a retry) instead of re-verifying or, worse, letting a
+            // different client_id claim someone else's already-paid deposit.
+            $existingTransaction = PaymentTransaction::where('fort_id', $paymentId)
+                ->orWhereJsonContains('response_data->moyasar_payment_id', $paymentId)
+                ->first();
+
+            if ($existingTransaction) {
+                $existingClientId = (int) ($existingTransaction->response_data['client_id'] ?? 0);
+                if ($existingClientId !== (int) $user->id) {
+                    return errorResponse(__('payment.unauthorized_transaction'), null, 409);
+                }
+
+                $paymentTransaction = $existingTransaction;
+            } else {
+                $this->paymentService->setGateway('moyasar');
+                $walletReferenceId = 'WALLET-MOYASAR-'.$user->id.'-'.$paymentId;
+                // resolveMoyasarReference() picks payment_id straight off this
+                // request, so the id passed here only anchors logging/caching.
+                $verificationResponse = $this->paymentService->verifyPayment($walletReferenceId);
+
+                if (! $verificationResponse->isSuccessful()) {
+                    return errorResponse(
+                        $verificationResponse->message ?? __('payment.payment_verification_failed'),
+                        $verificationResponse->status === 'pending' ? 202 : 400,
+                        ['status' => $verificationResponse->status]
+                    );
+                }
+
+                $verifiedAmount = $verificationResponse->amount;
+                if ($verifiedAmount === null || $verifiedAmount <= 0) {
+                    return errorResponse(__('payment.payment_verification_failed'), null, 400);
+                }
+
+                $paymentTransaction = PaymentTransaction::create([
+                    'order_id' => null,
+                    'gateway' => 'moyasar',
+                    'transaction_id' => $walletReferenceId,
+                    'fort_id' => $verificationResponse->data['fort_id'] ?? $paymentId,
+                    'amount' => $verifiedAmount,
+                    'currency' => $verificationResponse->currency ?? config('payment.currency', 'SAR'),
+                    'status' => 'completed',
+                    'payment_method' => PaymentMethod::SAMSUNG_PAY->value,
+                    'customer_email' => $user->email,
+                    'customer_name' => $user->full_name,
+                    'customer_phone' => $user->phone,
+                    'paid_at' => now(),
+                    'response_data' => array_merge($verificationResponse->data ?? [], [
+                        'wallet_reference_id' => $walletReferenceId,
+                        'wallet_deposit' => true,
+                        'client_id' => $user->id,
+                    ]),
+                ]);
+
+                // Resolve the concrete method (samsung_pay/apple_pay/card brand)
+                // from Moyasar's own `source`, same as the redirect-based path.
+                $paymentTransaction = app(\Modules\Payment\Services\MoyasarPaymentMethodApplier::class)
+                    ->applyFromVerifiedSource($paymentTransaction, $verificationResponse->data['source'] ?? null, null);
+            }
+
+            $settlement = $this->walletDepositCreditor->creditIfNotAlready(
+                $paymentTransaction,
+                'Nathefah Wallet deposit - '.($paymentTransaction->payment_method ?? 'moyasar')
+            );
+
+            $walletTxn = $settlement['wallet_txn'];
+            $newBalance = DB::table('clients')->where('id', $user->id)->value('wallet_balance');
+
+            return successResponse([
+                'status' => 'completed',
+                'transaction' => [
+                    'wallet_txn_id' => $walletTxn?->id,
+                    'payment_transaction_id' => $paymentTransaction->id,
+                    'transaction_id' => $paymentTransaction->transaction_id,
+                    'amount' => (float) $paymentTransaction->amount,
+                    'payment_method' => $paymentTransaction->payment_method,
+                    'payment_method_label' => $this->paymentMethodLabel($paymentTransaction->payment_method),
+                    'status' => 'completed',
+                    'date' => now()->toISOString(),
+                ],
+                'balance' => (float) $newBalance,
+            ], $settlement['credited']
+                ? __('payment.deposit_verified_wallet_updated')
+                : __('payment.deposit_already_verified'));
+        } catch (\Exception $e) {
+            return serverErrorResponse(__('payment.failed_to_verify_deposit').': '.$e->getMessage());
+        }
+    }
+
+    /**
      * Verify a wallet deposit transaction
      */
     public function verifyDeposit(Request $request, string $transactionId): JsonResponse
