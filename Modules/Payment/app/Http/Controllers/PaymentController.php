@@ -322,6 +322,9 @@ class PaymentController extends Controller
             $cacheKey = "payfort_response_{$merchantReference}";
             Cache::put($cacheKey, $payfortData, now()->addMinutes(10));
 
+            // If an explicit payment id was passed (e.g. via confirmByTransaction / query), preserve it in fort_id
+            $passedPaymentId = $request->input('id') ?? $request->input('payment_id');
+
             // Also check for order_id from query params
             $orderId = $request->get('order_id') ?? $request->query('order_id');
 
@@ -450,6 +453,7 @@ class PaymentController extends Controller
             // Extract fort_id from response for future CAPTURE/VOID operations
             $fortId = $response->data['fort_id']
                 ?? $payfortData['fort_id']
+                ?? $passedPaymentId
                 ?? $transaction->fort_id;
 
             // The browser-redirect /payments/callback route is PUBLIC and unauthenticated,
