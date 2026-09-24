@@ -157,9 +157,9 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     public function initializePayment(PaymentRequest $request): PaymentResponse
     {
-        // Same path for orders and wallet deposits. Do not send wallet to a separate
-        // moyasar.js page — that is what required a Samsung Pay Service ID. Order
-        // checkout already shows Samsung Pay on Moyasar's hosted invoice without it.
+        // Same hosted invoice path for orders and wallet deposits. Samsung Pay is
+        // intentionally excluded from this web checkout because the mobile app
+        // handles it through its native SDK flow.
         if ($this->mode === 'embedded' || $this->mode === 'hosted_local') {
             return $this->initializeEmbeddedPayment($request);
         }
@@ -221,16 +221,6 @@ class MoyasarGateway extends AbstractPaymentGateway
 
             $response = $this->httpClient()->post($this->apiBase.'/invoices', $payload);
             $body = $response->json() ?? [];
-
-            if (! $response->successful() && isset($payload['allowed_payment_methods'])) {
-                $this->log('warning', 'Moyasar invoice rejected with allowed_payment_methods; retrying without it', [
-                    'http_status' => $response->status(),
-                    'error' => $this->extractError($body),
-                ]);
-                unset($payload['allowed_payment_methods']);
-                $response = $this->httpClient()->post($this->apiBase.'/invoices', $payload);
-                $body = $response->json() ?? [];
-            }
 
             $this->log('info', 'Moyasar invoice create response', [
                 'http_status' => $response->status(),
@@ -913,9 +903,8 @@ class MoyasarGateway extends AbstractPaymentGateway
     /**
      * Map a Payfort/internal payment option to Moyasar's allowed methods list.
      *
-     * Empty = unrestricted hosted invoice (creditcard, mada, stcpay, applepay, samsungpay
-     * as enabled on the Moyasar account) — this is what order checkout uses, so wallet
-     * top-up must do the same or Samsung Pay disappears in the WebView.
+    * Empty means that the hosted invoice uses the default non-Samsung methods. The
+    * native Samsung Pay flow is handled separately by the mobile application.
      *
      * @return list<string>
      */
@@ -927,8 +916,7 @@ class MoyasarGateway extends AbstractPaymentGateway
 
         return match (strtoupper($payfortOption)) {
             // STC Pay is a distinct hosted method. Everything else (including mada,
-            // which is a card network, not a Moyasar method) stays unrestricted so
-            // Samsung Pay / Apple Pay / STC still appear on the same page.
+            // which is a card network, not a Moyasar method) uses the default list.
             'STCPAY' => ['stcpay'],
             'MADA', 'APPLEPAY', 'SAMSUNGPAY', 'VISA', 'MASTERCARD', 'CREDIT_CARD', 'GOOGLEPAY' => [],
             default => [],
