@@ -720,6 +720,19 @@ class PaymentController extends Controller
         }
 
         if (! $transaction) {
+            // Check if transactionId matches a PendingOrder order_number
+            $pendingOrder = \Modules\Order\Models\PendingOrder::where('order_data->order_number', $transactionId)
+                ->orWhere('id', (int) $transactionId)
+                ->first();
+            if ($pendingOrder) {
+                $transaction = PaymentTransaction::whereNull('order_id')
+                    ->where('response_data->pending_order_id', (int) $pendingOrder->id)
+                    ->latest()
+                    ->first();
+            }
+        }
+
+        if (! $transaction) {
             return response()->json([
                 'success' => false,
                 'message' => __('order.missing_order_or_transaction'),
