@@ -674,6 +674,16 @@ class WalletController extends Controller
                 ], __('payment.deposit_already_verified'));
             }
 
+            // If Flutter passes an 'id' or 'payment_id' in the query, save it in response_data
+            $passedId = $request->input('id') ?? $request->input('payment_id');
+            if ($passedId) {
+                $existingData = $paymentTransaction->response_data ?? [];
+                $existingData['moyasar_payment_id'] = (string) $passedId;
+                $existingData['fort_id'] = (string) $passedId;
+                $paymentTransaction->update(['response_data' => $existingData]);
+                $paymentTransaction = $paymentTransaction->fresh();
+            }
+
             $this->paymentService->setGateway(strtolower(str_replace(' ', '_', $paymentTransaction->gateway)));
 
             $verificationResponse = $this->paymentService->verifyPayment($paymentTransaction->transaction_id);
