@@ -707,8 +707,17 @@ class PaymentController extends Controller
     public function confirmByTransaction(Request $request, string $transactionId)
     {
         $transaction = PaymentTransaction::where('transaction_id', $transactionId)
+            ->orWhere('order_id', $transactionId)
+            ->orWhereJsonContains('response_data->pending_order_id', (int) $transactionId)
             ->latest()
             ->first();
+
+        if (! $transaction) {
+            $order = Order::where('order_number', $transactionId)->orWhere('id', $transactionId)->first();
+            if ($order) {
+                $transaction = PaymentTransaction::where('order_id', $order->id)->latest()->first();
+            }
+        }
 
         if (! $transaction) {
             return response()->json([
