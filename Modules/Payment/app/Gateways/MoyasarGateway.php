@@ -742,6 +742,10 @@ class MoyasarGateway extends AbstractPaymentGateway
         $invoiceResponse = $this->httpClient()->get($this->apiBase.'/invoices/'.$reference);
         $invoice = $invoiceResponse->json() ?? [];
 
+        if ($invoiceResponse->successful() && ! empty($invoice['id'])) {
+            return $this->paymentFromInvoice($invoice);
+        }
+
         // Fallback 2: Search payments by metadata.merchant_reference
         $searchResponse = $this->httpClient()->get($this->apiBase.'/payments', [
             'metadata[merchant_reference]' => $reference,
@@ -823,11 +827,11 @@ class MoyasarGateway extends AbstractPaymentGateway
         // Fallback: look up the transaction in the database directly to get the invoice_id/payment_id
         $transaction = \Modules\Payment\Models\PaymentTransaction::where('transaction_id', $transactionId)->first();
         if ($transaction && is_array($transaction->response_data)) {
-            $id = $transaction->response_data['invoice_id'] 
-                ?? $transaction->response_data['moyasar_payment_id'] 
-                ?? $transaction->response_data['fort_id'] 
+            $id = $transaction->response_data['invoice_id']
+                ?? $transaction->response_data['moyasar_payment_id']
+                ?? $transaction->response_data['fort_id']
                 ?? null;
-                
+
             if (! empty($id)) {
                 return (string) $id;
             }
