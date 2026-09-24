@@ -742,11 +742,22 @@ class MoyasarGateway extends AbstractPaymentGateway
         $invoiceResponse = $this->httpClient()->get($this->apiBase.'/invoices/'.$reference);
         $invoice = $invoiceResponse->json() ?? [];
 
-        if ($invoiceResponse->successful() && ! empty($invoice['id'])) {
-            return $this->paymentFromInvoice($invoice);
+        // Fallback 2: Search payments by metadata.merchant_reference
+        $searchResponse = $this->httpClient()->get($this->apiBase.'/payments', [
+            'metadata[merchant_reference]' => $reference,
+        ]);
+        $searchBody = $searchResponse->json() ?? [];
+        $paymentsList = $searchBody['payments'] ?? [];
+        if ($searchResponse->successful() && is_array($paymentsList) && count($paymentsList) > 0) {
+            foreach ($paymentsList as $item) {
+                if (in_array(strtolower((string) ($item['status'] ?? '')), ['paid', 'captured', 'authorized'], true)) {
+                    return $item;
+                }
+            }
+            return (array) reset($paymentsList);
         }
 
-        $this->log('warning', 'Moyasar fetchPayment: neither payment nor invoice found', [
+        $this->log('warning', 'Moyasar fetchPayment: neither payment, invoice, nor search by metadata found', [
             'reference' => $reference,
             'payment_http_status' => $response->status(),
             'invoice_http_status' => $invoiceResponse->status(),
