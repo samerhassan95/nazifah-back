@@ -9,112 +9,127 @@
     <link rel="stylesheet" href="https://cdn.moyasar.com/mpf/1.14.0/moyasar.css" />
 
     <style>
+        * { box-sizing: border-box; }
         body {
             font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
-            background-color: #f3f4f6;
+            background-color: #ffffff;
             margin: 0;
             padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             min-height: 100vh;
         }
         .checkout-container {
             width: 100%;
             max-width: 500px;
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            padding: 2rem;
-            margin: 1rem;
+            margin: 0 auto;
+            padding-bottom: 2rem;
         }
-        .checkout-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        .checkout-header img {
-            max-height: 60px;
-            margin-bottom: 1rem;
-        }
-        .checkout-header h1 {
-            font-size: 1.5rem;
-            color: #1f2937;
-            margin: 0;
-            font-weight: 700;
-        }
-        .checkout-header p {
-            color: #6b7280;
-            margin-top: 0.5rem;
-            font-size: 0.875rem;
-        }
-        .order-details {
-            background: #f9fafb;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 2rem;
+        .topbar {
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            border: 1px solid #e5e7eb;
+            padding: 1.25rem 1.5rem;
         }
-        .order-details div {
-            display: flex;
-            flex-direction: column;
+        .topbar .back-arrow {
+            width: 20px;
+            height: 20px;
+            color: #111827;
+            flex: 0 0 auto;
         }
-        .order-details span.label {
-            font-size: 0.75rem;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .order-details span.value {
+        .topbar h1 {
             font-size: 1.125rem;
             font-weight: 700;
             color: #111827;
+            margin: 0;
+        }
+        .topbar-spacer {
+            background: #f3f4f6;
+            height: 3rem;
+        }
+        .amount-block {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            padding: 1.5rem 1.5rem 0.5rem;
+        }
+        .amount-block .meta {
+            display: flex;
+            flex-direction: column;
+        }
+        .amount-block .amount {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: #111827;
+        }
+        .amount-block .datetime,
+        .amount-block .reference {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 0.35rem;
+            word-break: break-all;
+        }
+        .amount-block img.brand-logo {
+            max-height: 42px;
+            border-radius: 8px;
+        }
+        .description-box {
+            margin: 1rem 1.5rem 1.5rem;
+            background: #f3f4f6;
+            border-radius: 8px;
+            padding: 0.9rem 1rem;
+            font-size: 0.9rem;
+            color: #374151;
+        }
+        .mysr-form-wrap {
+            padding: 0 1.5rem;
         }
         .secure-badge {
             text-align: center;
             font-size: 0.75rem;
             color: #9ca3af;
-            margin-top: 2rem;
+            margin-top: 1.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
         .secure-badge svg {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
         }
     </style>
 </head>
 <body>
     <div class="checkout-container">
-        <div class="checkout-header">
-            @if(!empty($moyasarConfig['logo_url']))
-                <img src="{{ $moyasarConfig['logo_url'] }}" alt="Logo">
-            @else
-                <img src="https://back.nathefah.com/logo.jpeg" alt="Nathefah Logo" onerror="this.style.display='none'">
-            @endif
+        <div class="topbar">
             <h1>{{ __('payment.complete_your_payment') }}</h1>
-            <p>{{ $moyasarConfig['description'] ?? 'Nathefah Order' }}</p>
+            <svg class="back-arrow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M{{ app()->getLocale() === 'ar' ? '14 5l7 7-7 7M21 12H3' : '10 19l-7-7 7-7M3 12h18' }}" />
+            </svg>
+        </div>
+        <div class="topbar-spacer"></div>
+
+        <div class="amount-block">
+            <div class="meta">
+                <span class="amount">{{ number_format(($moyasarConfig['amount'] ?? 0) / 100, 2) }} {{ $moyasarConfig['currency'] ?? 'SAR' }}</span>
+                <span class="datetime">{{ now()->format('Y-m-d h:i A') }}</span>
+                <span class="reference">{{ $transaction->transaction_id }}</span>
+            </div>
+            @if(!empty($moyasarConfig['logo_url']))
+                <img class="brand-logo" src="{{ $moyasarConfig['logo_url'] }}" alt="Logo">
+            @else
+                <img class="brand-logo" src="https://back.nathefah.com/logo.jpeg" alt="Nathefah Logo" onerror="this.style.display='none'">
+            @endif
         </div>
 
-        <div class="order-details">
-            <div>
-                <span class="label">{{ __('Amount') }}</span>
-                <span class="value">{{ number_format(($moyasarConfig['amount'] ?? 0) / 100, 2) }} {{ $moyasarConfig['currency'] ?? 'SAR' }}</span>
-            </div>
-            <div style="text-align: {{ app()->getLocale() === 'ar' ? 'left' : 'right' }};">
-                <span class="label">{{ __('Reference') }}</span>
-                <span class="value" style="font-size: 0.875rem;">{{ str_replace('ORD-', '', $transaction->transaction_id) }}</span>
-            </div>
-        </div>
+        <div class="description-box">{{ $moyasarConfig['description'] ?? 'Nathefah Order' }}</div>
 
         <!-- The Moyasar Form Container -->
-        <div class="mysr-form"></div>
+        <div class="mysr-form-wrap">
+            <div class="mysr-form"></div>
+        </div>
 
         <div class="secure-badge">
-            <svg xmlns="http://www.w3.org/Dom/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
             {{ __('Secured by Moyasar') }}
