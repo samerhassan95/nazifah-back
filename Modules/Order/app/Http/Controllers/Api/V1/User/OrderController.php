@@ -1607,11 +1607,28 @@ class OrderController extends Controller
             ]);
 
             if (empty($checkoutGatewayPayments)) {
-                app(\App\Services\OrderNotificationService::class)
-                    ->sendOrderCreatedNotificationsIfNeeded($order);
+                $orderId = (int) $order->id;
 
-                app(\Modules\Invoice\Services\InvoiceService::class)
-                    ->issueForOrder($order->fresh(['client', 'branch.vendor', 'items.piece', 'items.service']), null, 'order_create_paid');
+                dispatch(function () use ($orderId): void {
+                    $order = Order::find($orderId);
+                    if (! $order) {
+                        return;
+                    }
+
+                    try {
+                        app(\App\Services\OrderNotificationService::class)
+                            ->sendOrderCreatedNotificationsIfNeeded($order);
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
+
+                    try {
+                        app(\Modules\Invoice\Services\InvoiceService::class)
+                            ->issueForOrder($order->fresh(['client', 'branch.vendor', 'items.piece', 'items.service']), null, 'order_create_paid');
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
+                })->afterResponse();
             }
 
             $responseData = [
