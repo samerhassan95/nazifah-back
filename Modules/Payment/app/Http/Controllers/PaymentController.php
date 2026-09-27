@@ -873,6 +873,13 @@ class PaymentController extends Controller
             abort(404, 'Checkout session is not ready');
         }
 
+        // The app's default locale is 'en' (APP_LOCALE), so without this the
+        // blade's own __() text (title, Amount/Reference labels) renders in
+        // English while the embedded moyasar.js widget - which reads
+        // config.language independently - correctly shows Arabic. Match the
+        // page's static text to the same language the widget was built with.
+        app()->setLocale($moyasarConfig['language'] ?? 'ar');
+
         return response()
             ->view('payment::moyasar_checkout', [
                 'transaction' => $transaction,
