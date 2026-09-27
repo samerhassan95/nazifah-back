@@ -596,6 +596,7 @@ class WalletController extends Controller
             $walletTxn = $settlement['wallet_txn'];
             $newBalance = DB::table('clients')->where('id', $user->id)->value('wallet_balance');
             $successMessage = $this->walletDepositResultMessage((float) $paymentTransaction->amount);
+            $resolvedBrand = $paymentTransaction->card_brand ?? ($walletTxn->card_brand ?? null);
 
             return successResponse([
                 'status' => 'completed',
@@ -607,6 +608,8 @@ class WalletController extends Controller
                     'amount' => (float) $paymentTransaction->amount,
                     'payment_method' => $paymentTransaction->payment_method,
                     'payment_method_label' => $this->paymentMethodLabel($paymentTransaction->payment_method),
+                    'card_brand' => $resolvedBrand,
+                    'card_brand_label' => $this->paymentMethodLabel($resolvedBrand),
                     'status' => 'completed',
                     'date' => now()->toISOString(),
                 ],
