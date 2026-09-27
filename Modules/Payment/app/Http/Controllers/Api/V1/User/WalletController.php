@@ -552,8 +552,8 @@ class WalletController extends Controller
                 if (! $verificationResponse->isSuccessful()) {
                     return errorResponse(
                         $verificationResponse->message ?? __('payment.payment_verification_failed'),
-                        $verificationResponse->status === 'pending' ? 202 : 400,
-                        ['status' => $verificationResponse->status]
+                        ['status' => $verificationResponse->status],
+                        $verificationResponse->status === 'pending' ? 202 : 400
                     );
                 }
 
@@ -595,9 +595,14 @@ class WalletController extends Controller
 
             $walletTxn = $settlement['wallet_txn'];
             $newBalance = DB::table('clients')->where('id', $user->id)->value('wallet_balance');
+            $successMessage = $this->walletDepositResultMessage(
+                (float) $paymentTransaction->amount,
+                ! $settlement['credited']
+            );
 
             return successResponse([
                 'status' => 'completed',
+                'message' => $successMessage,
                 'transaction' => [
                     'wallet_txn_id' => $walletTxn?->id,
                     'payment_transaction_id' => $paymentTransaction->id,
@@ -609,11 +614,14 @@ class WalletController extends Controller
                     'date' => now()->toISOString(),
                 ],
                 'balance' => (float) $newBalance,
-            ], $settlement['credited']
-                ? __('payment.deposit_verified_wallet_updated')
-                : __('payment.deposit_already_verified'));
+            ], $successMessage);
         } catch (\Exception $e) {
-            return serverErrorResponse(__('payment.failed_to_verify_deposit').': '.$e->getMessage());
+            Log::channel('payment')->error('Native Moyasar wallet deposit confirmation failed', [
+                'error' => $e->getMessage(),
+                'client_id' => $user->id,
+            ]);
+
+            return serverErrorResponse(__('payment.failed_to_verify_deposit'));
         }
     }
 
@@ -652,10 +660,14 @@ class WalletController extends Controller
                 $currentBalance = DB::table('clients')
                     ->where('id', $user->id)
                     ->value('wallet_balance');
+                $successMessage = $this->walletDepositResultMessage(
+                    (float) $existingWalletTxn->amount,
+                    true
+                );
 
                 return successResponse([
                     'status' => 'completed',
-                    'message' => __('payment.deposit_already_processed'),
+                    'message' => $successMessage,
                     'transaction' => [
                         'wallet_txn_id' => $existingWalletTxn->id,
                         'payment_transaction_id' => $paymentTransaction->id,
@@ -671,7 +683,7 @@ class WalletController extends Controller
                         'date' => $existingWalletTxn->created_at,
                     ],
                     'balance' => (float) $currentBalance,
-                ], __('payment.deposit_already_verified'));
+                ], $successMessage);
             }
 
             // If Flutter passes an 'id' or 'payment_id' in the query, save it in response_data & fort_id
@@ -743,11 +755,11 @@ class WalletController extends Controller
 
                     return errorResponse(
                         $capture->message ?? __('payment.payment_verification_failed'),
-                        400,
                         [
                             'status' => 'authorized',
                             'transaction_id' => $paymentTransaction->transaction_id,
-                        ]
+                        ],
+                        400
                     );
                 }
             }
@@ -774,12 +786,14 @@ class WalletController extends Controller
                     $resolvedMethod = $paymentTransaction->payment_method ?? $metadata['payment_method'] ?? 'unknown';
                     $resolvedBrand = $paymentTransaction->card_brand
                         ?? ($walletTxn->card_brand ?? null);
+                    $successMessage = $this->walletDepositResultMessage(
+                        (float) $paymentTransaction->amount,
+                        ! $settlement['credited']
+                    );
 
                     return successResponse([
                         'status' => 'completed',
-                        'message' => $settlement['credited']
-                            ? __('payment.deposit_verified_successfully')
-                            : __('payment.deposit_already_processed'),
+                        'message' => $successMessage,
                         'transaction' => [
                             'wallet_txn_id' => $walletTxn?->id,
                             'payment_transaction_id' => $paymentTransaction->id,
@@ -793,26 +807,35 @@ class WalletController extends Controller
                             'date' => now()->toISOString(),
                         ],
                         'balance' => (float) $newBalance,
-                    ], $settlement['credited']
-                        ? __('payment.deposit_verified_wallet_updated')
-                        : __('payment.deposit_already_verified'));
+                    ], $successMessage);
                 } catch (\Exception $e) {
-                    return serverErrorResponse(__('payment.failed_to_update_wallet').': '.$e->getMessage());
+                    Log::channel('payment')->error('Verified Moyasar wallet deposit update failed', [
+                        'error' => $e->getMessage(),
+                        'transaction_id' => $paymentTransaction->transaction_id,
+                    ]);
+
+                    return serverErrorResponse(__('payment.failed_to_update_wallet'));
                 }
             }
 
             // Payment verification failed or is still pending
             return errorResponse(
                 $verificationResponse->message ?? __('payment.payment_verification_failed'),
-                $verificationResponse->status === 'pending' ? 202 : 400,
                 [
                     'status' => $verificationResponse->status,
                     'transaction_id' => $paymentTransaction->transaction_id,
-                ]
+                ],
+                $verificationResponse->status === 'pending' ? 202 : 400
             );
 
         } catch (\Exception $e) {
-            return serverErrorResponse(__('payment.failed_to_verify_deposit').': '.$e->getMessage());
+            Log::channel('payment')->error('Wallet deposit verification failed', [
+                'error' => $e->getMessage(),
+                'transaction_id' => $transactionId,
+                'client_id' => $user->id,
+            ]);
+
+            return serverErrorResponse(__('payment.failed_to_verify_deposit'));
         }
     }
 
@@ -964,6 +987,17 @@ class WalletController extends Controller
         }
 
         return null;
+    }
+
+    private function walletDepositResultMessage(float $amount, bool $alreadyProcessed): string
+    {
+        $formattedAmount = rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
+
+        return __($alreadyProcessed
+            ? 'payment.wallet_deposit_already_processed_amount'
+            : 'payment.wallet_deposit_success_amount', [
+                'amount' => $formattedAmount,
+            ]);
     }
 
     /**

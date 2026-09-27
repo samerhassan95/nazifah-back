@@ -79,6 +79,18 @@ return [
     'moyasar_error_stolen_card' => 'This card was reported stolen. Please use another card.',
     'moyasar_error_fraud' => 'The transaction was declined as suspected fraud.',
     'moyasar_error_amount_exceeded' => 'The amount exceeds the maximum allowed per transaction.',
+    'moyasar_error_issuer_referred' => 'Your bank could not approve the transaction. Contact your bank or use another card.',
+    'moyasar_error_invalid_amount' => 'The amount is invalid. Check it and try again.',
+    'moyasar_error_card_not_supported' => 'This card cannot be used for this transaction. Please use another card.',
+    'moyasar_error_pin' => 'The card PIN could not be verified. Please try again or use another card.',
+    'moyasar_error_limit_exceeded' => 'The card limit was exceeded. Use another card or contact your bank.',
+    'moyasar_error_card_restricted' => 'Restrictions on this card prevent the transaction. Contact your bank or use another card.',
+    'moyasar_error_duplicate' => 'This appears to be a duplicate transaction. Check its payment status before retrying.',
+    'moyasar_error_issuer_unavailable' => 'The bank is currently unavailable to process this payment. Please try again later.',
+
+    // Successful wallet deposit confirmation
+    'wallet_deposit_success_amount' => 'Wallet topped up by :amount SAR',
+    'wallet_deposit_already_processed_amount' => 'Wallet was already topped up by :amount SAR',
 
     // Payment status short labels (API payment_status_label)
     'status_completed' => 'Completed',

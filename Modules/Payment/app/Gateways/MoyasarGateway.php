@@ -456,7 +456,7 @@ class MoyasarGateway extends AbstractPaymentGateway
                 success: false,
                 transactionId: $transactionId,
                 status: 'failed',
-                message: $e->getMessage()
+                message: app(MoyasarErrorLocalizer::class)->localize($e->getMessage())
             );
         }
     }
@@ -1092,6 +1092,9 @@ class MoyasarGateway extends AbstractPaymentGateway
     {
         $source = $payment['source'] ?? [];
         $source = is_array($source) ? $source : [];
+        if (! isset($source['response_code']) && isset($payment['response_code'])) {
+            $source['response_code'] = $payment['response_code'];
+        }
         $sourceMessage = $source['message'] ?? null;
 
         if ($isSuccess) {

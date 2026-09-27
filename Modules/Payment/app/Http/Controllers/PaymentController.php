@@ -807,6 +807,21 @@ class PaymentController extends Controller
 
         if ($paid && $order) {
             $message = __('order.payment_completed');
+        } elseif (
+            strtolower((string) $transaction->gateway) === 'moyasar'
+            && ! empty($transaction->error_message)
+            && in_array($transaction->status, ['pending', 'failed', 'cancelled'], true)
+        ) {
+            $rawResponse = $transaction->response_data['raw_response'] ?? [];
+            $source = is_array($rawResponse['source'] ?? null) ? $rawResponse['source'] : [];
+            if (! isset($source['response_code']) && isset($rawResponse['response_code'])) {
+                $source['response_code'] = $rawResponse['response_code'];
+            }
+
+            $message = app(\Modules\Payment\Services\MoyasarErrorLocalizer::class)->localize(
+                $transaction->error_message,
+                $source
+            );
         } elseif ($transaction->status === 'pending') {
             $message = __('order.no_payment_initiated');
         } else {

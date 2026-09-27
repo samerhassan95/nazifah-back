@@ -13,8 +13,16 @@ class MoyasarErrorLocalizer
      */
     public function localize(?string $rawMessage, ?array $source = null): string
     {
+        $responseCode = is_array($source)
+            ? strtolower(trim((string) ($source['response_code'] ?? '')))
+            : '';
+
+        if ($responseCode !== '' && ($byCode = $this->byFailureReason($responseCode)) !== null) {
+            return $byCode;
+        }
+
         $failureReason = is_array($source)
-            ? strtolower(trim((string) ($source['failure_reason'] ?? $source['response_code'] ?? '')))
+            ? strtolower(trim((string) ($source['failure_reason'] ?? '')))
             : '';
 
         if ($failureReason !== '' && ($byReason = $this->byFailureReason($failureReason)) !== null) {
@@ -80,6 +88,62 @@ class MoyasarErrorLocalizer
             'timed_out' => 'payment.moyasar_error_timed_out',
             'unspecified_failure' => 'payment.moyasar_error_unspecified',
             'referred' => 'payment.moyasar_error_referred',
+            '01' => 'payment.moyasar_error_issuer_referred',
+            '02' => 'payment.moyasar_error_issuer_referred',
+            '03' => 'payment.moyasar_error_generic',
+            '04' => 'payment.moyasar_error_blocked',
+            '05' => 'payment.moyasar_error_declined',
+            '06' => 'payment.moyasar_error_invalid_card',
+            '07' => 'payment.moyasar_error_blocked',
+            '09' => 'payment.moyasar_error_issuer_referred',
+            '12' => 'payment.moyasar_error_generic',
+            '13' => 'payment.moyasar_error_invalid_amount',
+            '14' => 'payment.moyasar_error_invalid_card',
+            '15' => 'payment.moyasar_error_invalid_card',
+            '19' => 'payment.moyasar_error_generic',
+            '21' => 'payment.moyasar_error_issuer_referred',
+            '22' => 'payment.moyasar_error_issuer_unavailable',
+            '23' => 'payment.moyasar_error_generic',
+            '25' => 'payment.moyasar_error_invalid_card',
+            '30' => 'payment.moyasar_error_generic',
+            '31' => 'payment.moyasar_error_card_not_supported',
+            '33' => 'payment.moyasar_error_expired_card',
+            '34' => 'payment.moyasar_error_fraud',
+            '35' => 'payment.moyasar_error_blocked',
+            '36' => 'payment.moyasar_error_blocked',
+            '37' => 'payment.moyasar_error_blocked',
+            '38' => 'payment.moyasar_error_pin',
+            '39' => 'payment.moyasar_error_card_not_supported',
+            '40' => 'payment.moyasar_error_card_not_supported',
+            '41' => 'payment.moyasar_error_stolen_card',
+            '42' => 'payment.moyasar_error_card_not_supported',
+            '43' => 'payment.moyasar_error_stolen_card',
+            '44' => 'payment.moyasar_error_card_not_supported',
+            '51' => 'payment.moyasar_error_insufficient_funds',
+            '52' => 'payment.moyasar_error_card_not_supported',
+            '53' => 'payment.moyasar_error_card_not_supported',
+            '54' => 'payment.moyasar_error_expired_card',
+            '55' => 'payment.moyasar_error_pin',
+            '56' => 'payment.moyasar_error_invalid_card',
+            '57' => 'payment.moyasar_error_card_not_supported',
+            '59' => 'payment.moyasar_error_fraud',
+            '60' => 'payment.moyasar_error_declined',
+            '61' => 'payment.moyasar_error_limit_exceeded',
+            '62' => 'payment.moyasar_error_card_restricted',
+            '63' => 'payment.moyasar_error_blocked',
+            '64' => 'payment.moyasar_error_invalid_amount',
+            '65' => 'payment.moyasar_error_limit_exceeded',
+            '66' => 'payment.moyasar_error_declined',
+            '67' => 'payment.moyasar_error_blocked',
+            '75' => 'payment.moyasar_error_pin',
+            '79' => 'payment.moyasar_error_invalid_card',
+            '82' => 'payment.moyasar_error_invalid_cvc',
+            '90' => 'payment.moyasar_error_issuer_unavailable',
+            '91' => 'payment.moyasar_error_issuer_unavailable',
+            '92' => 'payment.moyasar_error_issuer_unavailable',
+            '93' => 'payment.moyasar_error_declined',
+            '94' => 'payment.moyasar_error_duplicate',
+            '96' => 'payment.moyasar_error_issuer_unavailable',
         ];
 
         $key = $map[$reason] ?? null;

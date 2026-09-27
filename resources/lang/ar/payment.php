@@ -79,6 +79,18 @@ return [
     'moyasar_error_stolen_card' => 'تم الإبلاغ عن البطاقة كمسروقة. يرجى استخدام بطاقة أخرى.',
     'moyasar_error_fraud' => 'العملية مشتبه بها كاحتيال وتم رفضها.',
     'moyasar_error_amount_exceeded' => 'المبلغ تجاوز الحد الأقصى المسموح لكل عملية.',
+    'moyasar_error_issuer_referred' => 'تعذر على البنك اعتماد العملية. يرجى التواصل مع البنك أو استخدام بطاقة أخرى.',
+    'moyasar_error_invalid_amount' => 'المبلغ غير صحيح. يرجى مراجعة المبلغ والمحاولة مرة أخرى.',
+    'moyasar_error_card_not_supported' => 'البطاقة لا تسمح بهذا النوع من العمليات. يرجى استخدام بطاقة أخرى.',
+    'moyasar_error_pin' => 'تعذر التحقق من الرقم السري للبطاقة. يرجى المحاولة أو استخدام بطاقة أخرى.',
+    'moyasar_error_limit_exceeded' => 'تجاوزت العملية الحد المسموح للبطاقة. يرجى استخدام بطاقة أخرى أو التواصل مع البنك.',
+    'moyasar_error_card_restricted' => 'البطاقة عليها قيود تمنع إتمام العملية. يرجى التواصل مع البنك أو استخدام بطاقة أخرى.',
+    'moyasar_error_duplicate' => 'يبدو أن العملية مكررة. تحقق من حالة الدفع قبل إعادة المحاولة.',
+    'moyasar_error_issuer_unavailable' => 'البنك غير متاح حالياً لمعالجة الدفع. يرجى المحاولة لاحقاً.',
+
+    // Successful wallet deposit confirmation
+    'wallet_deposit_success_amount' => 'تم شحن المحفظة بقيمة :amount ريال',
+    'wallet_deposit_already_processed_amount' => 'تم شحن المحفظة مسبقاً بقيمة :amount ريال',
 
     // Payment status short labels (API payment_status_label)
     'status_completed' => 'مكتمل',
