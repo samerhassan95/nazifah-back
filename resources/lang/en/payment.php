@@ -90,7 +90,6 @@ return [
 
     // Successful wallet deposit confirmation
     'wallet_deposit_success_amount' => 'Wallet topped up by :amount SAR',
-    'wallet_deposit_already_processed_amount' => 'Wallet was already topped up by :amount SAR',
 
     // Payment status short labels (API payment_status_label)
     'status_completed' => 'Completed',

@@ -90,7 +90,6 @@ return [
 
     // Successful wallet deposit confirmation
     'wallet_deposit_success_amount' => 'تم شحن المحفظة بقيمة :amount ريال',
-    'wallet_deposit_already_processed_amount' => 'تم شحن المحفظة مسبقاً بقيمة :amount ريال',
 
     // Payment status short labels (API payment_status_label)
     'status_completed' => 'مكتمل',

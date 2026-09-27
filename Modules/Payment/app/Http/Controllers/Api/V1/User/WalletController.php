@@ -595,10 +595,7 @@ class WalletController extends Controller
 
             $walletTxn = $settlement['wallet_txn'];
             $newBalance = DB::table('clients')->where('id', $user->id)->value('wallet_balance');
-            $successMessage = $this->walletDepositResultMessage(
-                (float) $paymentTransaction->amount,
-                ! $settlement['credited']
-            );
+            $successMessage = $this->walletDepositResultMessage((float) $paymentTransaction->amount);
 
             return successResponse([
                 'status' => 'completed',
@@ -660,10 +657,7 @@ class WalletController extends Controller
                 $currentBalance = DB::table('clients')
                     ->where('id', $user->id)
                     ->value('wallet_balance');
-                $successMessage = $this->walletDepositResultMessage(
-                    (float) $existingWalletTxn->amount,
-                    true
-                );
+                $successMessage = $this->walletDepositResultMessage((float) $existingWalletTxn->amount);
 
                 return successResponse([
                     'status' => 'completed',
@@ -786,10 +780,7 @@ class WalletController extends Controller
                     $resolvedMethod = $paymentTransaction->payment_method ?? $metadata['payment_method'] ?? 'unknown';
                     $resolvedBrand = $paymentTransaction->card_brand
                         ?? ($walletTxn->card_brand ?? null);
-                    $successMessage = $this->walletDepositResultMessage(
-                        (float) $paymentTransaction->amount,
-                        ! $settlement['credited']
-                    );
+                    $successMessage = $this->walletDepositResultMessage((float) $paymentTransaction->amount);
 
                     return successResponse([
                         'status' => 'completed',
@@ -989,15 +980,13 @@ class WalletController extends Controller
         return null;
     }
 
-    private function walletDepositResultMessage(float $amount, bool $alreadyProcessed): string
+    private function walletDepositResultMessage(float $amount): string
     {
         $formattedAmount = rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
 
-        return __($alreadyProcessed
-            ? 'payment.wallet_deposit_already_processed_amount'
-            : 'payment.wallet_deposit_success_amount', [
-                'amount' => $formattedAmount,
-            ]);
+        return __('payment.wallet_deposit_success_amount', [
+            'amount' => $formattedAmount,
+        ]);
     }
 
     /**
