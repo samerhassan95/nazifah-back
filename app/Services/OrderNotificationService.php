@@ -156,13 +156,14 @@ class OrderNotificationService
 
     public function pushToUser(
         Model $user,
+        string $userType,
         string $titleAr,
         string $titleEn,
         string $bodyAr,
         string $bodyEn,
         array $data = []
     ): void {
-        $this->userNotifications->pushToUser($user, $titleAr, $titleEn, $bodyAr, $bodyEn, $data);
+        $this->userNotifications->pushToUser($user, $userType, $titleAr, $titleEn, $bodyAr, $bodyEn, $data);
     }
 
     /**

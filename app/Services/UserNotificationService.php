@@ -22,6 +22,16 @@ class UserNotificationService
 
     private const NEW_ORDER_ANDROID_CHANNEL = 'new_order_channel';
 
+    /**
+     * Vendor gets its own (longer) action tone — client and driver share
+     * NEW_ORDER_SOUND above. The mobile app must bundle a sound file with
+     * this exact name (Android: res/raw/vendor_new_order.wav or .mp3;
+     * iOS: added to the app bundle) for this to actually play.
+     */
+    private const VENDOR_NEW_ORDER_SOUND = 'vendor_new_order.wav';
+
+    private const VENDOR_NEW_ORDER_ANDROID_CHANNEL = 'vendor_new_order_channel';
+
     public function __construct(
         protected FirebaseService $firebaseService,
         protected NotificationSmsService $notificationSms,
@@ -71,7 +81,7 @@ class UserNotificationService
                 $this->flattenForFcm($data)
             );
 
-            $this->pushToUser($user, $titleAr, $titleEn, $bodyAr, $bodyEn, $pushData);
+            $this->pushToUser($user, $userType, $titleAr, $titleEn, $bodyAr, $bodyEn, $pushData);
         } catch (\Throwable $e) {
             $this->logWarning('Notification FCM push failed', $userType, (int) $user->id, $e);
         }
@@ -98,6 +108,7 @@ class UserNotificationService
      */
     public function pushToUser(
         Model $user,
+        string $userType,
         string $titleAr,
         string $titleEn,
         string $bodyAr,
@@ -111,6 +122,7 @@ class UserNotificationService
                 $this->sendPushToToken(
                     $fcmToken->token,
                     $fcmToken->lang,
+                    $userType,
                     $titleAr,
                     $titleEn,
                     $bodyAr,
@@ -131,6 +143,7 @@ class UserNotificationService
             $this->sendPushToToken(
                 (string) $user->fcm_token,
                 $lang,
+                $userType,
                 $titleAr,
                 $titleEn,
                 $bodyAr,
@@ -146,6 +159,7 @@ class UserNotificationService
     private function sendPushToToken(
         string $token,
         ?string $lang,
+        string $userType,
         string $titleAr,
         string $titleEn,
         string $bodyAr,
@@ -158,15 +172,18 @@ class UserNotificationService
 
         $notificationType = (string) ($data['notification_type'] ?? $data['type'] ?? '');
         $useNewOrderSound = $this->usesNewOrderSound($notificationType);
+        $isVendor = $userType === 'vendor';
 
         $payload = [
             'title' => NotificationLocale::pick($titleAr, $titleEn, $lang),
             'body' => NotificationLocale::pick($bodyAr, $bodyEn, $lang),
-            'sound' => $useNewOrderSound ? self::NEW_ORDER_SOUND : 'notification.wav',
+            'sound' => $useNewOrderSound
+                ? ($isVendor ? self::VENDOR_NEW_ORDER_SOUND : self::NEW_ORDER_SOUND)
+                : 'notification.wav',
         ];
 
         if ($useNewOrderSound) {
-            $payload['channel_id'] = self::NEW_ORDER_ANDROID_CHANNEL;
+            $payload['channel_id'] = $isVendor ? self::VENDOR_NEW_ORDER_ANDROID_CHANNEL : self::NEW_ORDER_ANDROID_CHANNEL;
         }
 
         $this->firebaseService->sendToDevice($token, $this->flattenForFcm($data), $payload);
