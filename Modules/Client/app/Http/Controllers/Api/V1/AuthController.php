@@ -155,75 +155,86 @@ class AuthController extends Controller
                 return ErrorResponse::make(__('auth.invalid_otp'), null, 401);
             }
 
-            // Check if client exists in database by phone
-            $client = Client::where('phone', $session->phone)->first();
-
             // Get full name from request or session
             $fullName = $session->name;
 
-            if (! $client) {
-                // Create new client (registration) - full_name must be available
-                if (! $fullName) {
-                    return ErrorResponse::make(
-                        __('auth.validation_error'),
-                        ['full_name' => [__('validation.required', ['attribute' => __('client.full_name') ?: 'full name'])]],
-                        422
-                    );
-                }
+            // Serialize concurrent verify-otp calls for the same phone (double-tap,
+            // network retry) so only one request ever creates/updates the client row —
+            // the second waits, then sees the first request's committed result instead
+            // of racing it (which previously could hit clients_phone_unique and 500).
+            $lock = \Illuminate\Support\Facades\Cache::lock('verify-otp-client:'.$session->phone, 10);
 
-                try {
-                    $client = Client::create([
-                        'phone' => $session->phone,
-                        'full_name' => $fullName,
-                        'email' => null,
-                        'is_verified' => true,
-                    ]);
-                } catch (\Illuminate\Database\QueryException $e) {
-                    // A concurrent verify-otp request for the same phone (double-tap,
-                    // network retry) can win the create() race between our lookup above
-                    // and this insert. Treat "someone else just created it" as success
-                    // instead of a 500 — re-fetch and continue as the existing-client path.
-                    if ((int) $e->getCode() !== 23000) {
-                        throw $e;
+            try {
+                $lock->block(5);
+
+                // Check if client exists in database by phone
+                $client = Client::where('phone', $session->phone)->first();
+
+                if (! $client) {
+                    // Create new client (registration) - full_name must be available
+                    if (! $fullName) {
+                        return ErrorResponse::make(
+                            __('auth.validation_error'),
+                            ['full_name' => [__('validation.required', ['attribute' => __('client.full_name') ?: 'full name'])]],
+                            422
+                        );
                     }
 
-                    $client = Client::where('phone', $session->phone)->first();
-                    if (! $client) {
-                        throw $e;
+                    try {
+                        $client = Client::create([
+                            'phone' => $session->phone,
+                            'full_name' => $fullName,
+                            'email' => null,
+                            'is_verified' => true,
+                        ]);
+                    } catch (\Illuminate\Database\QueryException $e) {
+                        // Defense in depth: the lock above should make this unreachable,
+                        // but if it is ever bypassed (lock store misconfigured, TTL
+                        // exceeded), fall back to re-fetching instead of a raw 500.
+                        if ((int) $e->getCode() !== 23000) {
+                            throw $e;
+                        }
+
+                        $client = Client::where('phone', $session->phone)->first();
+                        if (! $client) {
+                            throw $e;
+                        }
+                    }
+
+                    $session->update(['client_id' => $client->id]);
+                } else {
+                    // Check if client is banned
+                    if ($client->is_banned) {
+                        return ErrorResponse::make(
+                            __('auth.account_banned'),
+                            [
+                                'is_banned' => true,
+                                'ban_reason' => $client->ban_reason,
+                                'banned_at' => $client->banned_at?->toDateTimeString(),
+                            ],
+                            403
+                        );
+                    }
+
+                    // Update existing client
+                    $updateData = [];
+
+                    // Update name if provided (full_name is a string, not JSON)
+                    if ($fullName) {
+                        $updateData['full_name'] = $fullName;
+                    }
+
+                    // Update verification status if needed
+                    if (! $client->is_verified) {
+                        $updateData['is_verified'] = true;
+                    }
+
+                    if (! empty($updateData)) {
+                        $client->update($updateData);
                     }
                 }
-
-                $session->update(['client_id' => $client->id]);
-            } else {
-                // Check if client is banned
-                if ($client->is_banned) {
-                    return ErrorResponse::make(
-                        __('auth.account_banned'),
-                        [
-                            'is_banned' => true,
-                            'ban_reason' => $client->ban_reason,
-                            'banned_at' => $client->banned_at?->toDateTimeString(),
-                        ],
-                        403
-                    );
-                }
-
-                // Update existing client
-                $updateData = [];
-
-                // Update name if provided (full_name is a string, not JSON)
-                if ($fullName) {
-                    $updateData['full_name'] = $fullName;
-                }
-
-                // Update verification status if needed
-                if (! $client->is_verified) {
-                    $updateData['is_verified'] = true;
-                }
-
-                if (! empty($updateData)) {
-                    $client->update($updateData);
-                }
+            } finally {
+                $lock->release();
             }
 
             // Add or update FCM token if provided
