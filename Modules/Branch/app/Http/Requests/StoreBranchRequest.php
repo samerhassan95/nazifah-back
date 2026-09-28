@@ -3,6 +3,7 @@
 namespace Modules\Branch\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreBranchRequest extends FormRequest
 {
@@ -36,8 +37,14 @@ class StoreBranchRequest extends FormRequest
         return [
             'vendor_id' => 'required|integer|exists:vendors,id',
             'name' => ['required', 'array'],
-            'name.ar' => ['required', 'string', 'max:255'],
-            'name.en' => ['required', 'string', 'max:255'],
+            'name.ar' => [
+                'required', 'string', 'max:255',
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $this->input('vendor_id'))),
+            ],
+            'name.en' => [
+                'required', 'string', 'max:255',
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $this->input('vendor_id'))),
+            ],
             'location' => ['nullable', 'array'],
             'location.ar' => ['nullable', 'string'],
             'location.en' => ['nullable', 'string'],

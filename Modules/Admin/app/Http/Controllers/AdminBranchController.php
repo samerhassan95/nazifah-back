@@ -5,6 +5,7 @@ namespace Modules\Admin\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Modules\Admin\Http\Requests\UpdateBranchRequest;
 use Modules\Admin\Http\Resources\BranchResource;
 use Modules\Branch\Models\Branch;
@@ -62,7 +63,14 @@ class AdminBranchController extends Controller
             'vendor_id' => 'required|exists:vendors,id',
             // accept translated name as array (title[ar], title[en]) or string
             'name' => 'required_without:name',
-            'name' => 'required_without:name',
+            'name.ar' => [
+                'sometimes', 'string',
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $request->input('vendor_id'))),
+            ],
+            'name.en' => [
+                'sometimes', 'string',
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $request->input('vendor_id'))),
+            ],
             'phone' => 'nullable|string',
             'phone_number' => 'nullable|string',
             'address' => 'nullable',

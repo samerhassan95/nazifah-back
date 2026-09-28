@@ -268,10 +268,18 @@ class BranchesController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $vendorId = $request->user()->vendor_id;
+
         $validator = Validator::make($request->all(), [
             'name' => ['required_without_all:name.ar,name.en'],
-            'name.ar' => ['required_without:name', 'string', 'max:255'],
-            'name.en' => ['required_without:name', 'string', 'max:255'],
+            'name.ar' => [
+                'required_without:name', 'string', 'max:255',
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $vendorId)),
+            ],
+            'name.en' => [
+                'required_without:name', 'string', 'max:255',
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $vendorId)),
+            ],
             'phone_number' => ['required', 'string'],
             'land_phone' => ['nullable', 'string'],
             'description' => ['nullable'],
@@ -292,7 +300,6 @@ class BranchesController extends Controller
         }
 
         $employee = $request->user();
-        $vendorId = $employee->vendor_id;
 
         // Ensure branch location is inside a defined zone
         $lat = (float) $request->location_gps['lat'];
@@ -443,10 +450,18 @@ class BranchesController extends Controller
      */
     public function update(Request $request, $branchId): JsonResponse
     {
+        $vendorId = $request->user()->vendor_id;
+
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes'],
-            'name.ar' => ['required_with:name', 'string', 'max:255'],
-            'name.en' => ['required_with:name', 'string', 'max:255'],
+            'name.ar' => [
+                'required_with:name', 'string', 'max:255',
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId),
+            ],
+            'name.en' => [
+                'required_with:name', 'string', 'max:255',
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId),
+            ],
             'phone_number' => ['sometimes', 'string'],
             'land_phone' => ['nullable', 'string'],
             'description' => ['nullable'],
@@ -467,7 +482,6 @@ class BranchesController extends Controller
         }
 
         $employee = $request->user();
-        $vendorId = $employee->vendor_id;
 
         $branch = Branch::where('id', $branchId)
             ->where('vendor_id', $vendorId)

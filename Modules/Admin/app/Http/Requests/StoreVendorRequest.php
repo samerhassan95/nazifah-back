@@ -3,6 +3,7 @@
 namespace Modules\Admin\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreVendorRequest extends FormRequest
 {
@@ -16,8 +17,8 @@ class StoreVendorRequest extends FormRequest
     {
         return [
             'name' => ['required', 'array'],
-            'name.ar' => ['required', 'string', 'max:255'],
-            'name.en' => ['required', 'string', 'max:255'],
+            'name.ar' => ['required', 'string', 'max:255', Rule::unique('vendors', 'name->ar')],
+            'name.en' => ['required', 'string', 'max:255', Rule::unique('vendors', 'name->en')],
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
             'email' => 'required|email|unique:vendors,email',
             'official_number' => 'nullable|string',

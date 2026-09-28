@@ -19,8 +19,8 @@ class UpdateVendorRequest extends FormRequest
 
         return [
             'name' => ['nullable', 'array'],
-            'name.ar' => ['nullable', 'string', 'max:255'],
-            'name.en' => ['nullable', 'string', 'max:255'],
+            'name.ar' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->ar')->ignore($vendorId)],
+            'name.en' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->en')->ignore($vendorId)],
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
             'email' => ['nullable', 'email', Rule::unique('vendors', 'email')->ignore($vendorId)],
             'official_number' => 'nullable|string',

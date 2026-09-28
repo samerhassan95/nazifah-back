@@ -3,6 +3,8 @@
 namespace Modules\Branch\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Modules\Branch\Models\Branch;
 
 class UpdateBranchRequest extends FormRequest
 {
@@ -33,11 +35,21 @@ class UpdateBranchRequest extends FormRequest
      */
     public function rules(): array
     {
+        $branchId = $this->route('id');
+        $vendorId = $this->input('vendor_id')
+            ?? Branch::whereKey($branchId)->value('vendor_id');
+
         return [
             'vendor_id' => 'sometimes|integer|exists:vendors,id',
             'name' => ['sometimes', 'array'],
-            'name.ar' => ['sometimes', 'string', 'max:255'],
-            'name.en' => ['sometimes', 'string', 'max:255'],
+            'name.ar' => [
+                'sometimes', 'string', 'max:255',
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId),
+            ],
+            'name.en' => [
+                'sometimes', 'string', 'max:255',
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId),
+            ],
             'location' => ['nullable', 'array'],
             'location.ar' => ['nullable', 'string'],
             'location.en' => ['nullable', 'string'],
