@@ -47,11 +47,7 @@ class AdminLaundryServiceController extends Controller
         } elseif ($branchId) {
             $query->whereHas('branches', fn ($q) => $q->where('branches.id', $branchId));
         } elseif ($vendorId) {
-            $query->where(function ($q) use ($vendorId) {
-                $q->whereHas('vendors', fn ($v) => $v->where('vendors.id', $vendorId))
-                    ->orWhereHas('branches', fn ($b) => $b->where('branches.vendor_id', $vendorId))
-                    ->orWhereHas('pieces', fn ($p) => $p->where('pieces.vendor_id', $vendorId));
-            });
+            $query->whereHas('vendors', fn ($v) => $v->where('vendors.id', $vendorId));
         }
 
         $services = $query->paginate($request->input('per_page', 15));
