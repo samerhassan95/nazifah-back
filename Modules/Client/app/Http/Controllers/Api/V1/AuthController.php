@@ -167,8 +167,15 @@ class AuthController extends Controller
             try {
                 $lock->block(5);
 
-                // Check if client exists in database by phone
-                $client = Client::where('phone', $session->phone)->first();
+                // Check if client exists in database by phone — including soft-deleted
+                // rows. `phone` has a plain unique index that ignores deleted_at, so a
+                // previously-deleted account permanently blocks its phone number from
+                // Client::create() unless we find and restore it here.
+                $client = Client::withTrashed()->where('phone', $session->phone)->first();
+
+                if ($client && $client->trashed()) {
+                    $client->restore();
+                }
 
                 if (! $client) {
                     // Create new client (registration) - full_name must be available
@@ -195,9 +202,12 @@ class AuthController extends Controller
                             throw $e;
                         }
 
-                        $client = Client::where('phone', $session->phone)->first();
+                        $client = Client::withTrashed()->where('phone', $session->phone)->first();
                         if (! $client) {
                             throw $e;
+                        }
+                        if ($client->trashed()) {
+                            $client->restore();
                         }
                     }
 
