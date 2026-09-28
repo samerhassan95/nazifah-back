@@ -171,12 +171,27 @@ class AuthController extends Controller
                     );
                 }
 
-                $client = Client::create([
-                    'phone' => $session->phone,
-                    'full_name' => $fullName,
-                    'email' => null,
-                    'is_verified' => true,
-                ]);
+                try {
+                    $client = Client::create([
+                        'phone' => $session->phone,
+                        'full_name' => $fullName,
+                        'email' => null,
+                        'is_verified' => true,
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // A concurrent verify-otp request for the same phone (double-tap,
+                    // network retry) can win the create() race between our lookup above
+                    // and this insert. Treat "someone else just created it" as success
+                    // instead of a 500 — re-fetch and continue as the existing-client path.
+                    if ((int) $e->getCode() !== 23000) {
+                        throw $e;
+                    }
+
+                    $client = Client::where('phone', $session->phone)->first();
+                    if (! $client) {
+                        throw $e;
+                    }
+                }
 
                 $session->update(['client_id' => $client->id]);
             } else {
