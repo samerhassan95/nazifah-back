@@ -44,11 +44,11 @@ class UpdateBranchRequest extends FormRequest
             'name' => ['sometimes', 'array'],
             'name.ar' => [
                 'sometimes', 'string', 'max:255',
-                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId),
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId)->whereNull('deleted_at'),
             ],
             'name.en' => [
                 'sometimes', 'string', 'max:255',
-                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId),
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId)->whereNull('deleted_at'),
             ],
             'location' => ['nullable', 'array'],
             'location.ar' => ['nullable', 'string'],

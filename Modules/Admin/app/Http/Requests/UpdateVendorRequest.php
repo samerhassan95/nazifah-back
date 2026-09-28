@@ -19,13 +19,13 @@ class UpdateVendorRequest extends FormRequest
 
         return [
             'name' => ['nullable', 'array'],
-            'name.ar' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->ar')->ignore($vendorId)],
-            'name.en' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->en')->ignore($vendorId)],
+            'name.ar' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->ar')->ignore($vendorId)->whereNull('deleted_at')],
+            'name.en' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->en')->ignore($vendorId)->whereNull('deleted_at')],
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
-            'email' => ['nullable', 'email', Rule::unique('vendors', 'email')->ignore($vendorId)],
+            'email' => ['nullable', 'email', Rule::unique('vendors', 'email')->ignore($vendorId)->whereNull('deleted_at')],
             'official_number' => 'nullable|string',
             'vat_number' => 'nullable|string',
-            'phone' => ['nullable', 'string', Rule::unique('vendors', 'phone')->ignore($vendorId)],
+            'phone' => ['nullable', 'string', Rule::unique('vendors', 'phone')->ignore($vendorId)->whereNull('deleted_at')],
             'delivery_price_per_km' => 'nullable|numeric|min:0',
             'is_verified' => 'nullable|boolean',
             'rejection_reason' => 'nullable|string|max:1000',

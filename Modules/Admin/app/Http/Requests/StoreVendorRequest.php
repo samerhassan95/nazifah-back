@@ -17,13 +17,13 @@ class StoreVendorRequest extends FormRequest
     {
         return [
             'name' => ['required', 'array'],
-            'name.ar' => ['required', 'string', 'max:255', Rule::unique('vendors', 'name->ar')],
-            'name.en' => ['required', 'string', 'max:255', Rule::unique('vendors', 'name->en')],
+            'name.ar' => ['required', 'string', 'max:255', Rule::unique('vendors', 'name->ar')->whereNull('deleted_at')],
+            'name.en' => ['required', 'string', 'max:255', Rule::unique('vendors', 'name->en')->whereNull('deleted_at')],
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
-            'email' => 'required|email|unique:vendors,email',
+            'email' => ['required', 'email', Rule::unique('vendors', 'email')->whereNull('deleted_at')],
             'official_number' => 'nullable|string',
             'vat_number' => 'nullable|string',
-            'phone' => 'required|string|unique:vendors,phone',
+            'phone' => ['required', 'string', Rule::unique('vendors', 'phone')->whereNull('deleted_at')],
             'delivery_price_per_km' => 'nullable|numeric|min:0',
             'is_verified' => 'boolean',
             'is_active' => 'boolean',

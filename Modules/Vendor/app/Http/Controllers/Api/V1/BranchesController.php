@@ -274,11 +274,11 @@ class BranchesController extends Controller
             'name' => ['required_without_all:name.ar,name.en'],
             'name.ar' => [
                 'required_without:name', 'string', 'max:255',
-                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $vendorId)),
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $vendorId))->whereNull('deleted_at'),
             ],
             'name.en' => [
                 'required_without:name', 'string', 'max:255',
-                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $vendorId)),
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $vendorId))->whereNull('deleted_at'),
             ],
             'phone_number' => ['required', 'string'],
             'land_phone' => ['nullable', 'string'],
@@ -456,11 +456,11 @@ class BranchesController extends Controller
             'name' => ['sometimes'],
             'name.ar' => [
                 'required_with:name', 'string', 'max:255',
-                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId),
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId)->whereNull('deleted_at'),
             ],
             'name.en' => [
                 'required_with:name', 'string', 'max:255',
-                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId),
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $vendorId))->ignore($branchId)->whereNull('deleted_at'),
             ],
             'phone_number' => ['sometimes', 'string'],
             'land_phone' => ['nullable', 'string'],

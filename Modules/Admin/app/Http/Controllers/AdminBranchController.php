@@ -65,11 +65,11 @@ class AdminBranchController extends Controller
             'name' => 'required_without:name',
             'name.ar' => [
                 'sometimes', 'string',
-                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $request->input('vendor_id'))),
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $request->input('vendor_id')))->whereNull('deleted_at'),
             ],
             'name.en' => [
                 'sometimes', 'string',
-                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $request->input('vendor_id'))),
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $request->input('vendor_id')))->whereNull('deleted_at'),
             ],
             'phone' => 'nullable|string',
             'phone_number' => 'nullable|string',

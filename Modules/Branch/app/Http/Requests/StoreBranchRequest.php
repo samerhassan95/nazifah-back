@@ -39,11 +39,11 @@ class StoreBranchRequest extends FormRequest
             'name' => ['required', 'array'],
             'name.ar' => [
                 'required', 'string', 'max:255',
-                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $this->input('vendor_id'))),
+                Rule::unique('branches', 'name->ar')->where(fn ($q) => $q->where('vendor_id', $this->input('vendor_id')))->whereNull('deleted_at'),
             ],
             'name.en' => [
                 'required', 'string', 'max:255',
-                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $this->input('vendor_id'))),
+                Rule::unique('branches', 'name->en')->where(fn ($q) => $q->where('vendor_id', $this->input('vendor_id')))->whereNull('deleted_at'),
             ],
             'location' => ['nullable', 'array'],
             'location.ar' => ['nullable', 'string'],
