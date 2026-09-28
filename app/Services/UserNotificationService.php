@@ -16,6 +16,10 @@ class UserNotificationService
         'new_order',
         'driver_pickup_assigned',
         'driver_delivery_assigned',
+        'driver_on_the_way_pickup',
+        'driver_on_the_way_delivery',
+        'client_visit_confirmed_pickup',
+        'client_visit_confirmed_delivery',
     ];
 
     private const NEW_ORDER_SOUND = 'new_order.wav';
