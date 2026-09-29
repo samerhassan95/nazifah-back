@@ -140,6 +140,13 @@ class AdminServiceController extends Controller
         }
 
         // TEMP DEBUG - remove after diagnosing price=1 not erroring/saving
+        // Raw file write, bypassing Laravel's logging config entirely, to rule out
+        // a log-channel misconfiguration as the reason nothing shows up.
+        @file_put_contents(
+            storage_path('app/temp_debug_price.txt'),
+            date('c')." hit update() id={$id} all=".json_encode($request->all())." raw=".$request->getContent().PHP_EOL,
+            FILE_APPEND
+        );
         \Illuminate\Support\Facades\Log::info('TEMP DEBUG AdminServiceController@update', [
             'all' => $request->all(),
             'content_type' => $request->header('Content-Type'),
