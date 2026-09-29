@@ -485,6 +485,7 @@ class AdminLaundryBranchController extends Controller
     private function formatBranch($branch): array
     {
         $lang = app()->getLocale();
+        $unifiedNumber = $branch->land_phone ?: $branch->vendor?->official_number;
 
         return [
             'id' => $branch->id,
@@ -510,7 +511,8 @@ class AdminLaundryBranchController extends Controller
             ],
             'National_Address' => $branch->national_address,
             'Phone' => $branch->phone_number,
-            'Land_Phone' => $branch->land_phone,
+            'Land_Phone' => $unifiedNumber,
+            'Landline' => $unifiedNumber,
             'Latitude' => $branch->latitude !== null ? (float) $branch->latitude : null,
             'Longitude' => $branch->longitude !== null ? (float) $branch->longitude : null,
             'Home_Pickup' => (bool) $branch->home_pickup,
