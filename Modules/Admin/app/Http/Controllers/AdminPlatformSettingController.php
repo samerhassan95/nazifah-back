@@ -47,7 +47,7 @@ class AdminPlatformSettingController extends Controller
                 ? 'فشل في استرجاع الإعدادات'
                 : 'Failed to retrieve settings';
 
-            return ErrorResponse::make($message, null, 500);
+            return ErrorResponse::make(adminErrorMessage($message, $e), null, 500);
         }
     }
 
@@ -87,7 +87,7 @@ class AdminPlatformSettingController extends Controller
                 ? 'فشل في استرجاع الإعداد'
                 : 'Failed to retrieve setting';
 
-            return ErrorResponse::make($message, null, 500);
+            return ErrorResponse::make(adminErrorMessage($message, $e), null, 500);
         }
     }
 
@@ -161,7 +161,7 @@ class AdminPlatformSettingController extends Controller
                 ? 'فشل في تحديث الإعداد'
                 : 'Failed to update setting';
 
-            return ErrorResponse::make($message, null, 500);
+            return ErrorResponse::make(adminErrorMessage($message, $e), null, 500);
         }
     }
 
@@ -215,7 +215,7 @@ class AdminPlatformSettingController extends Controller
                 ? 'فشل في تحديث الإعدادات'
                 : 'Failed to update settings';
 
-            return ErrorResponse::make($message, null, 500);
+            return ErrorResponse::make(adminErrorMessage($message, $e), null, 500);
         }
     }
 
@@ -261,7 +261,7 @@ class AdminPlatformSettingController extends Controller
                 ? 'فشل في إضافة الإعداد'
                 : 'Failed to create setting';
 
-            return ErrorResponse::make($message, null, 500);
+            return ErrorResponse::make(adminErrorMessage($message, $e), null, 500);
         }
     }
 
@@ -297,7 +297,7 @@ class AdminPlatformSettingController extends Controller
                 ? 'فشل في حذف الإعداد'
                 : 'Failed to delete setting';
 
-            return ErrorResponse::make($message, null, 500);
+            return ErrorResponse::make(adminErrorMessage($message, $e), null, 500);
         }
     }
 

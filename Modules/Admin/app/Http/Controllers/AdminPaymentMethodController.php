@@ -26,7 +26,7 @@ class AdminPaymentMethodController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make(__('payment.retrieval_failed'), null, 500);
+            return ErrorResponse::make(adminErrorMessage(__('payment.retrieval_failed'), $e), null, 500);
         }
     }
 
@@ -58,7 +58,7 @@ class AdminPaymentMethodController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ErrorResponse::make(__('payment.method_not_found'), null, 404);
         } catch (\Exception $e) {
-            return ErrorResponse::make(__('payment.update_failed'), null, 500);
+            return ErrorResponse::make(adminErrorMessage(__('payment.update_failed'), $e), null, 500);
         }
     }
 
@@ -91,7 +91,7 @@ class AdminPaymentMethodController extends Controller
 
             return successResponse(null, __('payment.sort_order_updated'));
         } catch (\Exception $e) {
-            return ErrorResponse::make(__('payment.sort_order_failed'), null, 500);
+            return ErrorResponse::make(adminErrorMessage(__('payment.sort_order_failed'), $e), null, 500);
         }
     }
 }

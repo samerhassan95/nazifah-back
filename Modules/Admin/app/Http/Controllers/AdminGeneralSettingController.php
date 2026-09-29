@@ -33,7 +33,7 @@ class AdminGeneralSettingController extends Controller
             return successResponse($settings, 'General settings retrieved successfully');
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve general settings', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve general settings', $e), null, 500);
         }
     }
 
@@ -89,7 +89,7 @@ class AdminGeneralSettingController extends Controller
             return successResponse($settings, 'General settings updated successfully');
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to update general settings', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to update general settings', $e), null, 500);
         }
     }
 
@@ -112,7 +112,7 @@ class AdminGeneralSettingController extends Controller
             return successResponse($formattedTimezones, 'Timezones retrieved successfully');
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve timezones', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve timezones', $e), null, 500);
         }
     }
 

@@ -38,7 +38,7 @@ class AdminSettingController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve settings', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve settings', $e), null, 500);
         }
     }
 
@@ -66,7 +66,7 @@ class AdminSettingController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to create setting', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to create setting', $e), null, 500);
         }
     }
 
@@ -88,7 +88,7 @@ class AdminSettingController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve setting', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve setting', $e), null, 500);
         }
     }
 
@@ -110,7 +110,7 @@ class AdminSettingController extends Controller
             ], 'Setting retrieved successfully');
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve setting', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve setting', $e), null, 500);
         }
     }
 
@@ -143,7 +143,7 @@ class AdminSettingController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to update setting', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to update setting', $e), null, 500);
         }
     }
 
@@ -169,7 +169,7 @@ class AdminSettingController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to update setting', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to update setting', $e), null, 500);
         }
     }
 
@@ -193,7 +193,7 @@ class AdminSettingController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to delete setting', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to delete setting', $e), null, 500);
         }
     }
 
@@ -217,7 +217,7 @@ class AdminSettingController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to delete setting', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to delete setting', $e), null, 500);
         }
     }
 }

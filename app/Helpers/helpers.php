@@ -196,11 +196,34 @@ function tooManyRequestsResponse($message = 'Too many requests', $code = 429): J
     return jsonResponse(false, $code, $message);
 }
 
+if (! function_exists('adminErrorMessage')) {
+    /**
+     * Append the real exception message to a generic message for admin dashboard
+     * requests (trusted/internal), so a broken screen tells the admin what actually
+     * failed instead of a generic string. Public-facing endpoints that call this
+     * (client/vendor/driver) keep the generic message in production.
+     */
+    function adminErrorMessage(string $generic, \Throwable $e): string
+    {
+        if (! app()->environment('production') || auth('admin')->check()) {
+            return $generic.': '.($e->getMessage() ?: get_class($e));
+        }
+
+        return $generic;
+    }
+}
+
 /**
  * Handle exception and return appropriate JSON response
  */
 function handleExceptionResponse(\Throwable $exception): JsonResponse
 {
+    // Admin dashboard requests are trusted/internal, so always surface the real
+    // error detail to them (not just when APP_ENV isn't "production") — an admin
+    // debugging a broken screen needs the actual cause, not a generic message.
+    // Public-facing client/vendor/driver traffic still gets details hidden in
+    // production, since that's untrusted and could leak schema/internals.
+    $showDetails = ! app()->environment('production') || auth('admin')->check();
     // Route not found exception
     if ($exception instanceof \Symfony\Component\Routing\Exception\RouteNotFoundException) {
         preg_match('/Route \[(.*?)\]/', $exception->getMessage(), $matches);
@@ -248,7 +271,7 @@ function handleExceptionResponse(\Throwable $exception): JsonResponse
 
     // Database exceptions
     if ($exception instanceof \Illuminate\Database\QueryException) {
-        if (app()->environment('production')) {
+        if (! $showDetails) {
             return serverErrorResponse('Database error occurred');
         }
 
@@ -266,11 +289,13 @@ function handleExceptionResponse(\Throwable $exception): JsonResponse
     }
 
     // General server error
-    if (app()->environment('production')) {
+    if (! $showDetails) {
         return serverErrorResponse();
     }
 
-    return serverErrorResponse($exception->getMessage());
+    return serverErrorResponse(
+        $exception->getMessage() ?: get_class($exception).' with no message'
+    );
 }
 
 /**

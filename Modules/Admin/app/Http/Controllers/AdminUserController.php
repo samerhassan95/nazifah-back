@@ -56,7 +56,7 @@ class AdminUserController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve users', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve users', $e), null, 500);
         }
     }
 
@@ -104,7 +104,7 @@ class AdminUserController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to create user', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to create user', $e), null, 500);
         }
     }
 
@@ -124,7 +124,7 @@ class AdminUserController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ErrorResponse::make('User not found', null, 404);
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve user', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve user', $e), null, 500);
         }
     }
 
@@ -193,7 +193,7 @@ class AdminUserController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ErrorResponse::make('User not found', null, 404);
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to update user', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to update user', $e), null, 500);
         }
     }
 
@@ -217,7 +217,7 @@ class AdminUserController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ErrorResponse::make('User not found', null, 404);
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to delete user', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to delete user', $e), null, 500);
         }
     }
 }

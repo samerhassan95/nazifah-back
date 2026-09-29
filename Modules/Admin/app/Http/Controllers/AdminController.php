@@ -43,7 +43,7 @@ class AdminController extends Controller
             );
 
         } catch (\Exception $e) {
-            return ErrorResponse::make(__('admin::messages.admins_retrieve_failed'), null, 500);
+            return ErrorResponse::make(adminErrorMessage(__('admin::messages.admins_retrieve_failed'), $e), null, 500);
         }
     }
 
@@ -76,7 +76,7 @@ class AdminController extends Controller
             return ErrorResponse::make(__('admin::messages.admin_create_failed'), $errors, 422, $request);
 
         } catch (\Exception $e) {
-            return ErrorResponse::make(__('admin::messages.admin_create_failed'), null, 500, $request);
+            return ErrorResponse::make(adminErrorMessage(__('admin::messages.admin_create_failed'), $e), null, 500, $request);
         }
     }
 
@@ -93,7 +93,7 @@ class AdminController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ErrorResponse::make(__('admin::auth.admin_not_found'), null, 404);
         } catch (\Exception $e) {
-            return ErrorResponse::make(__('admin::messages.admin_retrieve_failed'), null, 500);
+            return ErrorResponse::make(adminErrorMessage(__('admin::messages.admin_retrieve_failed'), $e), null, 500);
         }
     }
 
@@ -141,7 +141,7 @@ class AdminController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ErrorResponse::make(__('admin::auth.admin_not_found'), null, 404);
         } catch (\Exception $e) {
-            return ErrorResponse::make(__('admin::messages.admin_update_failed'), null, 500);
+            return ErrorResponse::make(adminErrorMessage(__('admin::messages.admin_update_failed'), $e), null, 500);
         }
     }
 
@@ -165,7 +165,7 @@ class AdminController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ErrorResponse::make(__('admin::auth.admin_not_found'), null, 404);
         } catch (\Exception $e) {
-            return ErrorResponse::make(__('admin::messages.admin_delete_failed'), null, 500);
+            return ErrorResponse::make(adminErrorMessage(__('admin::messages.admin_delete_failed'), $e), null, 500);
         }
     }
 }

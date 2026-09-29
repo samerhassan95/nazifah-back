@@ -42,7 +42,7 @@ class AdminAccountController extends Controller
                 ? 'فشل في استرجاع بيانات الحساب'
                 : 'Failed to retrieve account details';
 
-            return ErrorResponse::make($message, null, 500);
+            return ErrorResponse::make(adminErrorMessage($message, $e), null, 500);
         }
     }
 
@@ -124,7 +124,7 @@ class AdminAccountController extends Controller
                 ? 'فشل في تحديث الحساب'
                 : 'Failed to update account';
 
-            return ErrorResponse::make($message, null, 500);
+            return ErrorResponse::make(adminErrorMessage($message, $e), null, 500);
         }
     }
 
@@ -179,7 +179,7 @@ class AdminAccountController extends Controller
                 ? 'فشل في تغيير كلمة المرور'
                 : 'Failed to change password';
 
-            return ErrorResponse::make($message, null, 500);
+            return ErrorResponse::make(adminErrorMessage($message, $e), null, 500);
         }
     }
 }

@@ -65,7 +65,7 @@ class AdminRoleController extends Controller
             ], 'Roles retrieved successfully');
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve roles', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve roles', $e), null, 500);
         }
     }
 
@@ -104,7 +104,7 @@ class AdminRoleController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ErrorResponse::make('Role not found', null, 404);
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve role', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve role', $e), null, 500);
         }
     }
 
@@ -161,7 +161,7 @@ class AdminRoleController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return ErrorResponse::make('Failed to create role', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to create role', $e), null, 500);
         }
     }
 
@@ -232,7 +232,7 @@ class AdminRoleController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return ErrorResponse::make('Failed to update role', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to update role', $e), null, 500);
         }
     }
 
@@ -271,7 +271,7 @@ class AdminRoleController extends Controller
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ErrorResponse::make('Role not found', null, 404);
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to delete role', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to delete role', $e), null, 500);
         }
     }
 
@@ -287,7 +287,7 @@ class AdminRoleController extends Controller
             return successResponse($permissions, 'Permissions retrieved successfully');
 
         } catch (\Exception $e) {
-            return ErrorResponse::make('Failed to retrieve permissions', null, 500);
+            return ErrorResponse::make(adminErrorMessage('Failed to retrieve permissions', $e), null, 500);
         }
     }
 }
