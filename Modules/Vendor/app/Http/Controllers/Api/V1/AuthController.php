@@ -125,7 +125,7 @@ class AuthController extends Controller
             'name.ar' => ['nullable', 'string', 'max:255'],
             'name.en' => ['nullable', 'string', 'max:255'],
             'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendors', 'phone')->whereNull('deleted_at')],
-            'email' => ['required', 'email', 'unique:vendors,email'],
+            'email' => ['required', 'email', Rule::unique('vendors', 'email')->whereNull('deleted_at')],
             'vat_number' => ['sometimes', 'nullable', 'string', 'max:50'],
         ]);
 
@@ -599,7 +599,7 @@ class AuthController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes', 'nullable'],
-            'email' => ['sometimes', 'email', 'unique:vendors,email,'.$vendor->id],
+            'email' => ['sometimes', 'email', Rule::unique('vendors', 'email')->ignore($vendor->id)->whereNull('deleted_at')],
             'phone' => ['sometimes', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendors', 'phone')->ignore($vendor->id)->whereNull('deleted_at')],
             'attachments' => ['sometimes', 'array'],
             'attachments.*' => ['file', 'mimes:jpeg,png,jpg,gif,webp,pdf,doc,docx', 'max:10240'],
@@ -753,7 +753,7 @@ class AuthController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes', 'string', 'max:255'],
-            'email' => ['sometimes', 'email', 'unique:vendor_employees,email,'.$employee->id],
+            'email' => ['sometimes', 'email', Rule::unique('vendor_employees', 'email')->ignore($employee->id)->whereNull('deleted_at')],
             'image' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
         ]);
 

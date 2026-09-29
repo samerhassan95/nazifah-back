@@ -25,7 +25,7 @@ class StoreVendorRequest extends FormRequest
             'name' => ['required', 'array'],
             'name.ar' => ['required', 'string', 'max:255'],
             'name.en' => ['required', 'string', 'max:255'],
-            'email' => 'required|email|unique:vendors,email',
+            'email' => ['required', 'email', Rule::unique('vendors', 'email')->whereNull('deleted_at')],
             'phone' => ['required', 'string', Rule::unique('vendors', 'phone')->whereNull('deleted_at')],
             'password' => 'required|string|min:8|confirmed',
             'logo' => 'nullable|image|mimes:jpeg,jpg,png,gif,webp|max:2048',

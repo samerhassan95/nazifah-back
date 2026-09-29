@@ -68,7 +68,7 @@ class VendorEmployeeController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:vendor_employees,email'],
+            'email' => ['required', 'email', Rule::unique('vendor_employees', 'email')->whereNull('deleted_at')],
             'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendor_employees', 'phone')->whereNull('deleted_at')],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'vendor_role_id' => ['nullable', 'integer', 'exists:vendor_roles,id'],
@@ -192,7 +192,7 @@ class VendorEmployeeController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes', 'string', 'max:255'],
-            'email' => ['sometimes', 'email', 'unique:vendor_employees,email,'.$employee->id],
+            'email' => ['sometimes', 'email', Rule::unique('vendor_employees', 'email')->ignore($employee->id)->whereNull('deleted_at')],
             'phone' => ['sometimes', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendor_employees', 'phone')->ignore($employee->id)->whereNull('deleted_at')],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'vendor_role_id' => ['nullable', 'integer', 'exists:vendor_roles,id'],
