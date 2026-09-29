@@ -6,11 +6,14 @@ use App\Enums\OrderStatus;
 use App\Services\UploadFilesService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Admin\Http\Resources\Concerns\DetectsDetailView;
 use Modules\Branch\Models\Branch;
 use Modules\Order\Models\Order;
 
 class VendorResource extends JsonResource
 {
+    use DetectsDetailView;
+
     public function toArray(Request $request): array
     {
         $uploadFilesService = app(UploadFilesService::class);
@@ -45,7 +48,7 @@ class VendorResource extends JsonResource
         $rating = $ratedOrders->count() > 0 ? round($ratedOrders->avg('rating'), 2) : 0;
         $totalReviews = $ratedOrders->count();
 
-        $isDetailView = $request->route() && $request->route()->getName() && str_contains($request->route()->getName(), 'show');
+        $isDetailView = $this->isDetailView($request);
         $locale = app()->getLocale();
 
         return [

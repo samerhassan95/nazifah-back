@@ -4,12 +4,15 @@ namespace Modules\Admin\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Admin\Http\Resources\Concerns\DetectsDetailView;
 
 class DiscountResource extends JsonResource
 {
+    use DetectsDetailView;
+
     public function toArray(Request $request): array
     {
-        $isDetailView = $request->route() && $request->route()->getName() && str_contains($request->route()->getName(), 'show');
+        $isDetailView = $this->isDetailView($request);
 
         return [
             'id' => $this->id,

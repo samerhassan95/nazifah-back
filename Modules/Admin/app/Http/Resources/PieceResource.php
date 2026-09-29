@@ -4,16 +4,19 @@ namespace Modules\Admin\Http\Resources;
 
 use App\Services\UploadFilesService;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Admin\Http\Resources\Concerns\DetectsDetailView;
 
 class PieceResource extends JsonResource
 {
+    use DetectsDetailView;
+
     /**
      * Transform the resource into an array.
      */
     public function toArray($request): array
     {
         $uploadFilesService = app(UploadFilesService::class);
-        $isDetailView = $request->route() && $request->route()->getName() && str_contains($request->route()->getName(), 'show');
+        $isDetailView = $this->isDetailView($request);
         $locale = app()->getLocale();
 
         return [

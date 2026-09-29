@@ -3,15 +3,18 @@
 namespace Modules\Admin\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Admin\Http\Resources\Concerns\DetectsDetailView;
 
 class OwnerResource extends JsonResource
 {
+    use DetectsDetailView;
+
     /**
      * Transform the resource into an array.
      */
     public function toArray($request): array
     {
-        $isDetailView = $request->route() && $request->route()->getName() && str_contains($request->route()->getName(), 'show');
+        $isDetailView = $this->isDetailView($request);
 
         return [
             'id' => $this->id,

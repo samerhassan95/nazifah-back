@@ -3,15 +3,18 @@
 namespace Modules\Admin\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Admin\Http\Resources\Concerns\DetectsDetailView;
 
 class ZoneResource extends JsonResource
 {
+    use DetectsDetailView;
+
     /**
      * Transform the resource into an array.
      */
     public function toArray($request): array
     {
-        $isDetailView = $request->route() && (str_contains($request->route()->getName() ?? '', 'show') || $request->route()->getActionMethod() === 'show');
+        $isDetailView = $this->isDetailView($request);
         $locale = app()->getLocale();
 
         return [

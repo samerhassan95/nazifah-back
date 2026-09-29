@@ -5,13 +5,16 @@ namespace Modules\Admin\Http\Resources;
 use App\Services\UploadFilesService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Admin\Http\Resources\Concerns\DetectsDetailView;
 
 class ServiceResource extends JsonResource
 {
+    use DetectsDetailView;
+
     public function toArray(Request $request): array
     {
         $uploadFilesService = app(UploadFilesService::class);
-        $isDetailView = $request->route() && $request->route()->getName() && str_contains($request->route()->getName(), 'show');
+        $isDetailView = $this->isDetailView($request);
         $locale = app()->getLocale();
 
         return [
