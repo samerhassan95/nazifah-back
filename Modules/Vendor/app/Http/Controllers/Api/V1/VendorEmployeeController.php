@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Modules\Branch\Models\Branch;
 use Modules\Vendor\Models\VendorEmployee;
 use Modules\Vendor\Models\VendorRole;
@@ -68,7 +69,7 @@ class VendorEmployeeController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:vendor_employees,email'],
-            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', 'unique:vendor_employees,phone'],
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendor_employees', 'phone')->whereNull('deleted_at')],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'vendor_role_id' => ['nullable', 'integer', 'exists:vendor_roles,id'],
             'role' => ['nullable', 'in:manager,employee'],
@@ -192,7 +193,7 @@ class VendorEmployeeController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', 'unique:vendor_employees,email,'.$employee->id],
-            'phone' => ['sometimes', 'string', 'regex:/^\+?[0-9]{10,15}$/', 'unique:vendor_employees,phone,'.$employee->id],
+            'phone' => ['sometimes', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendor_employees', 'phone')->ignore($employee->id)->whereNull('deleted_at')],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'vendor_role_id' => ['nullable', 'integer', 'exists:vendor_roles,id'],
             'role' => ['sometimes', 'in:manager,employee'],

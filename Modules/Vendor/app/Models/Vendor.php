@@ -64,6 +64,12 @@ class Vendor extends Model
      */
     protected static function booted(): void
     {
+        static::deleting(function (Vendor $vendor) {
+            if (! $vendor->isForceDeleting()) {
+                $vendor->employees()->delete();
+            }
+        });
+
         static::created(function (Vendor $vendor) {
             app(\Modules\Vendor\Services\VendorDefaultRolesService::class)->seedForVendor($vendor);
             $vendor->createOwnerEmployee();

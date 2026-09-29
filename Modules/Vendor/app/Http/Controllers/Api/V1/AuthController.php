@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Modules\Vendor\Models\Vendor;
 use Modules\Vendor\Models\VendorAuthSession;
 use Modules\Vendor\Models\VendorEmployee;
@@ -123,7 +124,7 @@ class AuthController extends Controller
             'name' => ['required', 'array'],
             'name.ar' => ['nullable', 'string', 'max:255'],
             'name.en' => ['nullable', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', 'unique:vendors,phone'],
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendors', 'phone')->whereNull('deleted_at')],
             'email' => ['required', 'email', 'unique:vendors,email'],
             'vat_number' => ['sometimes', 'nullable', 'string', 'max:50'],
         ]);
@@ -599,7 +600,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes', 'nullable'],
             'email' => ['sometimes', 'email', 'unique:vendors,email,'.$vendor->id],
-            'phone' => ['sometimes', 'string', 'regex:/^\+?[0-9]{10,15}$/', 'unique:vendors,phone,'.$vendor->id],
+            'phone' => ['sometimes', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendors', 'phone')->ignore($vendor->id)->whereNull('deleted_at')],
             'attachments' => ['sometimes', 'array'],
             'attachments.*' => ['file', 'mimes:jpeg,png,jpg,gif,webp,pdf,doc,docx', 'max:10240'],
             'vat_number' => ['sometimes', 'nullable', 'string', 'max:50'],
