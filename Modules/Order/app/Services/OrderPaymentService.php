@@ -657,11 +657,30 @@ class OrderPaymentService
             }
         }
 
+        $orderIsDelivered = in_array($order->status, [
+            \App\Enums\OrderStatus::DELIVERED->value,
+            \App\Enums\OrderStatus::COMPLETED->value,
+        ], true);
+
         $payments = collect($paymentsByMethod)
             ->values()
-            ->map(function (array $payment) {
+            ->map(function (array $payment) use ($orderIsDelivered) {
                 $payment['amount'] = round((float) $payment['amount'], 2);
-                $payment['status_label'] = PaymentStatusPresenter::label($payment['status']);
+
+                // The COD leg is recorded as "paid" at order-creation time (it counts
+                // toward order coverage immediately — see recordCodLeg()), but no cash
+                // has actually changed hands yet. Show it as pending to the client until
+                // the order is actually delivered, without touching the stored leg
+                // status that the rest of the payment logic relies on.
+                $displayStatus = $payment['status'];
+                if ($payment['payment_method'] === PaymentMethod::CASH_ON_DELIVERY->value
+                    && $displayStatus === OrderPayment::STATUS_PAID
+                    && ! $orderIsDelivered) {
+                    $displayStatus = OrderPayment::STATUS_PENDING;
+                }
+
+                $payment['status'] = $displayStatus;
+                $payment['status_label'] = PaymentStatusPresenter::label($displayStatus);
 
                 return $payment;
             })
