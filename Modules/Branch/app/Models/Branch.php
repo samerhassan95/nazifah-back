@@ -46,6 +46,10 @@ class Branch extends Model
         'self_pickup',
     ];
 
+    protected $appends = [
+        'unified_number',
+    ];
+
     protected $casts = [
         'delivery_and_pickup' => 'boolean',
         'is_active' => 'boolean',
@@ -104,6 +108,18 @@ class Branch extends Model
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    /**
+     * Branch has no unified-number column of its own — falls back to its own
+     * landline, then the parent vendor's official/unified number. Only reads
+     * the vendor relation if it's already eager-loaded, to avoid an N+1 query
+     * when this accessor fires while listing many branches.
+     */
+    public function getUnifiedNumberAttribute(): ?string
+    {
+        return $this->land_phone
+            ?: ($this->relationLoaded('vendor') ? $this->vendor?->official_number : null);
     }
 
     /**

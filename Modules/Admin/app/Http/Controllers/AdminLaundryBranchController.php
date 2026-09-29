@@ -485,7 +485,7 @@ class AdminLaundryBranchController extends Controller
     private function formatBranch($branch): array
     {
         $lang = app()->getLocale();
-        $unifiedNumber = $branch->land_phone ?: $branch->vendor?->official_number;
+        $unifiedNumber = $branch->unified_number;
 
         return [
             'id' => $branch->id,

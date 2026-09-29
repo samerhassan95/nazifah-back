@@ -21,6 +21,7 @@ class BranchResource extends JsonResource
             'name' => $isDetailView ? ['ar' => $this->getTranslation('name', 'ar'), 'en' => $this->getTranslation('name', 'en')] : $this->name,
             'phone_number' => $this->phone_number,
             'land_phone' => $this->land_phone,
+            'unified_number' => $this->unified_number,
             'location' => $isDetailView ? ['ar' => $this->getTranslation('location', 'ar'), 'en' => $this->getTranslation('location', 'en')] : $this->location,
             'store_front' => $this->store_front,
             'description' => $isDetailView ? ['ar' => $this->getTranslation('description', 'ar'), 'en' => $this->getTranslation('description', 'en')] : $this->description,
