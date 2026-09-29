@@ -2262,7 +2262,7 @@ class OrderPaymentService
 
         $titleAr = $context === 'cancellation'
             ? 'تم استرداد مبلغ طلبك'
-            : 'تم تعديل مبلغ طلبك واسترداد الفرق';
+            : 'تم تعديل طلبك واسترداد القيمة المتبقية';
         $titleEn = $context === 'cancellation'
             ? 'Your order refund has been processed'
             : 'Order price decrease refunded';
