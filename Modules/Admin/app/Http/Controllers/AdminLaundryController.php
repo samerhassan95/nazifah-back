@@ -166,7 +166,7 @@ class AdminLaundryController extends Controller
 
                 return [
                     'name' => $this->getTranslatableValue($branch, 'name', $lang),
-                    'orders' => $ordersCount,
+                    'orders' => (int) $ordersCount,
                 ];
             });
 
@@ -198,14 +198,17 @@ class AdminLaundryController extends Controller
                 [
                     'status_name' => __('branch.active'),
                     'count' => $activeBranches,
+                    'percentage' => $totalBranches > 0 ? (int) round(($activeBranches / $totalBranches) * 100) : 0,
                 ],
                 [
                     'status_name' => __('branch.pending_activation'),
                     'count' => 0, // Adjust based on your business logic
+                    'percentage' => 0,
                 ],
                 [
                     'status_name' => __('branch.rejected'),
                     'count' => $inactiveBranches,
+                    'percentage' => $totalBranches > 0 ? (int) round(($inactiveBranches / $totalBranches) * 100) : 0,
                 ],
             ],
         ];
