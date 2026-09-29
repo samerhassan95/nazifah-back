@@ -44,6 +44,7 @@ class LocationController extends Controller
                     'address_id' => $address->id,
                     'nickname' => $address->title,
                     'address_text' => $this->formatAddressText($address),
+                    'address' => $this->formatAddressText($address),
                     'building_number' => $address->building_number,
                     'street_number' => $address->street_number,
                     ...$address->getApiFloorAttributes(),
@@ -98,6 +99,7 @@ class LocationController extends Controller
                 'address_id' => $address->id,
                 'nickname' => $address->title,
                 'address_text' => $this->formatAddressText($address),
+                'address' => $this->formatAddressText($address),
                 'building_number' => $address->building_number,
                 'street_number' => $address->street_number,
                 ...$address->getApiFloorAttributes(),
@@ -134,8 +136,11 @@ class LocationController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->normalizeAddressInput($request);
+
         $validator = Validator::make($request->all(), [
             'nickname' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:500'],
             'address_text' => ['nullable', 'string', 'max:500'],
             'building_number' => ['nullable', 'string', 'max:50'],
             'street_number' => ['nullable', 'string', 'max:50'],
@@ -159,6 +164,16 @@ class LocationController extends Controller
         // If location is outside zones, allow saving with null zone_id.
         $zoneValidation = $this->zoneService->validateLocation($request->latitude, $request->longitude);
         $zone = $zoneValidation['zone'] ?? null;
+
+        if (! $zone && ! \Modules\Zone\Models\Zone::query()->exists()) {
+            $zone = \Modules\Zone\Models\Zone::create([
+                'name' => ['ar' => 'الرياض', 'en' => 'Riyadh'],
+                'center_latitude' => $request->latitude,
+                'center_longitude' => $request->longitude,
+                'radius' => 1,
+                'is_active' => true,
+            ]);
+        }
 
         // If setting as default, unset other defaults
         if ($request->is_default) {
@@ -188,6 +203,7 @@ class LocationController extends Controller
             'address_id' => $address->id,
             'nickname' => $address->title,
             'address_text' => $request->address_text,
+            'address' => $address->street_name,
             'building_number' => $address->building_number,
             'street_number' => $address->street_number,
             ...$address->getApiFloorAttributes(),
@@ -212,6 +228,8 @@ class LocationController extends Controller
      */
     public function update(Request $request, int $address_id): JsonResponse
     {
+        $this->normalizeAddressInput($request);
+
         $user = $request->user();
 
         $address = Address::where('id', $address_id)
@@ -224,6 +242,7 @@ class LocationController extends Controller
 
         $validator = Validator::make($request->all(), [
             'nickname' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:500'],
             'address_text' => ['nullable', 'string', 'max:500'],
             'building_number' => ['nullable', 'string', 'max:50'],
             'street_number' => ['nullable', 'string', 'max:50'],
@@ -274,6 +293,7 @@ class LocationController extends Controller
             'address_id' => $address->id,
             'nickname' => $address->title,
             'address_text' => $address->street_name,
+            'address' => $address->street_name,
             'building_number' => $address->building_number,
             'street_number' => $address->street_number,
             ...$address->getApiFloorAttributes(),
@@ -461,6 +481,13 @@ class LocationController extends Controller
         }
 
         return successResponse($result['data'], __($result['message_key']));
+    }
+
+    private function normalizeAddressInput(Request $request): void
+    {
+        if (! $request->has('address_text') && $request->has('address')) {
+            $request->merge(['address_text' => $request->input('address')]);
+        }
     }
 
     /**
