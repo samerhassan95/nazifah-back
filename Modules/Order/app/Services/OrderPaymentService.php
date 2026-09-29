@@ -2230,6 +2230,11 @@ class OrderPaymentService
             'wallet' => 'المحفظة',
             'card' => 'دفع الكتروني',
             'cash_on_delivery' => 'الدفع عند الاستلام',
+            'stc_pay' => 'STC Pay',
+            'apple_pay' => 'Apple Pay',
+            'google_pay' => 'Google Pay',
+            'samsung_pay' => 'Samsung Pay',
+            'digital_payment' => 'دفع رقمي',
         ];
         $methodLabelsEn = [
             'visa' => 'Visa',
@@ -2239,6 +2244,11 @@ class OrderPaymentService
             'wallet' => 'wallet',
             'card' => 'card',
             'cash_on_delivery' => 'cash on delivery',
+            'stc_pay' => 'STC Pay',
+            'apple_pay' => 'Apple Pay',
+            'google_pay' => 'Google Pay',
+            'samsung_pay' => 'Samsung Pay',
+            'digital_payment' => 'digital payment',
         ];
 
         $methodsAr = implode('، ', array_map(
@@ -2257,8 +2267,8 @@ class OrderPaymentService
             ? 'Your order refund has been processed'
             : 'Order price decrease refunded';
 
-        $bodyAr = "تم استرداد مبلغ {$total} ر.س للطلب #{$orderNumber} عبر: {$methodsAr}.";
-        $bodyEn = "An amount of {$total} SAR was refunded for order #{$orderNumber} via: {$methodsEn}.";
+        $bodyAr = "تم استرداد مبلغ {$total} ر.س للطلب رقم {$orderNumber} عبر: {$methodsAr}.";
+        $bodyEn = "An amount of {$total} SAR was refunded for order number {$orderNumber} via: {$methodsEn}.";
 
         if ($hadCardFailure) {
             $failDetail = collect($lines)
