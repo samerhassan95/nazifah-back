@@ -2,6 +2,10 @@
 
 return [
     'name' => 'Branch Name',
+    'accounts_status' => 'Accounts Status',
+    'active' => 'Active',
+    'pending_activation' => 'Pending Activation',
+    'rejected' => 'Rejected',
     'phone_number' => 'Phone Number',
     'land_phone' => 'Extension Number',
     'location' => 'Location',

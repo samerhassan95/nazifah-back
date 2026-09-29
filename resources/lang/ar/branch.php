@@ -2,6 +2,10 @@
 
 return [
     'name' => 'اسم الفرع',
+    'accounts_status' => 'حالة الحسابات',
+    'active' => 'نشط',
+    'pending_activation' => 'بانتظار التفعيل',
+    'rejected' => 'مرفوض',
     'phone_number' => 'رقم الهاتف',
     'land_phone' => 'رقم التحويلة',
     'location' => 'الموقع',
