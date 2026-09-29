@@ -23,7 +23,12 @@ class AdminChatsController extends Controller
     public function index(Request $request): JsonResponse
     {
         $perPage = (int) $request->get('per_page', 20);
-        $conversations = $this->chatService->getAllConversationsForAdmin($perPage);
+        $filters = array_filter([
+            'client_id' => $request->filled('client_id') ? (int) $request->get('client_id') : null,
+            'vendor_id' => $request->filled('vendor_id') ? (int) $request->get('vendor_id') : null,
+            'driver_id' => $request->filled('driver_id') ? (int) $request->get('driver_id') : null,
+        ]);
+        $conversations = $this->chatService->getAllConversationsForAdmin($perPage, $filters);
 
         $items = $conversations->getCollection()->map(function ($conversation) {
             return [

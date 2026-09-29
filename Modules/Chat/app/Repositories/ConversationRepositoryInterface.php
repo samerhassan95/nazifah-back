@@ -27,5 +27,8 @@ interface ConversationRepositoryInterface
 
     public function getConversationsForParticipant(string $type, int $id, int $perPage = 20): LengthAwarePaginator;
 
-    public function getAllConversations(int $perPage = 20): LengthAwarePaginator;
+    /**
+     * @param  array{client_id?: int, vendor_id?: int, driver_id?: int}  $filters
+     */
+    public function getAllConversations(int $perPage = 20, array $filters = []): LengthAwarePaginator;
 }

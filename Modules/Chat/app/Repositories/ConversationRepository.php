@@ -150,13 +150,27 @@ class ConversationRepository implements ConversationRepositoryInterface
     /**
      * Admin: get all conversations in the system (no ownership filter).
      */
-    public function getAllConversations(int $perPage = 20): LengthAwarePaginator
+    public function getAllConversations(int $perPage = 20, array $filters = []): LengthAwarePaginator
     {
-        return Conversation::has('messages')
+        $query = Conversation::has('messages')
             ->with(['client', 'vendor', 'driver', 'admin', 'order', 'lastMessage'])
             ->withExists(['messages as has_client_participation' => fn ($q) => $q->where('sender_type', 'client')])
             ->withExists(['messages as has_vendor_participation' => fn ($q) => $q->where('sender_type', 'vendor')])
-            ->withExists(['messages as has_driver_participation' => fn ($q) => $q->where('sender_type', 'driver')])
+            ->withExists(['messages as has_driver_participation' => fn ($q) => $q->where('sender_type', 'driver')]);
+
+        if (! empty($filters['client_id'])) {
+            $query->where('client_id', $filters['client_id']);
+        }
+
+        if (! empty($filters['vendor_id'])) {
+            $query->where('vendor_id', $filters['vendor_id']);
+        }
+
+        if (! empty($filters['driver_id'])) {
+            $query->where('driver_id', $filters['driver_id']);
+        }
+
+        return $query
             ->orderBy('last_message_at', 'desc')
             ->orderBy('updated_at', 'desc')
             ->paginate($perPage);

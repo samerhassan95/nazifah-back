@@ -299,9 +299,12 @@ class ChatService
     /**
      * Admin: list all conversations in the system (any chat).
      */
-    public function getAllConversationsForAdmin(int $perPage = 20): \Illuminate\Pagination\LengthAwarePaginator
+    /**
+     * @param  array{client_id?: int, vendor_id?: int, driver_id?: int}  $filters
+     */
+    public function getAllConversationsForAdmin(int $perPage = 20, array $filters = []): \Illuminate\Pagination\LengthAwarePaginator
     {
-        return $this->conversationRepository->getAllConversations($perPage);
+        return $this->conversationRepository->getAllConversations($perPage, $filters);
     }
 
     /**
