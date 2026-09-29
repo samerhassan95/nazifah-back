@@ -66,7 +66,7 @@ class AdminVendorController extends Controller
         $vendor = $this->vendorService->create($validated);
 
         return successResponse(
-            $vendor,
+            $this->formatVendorResponse($vendor),
             'Vendor created successfully',
             201
         );
@@ -111,7 +111,7 @@ class AdminVendorController extends Controller
             ],
             'logo' => $this->uploadFilesService->getFullUrl($vendor->logo),
             'email' => $vendor->email,
-            'official_number' => $vendor->official_number,
+            'unified_number' => $vendor->official_number,
             'vat_number' => $vendor->vat_number ?? null,
             'phone' => $vendor->phone,
             'delivery_price_per_km' => $vendor->delivery_price_per_km ? (float) $vendor->delivery_price_per_km : 0,
@@ -169,9 +169,18 @@ class AdminVendorController extends Controller
         $vendor->update($validated);
 
         return successResponse(
-            $vendor->fresh(),
+            $this->formatVendorResponse($vendor->fresh()),
             'Vendor updated successfully'
         );
+    }
+
+    private function formatVendorResponse(Vendor $vendor): array
+    {
+        $data = $vendor->toArray();
+        $data['unified_number'] = $data['official_number'] ?? null;
+        unset($data['official_number']);
+
+        return $data;
     }
 
     public function destroy(int $id): JsonResponse
@@ -322,7 +331,7 @@ class AdminVendorController extends Controller
             'email' => $vendor->email,
             'phone' => $vendor->phone,
             'vat_number' => $vendor->vat_number,
-            'official_number' => $vendor->official_number,
+            'unified_number' => $vendor->official_number,
             'delivery_price_per_km' => (float) $vendor->delivery_price_per_km,
             'wallet_balance' => (float) $vendor->wallet_balance,
             'attachments' => $attachments,

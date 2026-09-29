@@ -7,6 +7,13 @@ use Illuminate\Validation\Rule;
 
 class StoreVendorRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('unified_number')) {
+            $this->merge(['official_number' => $this->input('unified_number')]);
+        }
+    }
+
     public function authorize(): bool
     {
         // Only admins can perform this action

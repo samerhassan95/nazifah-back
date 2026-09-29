@@ -53,7 +53,7 @@ class VendorResource extends JsonResource
             'name' => $isDetailView ? ['ar' => $this->getTranslation('name', 'ar'), 'en' => $this->getTranslation('name', 'en')] : $this->getTranslation('name', $locale),
             'logo' => $uploadFilesService->getFullUrl($this->logo),
             'email' => $this->email,
-            'official_number' => $this->official_number,
+            'unified_number' => $this->official_number,
             'vat_number' => $this->vat_number ?? null,
             'phone' => $this->phone,
             'delivery_price_per_km' => $this->delivery_price_per_km ? (float) $this->delivery_price_per_km : 0,
