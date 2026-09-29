@@ -21,7 +21,7 @@ class UpdateVendorRequest extends FormRequest
             'name' => ['nullable', 'array'],
             'name.ar' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->ar')->ignore($vendorId)->whereNull('deleted_at')],
             'name.en' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->en')->ignore($vendorId)->whereNull('deleted_at')],
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
+            'logo' => 'nullable|image:allow_svg|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
             'email' => ['nullable', 'email', Rule::unique('vendors', 'email')->ignore($vendorId)->whereNull('deleted_at')],
             'official_number' => 'nullable|string',
             'vat_number' => 'nullable|string',
