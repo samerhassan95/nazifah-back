@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         $middleware->prepend(\App\Http\Middleware\ForceJsonResponse::class);
+        $middleware->prepend(\App\Http\Middleware\NormalizeBooleanStrings::class);
 
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
