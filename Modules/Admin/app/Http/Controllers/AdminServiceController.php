@@ -139,6 +139,13 @@ class AdminServiceController extends Controller
             return notFoundResponse('Service not found');
         }
 
+        // TEMP DEBUG - remove after diagnosing price=1 not erroring/saving
+        \Illuminate\Support\Facades\Log::info('TEMP DEBUG AdminServiceController@update', [
+            'all' => $request->all(),
+            'content_type' => $request->header('Content-Type'),
+            'raw' => $request->getContent(),
+        ]);
+
         $validated = $request->validate([
             'category_id' => 'sometimes|exists:categories,id',
             'name' => 'sometimes|array',
