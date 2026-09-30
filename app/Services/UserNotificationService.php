@@ -14,6 +14,7 @@ class UserNotificationService
      */
     private const NEW_ORDER_NOTIFICATION_TYPES = [
         'new_order',
+        'order_reviewed',
         'driver_pickup_assigned',
         'driver_delivery_assigned',
         'driver_on_the_way_pickup',
