@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Admin\Services\OrderService;
 use Modules\Order\Models\Order;
+use Modules\Order\Support\OrderItemGrouper;
 use Modules\Vendor\Models\Vendor;
 
 class AdminLaundryOrderController extends Controller
@@ -93,7 +94,7 @@ class AdminLaundryOrderController extends Controller
                 'Order_code'   => $order->order_number,
                 'Client_name'  => $order->client ? ($order->client->getTranslation('full_name', 'ar') ?? $order->client->full_name ?? 'N/A') : 'N/A',
                 'Driver_name'  => $order->driver ? ($order->driver->getTranslation('full_name', 'ar') ?? $order->driver->full_name ?? 'N/A') : 'N/A',
-                'Pieces_count' => $order->items()->count(),
+                'Pieces_count' => OrderItemGrouper::totalPiecesCount($order->items),
                 'Branch'       => $order->branch?->getTranslation('name', 'ar') ?? $order->branch?->name ?? 'N/A',
                 'Order_value'  => (float) $order->final_amount,
                 'order_value'  => (float) $order->final_amount,

@@ -37,7 +37,8 @@ class OrderResource extends JsonResource
         $driverName = $this->driver ? ($this->driver->getTranslation('full_name', 'ar') ?? $this->driver->full_name ?? 'N/A') : 'N/A';
         $branchName = $this->branch ? ($this->branch->getTranslation('name', 'ar') ?? $this->branch->name ?? 'N/A') : 'N/A';
         $vendorName = $vendor ? ($vendor->getTranslation('name', 'ar') ?? $vendor->name ?? 'N/A') : 'N/A';
-        $piecesCount = $this->relationLoaded('items') ? $this->items->count() : $this->items()->count();
+        $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();
+        $piecesCount = OrderItemGrouper::totalPiecesCount($items);
 
         return [
             'id' => $this->id,
