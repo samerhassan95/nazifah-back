@@ -479,7 +479,7 @@ class AdminOrderController extends Controller
                     if ($statusKey !== 'rejected') {
                         $totalPrice += (float) $item->total_price;
                     }
-                    foreach ($item->additions ?? [] as $addition) {
+                    foreach ($item->additionalServicesPivot ?? [] as $addition) {
                         $name = $addition->serviceAddition?->getTranslation('name', $lang)
                             ?? $addition->serviceAddition?->name;
                         if ($name) {
