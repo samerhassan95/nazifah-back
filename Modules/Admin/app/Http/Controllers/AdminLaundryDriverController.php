@@ -7,6 +7,7 @@ use App\Http\Responses\ErrorResponse;
 use App\Services\UploadFilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Admin\Services\DriverService;
 use Modules\Branch\Models\Branch;
@@ -116,11 +117,11 @@ class AdminLaundryDriverController extends Controller
             // The driver belongs to the laundry; a branch is optional and can be assigned later.
             'vendor_id' => 'required_without:branch_id|nullable|exists:vendors,id',
             'branch_id' => 'nullable|exists:branches,id',
-            'Driver_image' => 'nullable|image:allow_svg|mimes:jpeg,png,jpg,gif,webp,svg|max:5120',
-            'ID_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'Driver_image' => 'required|image:allow_svg|mimes:jpeg,png,jpg,gif,webp,svg|max:5120',
+            'ID_image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'Driver_name' => ['required', $this->translatableNameRule()],
-            'Phone' => 'required|string|unique:drivers,phone',
-            'National_id' => 'required|string|unique:drivers,id_number',
+            'Phone' => ['required', 'string', Rule::unique('drivers', 'phone')->whereNull('deleted_at')],
+            'National_id' => ['required', 'string', Rule::unique('drivers', 'id_number')->whereNull('deleted_at')],
         ]);
 
         $branch = ! empty($validated['branch_id']) ? Branch::find($validated['branch_id']) : null;
@@ -177,10 +178,10 @@ class AdminLaundryDriverController extends Controller
             'Driver_image' => 'nullable|image:allow_svg|mimes:jpeg,png,jpg,gif,webp,svg|max:5120',
             'ID_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'Driver_name' => ['sometimes', $this->translatableNameRule()],
-            'Phone' => 'sometimes|string|unique:drivers,phone,'.$id,
+            'Phone' => ['sometimes', 'string', Rule::unique('drivers', 'phone')->ignore($id)->whereNull('deleted_at')],
 
-            'Email' => 'sometimes|nullable|email|unique:drivers,email,'.$id,
-            'National_id' => 'sometimes|string|unique:drivers,id_number,'.$id,
+            'Email' => ['sometimes', 'nullable', 'email', Rule::unique('drivers', 'email')->ignore($id)->whereNull('deleted_at')],
+            'National_id' => ['sometimes', 'string', Rule::unique('drivers', 'id_number')->ignore($id)->whereNull('deleted_at')],
             'branch_id' => 'nullable|exists:branches,id',
             'Driver_status' => 'sometimes|string|in:active,in_active',
         ]);
