@@ -4,6 +4,7 @@ namespace Modules\Admin\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ErrorResponse;
+use App\Services\UploadFilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Admin\Http\Requests\StoreDriverRequest;
@@ -14,7 +15,8 @@ use Modules\Admin\Services\DriverService;
 class AdminDriverController extends Controller
 {
     public function __construct(
-        private DriverService $driverService
+        private DriverService $driverService,
+        private UploadFilesService $uploadFilesService
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -39,7 +41,12 @@ class AdminDriverController extends Controller
 
     public function store(StoreDriverRequest $request): JsonResponse
     {
-        $driver = $this->driverService->create($request->validated());
+        $data = $request->validated();
+
+        $data['image'] = $this->uploadFilesService->uploadImage($request->file('image'), 'drivers/images');
+        $data['image_document'] = $this->uploadFilesService->uploadFile($request->file('image_document'), 'drivers/documents');
+
+        $driver = $this->driverService->create($data);
 
         return successResponse(new DriverResource($driver), 'Driver created successfully', 201);
     }
@@ -63,7 +70,21 @@ class AdminDriverController extends Controller
             return ErrorResponse::make('Driver not found', null, 404);
         }
 
-        $driver = $this->driverService->update($id, $request->validated());
+        $data = $request->validated();
+
+        if ($request->hasFile('image')) {
+            $data['image'] = $this->uploadFilesService->uploadImage($request->file('image'), 'drivers/images', $driver->image);
+        } else {
+            unset($data['image']);
+        }
+
+        if ($request->hasFile('image_document')) {
+            $data['image_document'] = $this->uploadFilesService->uploadFile($request->file('image_document'), 'drivers/documents', $driver->image_document);
+        } else {
+            unset($data['image_document']);
+        }
+
+        $driver = $this->driverService->update($id, $data);
 
         return successResponse(new DriverResource($driver), 'Driver updated successfully');
     }

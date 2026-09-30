@@ -29,6 +29,8 @@ class UpdateDriverRequest extends FormRequest
             'full_name.ar' => 'nullable|string|max:255',
             'email' => 'sometimes|email|unique:drivers,email,'.$id,
             'image' => 'nullable|image:allow_svg|mimes:jpeg,png,jpg,gif,webp,svg|max:5120',
+            'id_number' => 'nullable|string|max:50',
+            'image_document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
             'is_available' => 'sometimes|boolean',
