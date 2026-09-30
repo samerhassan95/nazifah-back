@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Services\UploadFilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Branch\Models\Branch;
 use Modules\Service\Models\Service;
 use Modules\Service\Models\ServiceAddition;
+use Modules\Service\Support\ServiceAdditionBranchOffering;
 use Modules\Vendor\Models\Vendor;
 
 class AdminLaundryAdditionalServiceController extends Controller
@@ -87,6 +89,17 @@ class AdminLaundryAdditionalServiceController extends Controller
             return notFoundResponse('Additional service not found');
         }
 
+        $branchPrice = null;
+        if ($request->filled('branch_id')) {
+            $branchId = (int) $request->input('branch_id');
+            $branch = Branch::where('vendor_id', $service->vendor_id)->find($branchId);
+            if (! $branch) {
+                return errorResponse('Branch does not belong to this laundry', null, 422);
+            }
+
+            $branchPrice = ServiceAdditionBranchOffering::priceForBranch($branchId, $service);
+        }
+
         // Get pieces directly associated with this additional service
         $pieces = $service->pieces()
             ->get()
@@ -118,7 +131,9 @@ class AdminLaundryAdditionalServiceController extends Controller
                 'ar' => $category->getTranslation('name', 'ar'),
                 'en' => $category->getTranslation('name', 'en'),
             ] : null,
-            'Price' => (float) $service->price,
+            'Price' => $branchPrice ?? (float) $service->price,
+            'branch_price' => $branchPrice,
+            'vendor_price' => (float) $service->price,
             'is_active' => (bool) $service->is_active,
             'icon_id' => $service->icon_id,
             'service_ids' => $service->services->pluck('id'),

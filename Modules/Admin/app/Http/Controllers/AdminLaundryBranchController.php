@@ -14,6 +14,7 @@ use Modules\Order\Models\Order;
 use Modules\Piece\Models\Piece;
 use Modules\Service\Models\Service;
 use Modules\Service\Models\ServiceAddition;
+use Modules\Service\Support\ServiceAdditionBranchOffering;
 use Modules\Vendor\Models\Vendor;
 
 class AdminLaundryBranchController extends Controller
@@ -454,15 +455,19 @@ class AdminLaundryBranchController extends Controller
             'icon' => $piece->iconRelation?->full_path,
         ]);
 
-        $additionalServices = ServiceAddition::where('vendor_id', $branch->vendor_id)->get()->map(function ($addition) use ($locale) {
+        $branchAdditionalServices = $branch->serviceAdditions()->get()->keyBy('id');
+        $additionalServices = ServiceAddition::where('vendor_id', $branch->vendor_id)->get()->map(function ($addition) use ($locale, $branchAdditionalServices) {
             $rating = Order::whereHas('items.additionalServicesRelation', function ($q) use ($addition) {
                 $q->where('service_additions.id', $addition->id);
             })->whereNotNull('rating')->avg('rating') ?? 0;
+            $branchPrice = $branchAdditionalServices->get($addition->id)?->pivot?->price;
 
             return [
                 'id' => $addition->id,
                 'name' => $addition->getTranslation('name', $locale),
-                'price' => (float) $addition->price,
+                'price' => $branchPrice !== null ? (float) $branchPrice : (float) $addition->price,
+                'branch_price' => $branchPrice !== null ? (float) $branchPrice : null,
+                'vendor_price' => (float) $addition->price,
                 'rating' => round((float) $rating, 2),
                 'icon' => $addition->iconRelation?->full_path,
             ];
@@ -600,17 +605,9 @@ class AdminLaundryBranchController extends Controller
                 return errorResponse("Additional service ID {$additionId} does not belong to vendor {$branch->vendor_id}", null, 422);
             }
 
-            DB::table('branch_service_addition')->updateOrInsert(
-                [
-                    'branch_id' => $branch->id,
-                    'service_addition_id' => $additionId,
-                ],
-                [
-                    'price' => $price,
-                    'updated_at' => $now,
-                    'created_at' => $now,
-                ]
-            );
+            ServiceAdditionBranchOffering::upsert($branch->id, $addition, [
+                'price' => (float) $price,
+            ]);
         }
 
         return successResponse(
