@@ -437,6 +437,7 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
 
         // Orders
         Route::get('orders', [AdminLaundryOrderController::class, 'index']);
+        Route::delete('orders/{id}', [AdminLaundryOrderController::class, 'destroy']);
 
         // Services
         Route::prefix('services')->group(function () {

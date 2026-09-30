@@ -141,4 +141,17 @@ class AdminLaundryOrderController extends Controller
         ], 'Orders retrieved successfully');
     }
 
+    /**
+     * Soft-delete an order from the admin laundry orders screen.
+     * DELETE /laundries/orders/{id}
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        if (! $this->orderService->deleteOrder($id)) {
+            return notFoundResponse('Order not found');
+        }
+
+        return successResponse(null, 'Order deleted successfully');
+    }
+
 }

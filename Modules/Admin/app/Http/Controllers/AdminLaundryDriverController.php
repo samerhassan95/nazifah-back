@@ -116,7 +116,7 @@ class AdminLaundryDriverController extends Controller
             // The driver belongs to the laundry; a branch is optional and can be assigned later.
             'vendor_id' => 'required_without:branch_id|nullable|exists:vendors,id',
             'branch_id' => 'nullable|exists:branches,id',
-            'Driver_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'Driver_image' => 'nullable|image:allow_svg|mimes:jpeg,png,jpg,gif,webp,svg|max:5120',
             'ID_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'Driver_name' => ['required', $this->translatableNameRule()],
             'Phone' => 'required|string|unique:drivers,phone',
@@ -174,7 +174,7 @@ class AdminLaundryDriverController extends Controller
         }
 
         $validated = $request->validate([
-            'Driver_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'Driver_image' => 'nullable|image:allow_svg|mimes:jpeg,png,jpg,gif,webp,svg|max:5120',
             'ID_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'Driver_name' => ['sometimes', $this->translatableNameRule()],
             'Phone' => 'sometimes|string|unique:drivers,phone,'.$id,
