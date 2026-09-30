@@ -115,12 +115,16 @@ class AdminLaundryBranchController extends Controller
         if (! $request->has('lng') && $request->has('longitude')) {
             $request->merge(['lng' => $request->input('longitude')]);
         }
+        if (! $request->hasFile('Branch_banner') && $request->hasFile('banner')) {
+            $request->files->set('Branch_banner', $request->file('banner'));
+        }
         if (! $request->hasFile('Branch_logo') && $request->hasFile('logo')) {
             $request->files->set('Branch_logo', $request->file('logo'));
         }
 
         $validated = $request->validate([
             'vendor_id' => 'required|exists:vendors,id',
+            'Branch_banner' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'Branch_logo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'name' => 'required|array',
             'name.ar' => 'required|string',
@@ -168,8 +172,13 @@ class AdminLaundryBranchController extends Controller
         $branch->self_pickup = $request->boolean('self_pickup') || $deliveryCustomer === 'self_pickup';
         $branch->is_active = true;
 
-        if ($request->hasFile('Branch_logo')) {
+        if ($request->hasFile('Branch_banner')) {
             $branch->store_front = $this->uploadFilesService->uploadImage(
+                $request->file('Branch_banner'), 'branches/covers'
+            );
+        }
+        if ($request->hasFile('Branch_logo')) {
+            $branch->logo = $this->uploadFilesService->uploadImage(
                 $request->file('Branch_logo'), 'branches/logos'
             );
         }
@@ -221,11 +230,15 @@ class AdminLaundryBranchController extends Controller
         if (! $request->has('lng') && $request->has('longitude')) {
             $request->merge(['lng' => $request->input('longitude')]);
         }
+        if (! $request->hasFile('Branch_banner') && $request->hasFile('banner')) {
+            $request->files->set('Branch_banner', $request->file('banner'));
+        }
         if (! $request->hasFile('Branch_logo') && $request->hasFile('logo')) {
             $request->files->set('Branch_logo', $request->file('logo'));
         }
 
         $validated = $request->validate([
+            'Branch_banner' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'Branch_logo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'name' => 'sometimes|array',
             'name.ar' => 'sometimes|string',
@@ -298,9 +311,14 @@ class AdminLaundryBranchController extends Controller
             $branch->is_active = $validated['is_active'];
         }
 
-        if ($request->hasFile('Branch_logo')) {
+        if ($request->hasFile('Branch_banner')) {
             $branch->store_front = $this->uploadFilesService->uploadImage(
-                $request->file('Branch_logo'), 'branches/logos', $branch->store_front
+                $request->file('Branch_banner'), 'branches/covers', $branch->store_front
+            );
+        }
+        if ($request->hasFile('Branch_logo')) {
+            $branch->logo = $this->uploadFilesService->uploadImage(
+                $request->file('Branch_logo'), 'branches/logos', $branch->logo
             );
         }
 
@@ -491,6 +509,8 @@ class AdminLaundryBranchController extends Controller
     {
         $lang = app()->getLocale();
         $unifiedNumber = $branch->unified_number;
+        $logoUrl = $this->uploadFilesService->getFullUrl($branch->logo);
+        $bannerUrl = $this->uploadFilesService->getFullUrl($branch->store_front);
 
         return [
             'id' => $branch->id,
@@ -498,7 +518,11 @@ class AdminLaundryBranchController extends Controller
                 'id' => $branch->vendor_id,
                 'name' => $branch->vendor ? $branch->vendor->getTranslation('name', $lang) : null,
             ],
-            'Branch_logo' => $branch->store_front ? (str_starts_with($branch->store_front, 'http') ? $branch->store_front : config('app.url').$branch->store_front) : null,
+            'Branch_logo' => $logoUrl,
+            'logo' => $logoUrl,
+            'Branch_banner' => $bannerUrl,
+            'banner' => $bannerUrl,
+            'store_front' => $bannerUrl,
             'name' => [
                 'ar' => $branch->getTranslation('name', 'ar'),
                 'en' => $branch->getTranslation('name', 'en'),
