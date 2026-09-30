@@ -88,12 +88,15 @@ class AdminLaundryOrderController extends Controller
                 (bool) $order->delivery_at_vendor,
                 false,
             ) ?? $normalizedStatus;
+            $driverName = $order->driver
+                ? ($order->driver->getTranslation('full_name', 'ar') ?: $order->driver->full_name ?: ($isAr ? 'غير محدد' : 'Unspecified'))
+                : ($isAr ? 'غير محدد' : 'Unspecified');
 
             return [
                 'id'           => $order->id,
                 'Order_code'   => $order->order_number,
                 'Client_name'  => $order->client ? ($order->client->getTranslation('full_name', 'ar') ?? $order->client->full_name ?? 'N/A') : 'N/A',
-                'Driver_name'  => $order->driver ? ($order->driver->getTranslation('full_name', 'ar') ?? $order->driver->full_name ?? 'N/A') : 'N/A',
+                'Driver_name'  => $driverName,
                 'Pieces_count' => OrderItemGrouper::totalPiecesCount($order->items),
                 'Branch'       => $order->branch?->getTranslation('name', 'ar') ?? $order->branch?->name ?? 'N/A',
                 'Order_value'  => (float) $order->final_amount,

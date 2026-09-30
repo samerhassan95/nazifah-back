@@ -34,7 +34,9 @@ class OrderResource extends JsonResource
         ) ?? $normalizedStatus;
 
         $clientName = $this->client ? ($this->client->getTranslation('full_name', 'ar') ?? $this->client->full_name ?? 'N/A') : 'N/A';
-        $driverName = $this->driver ? ($this->driver->getTranslation('full_name', 'ar') ?? $this->driver->full_name ?? 'N/A') : 'N/A';
+        $driverName = $this->driver
+            ? ($this->driver->getTranslation('full_name', 'ar') ?: $this->driver->full_name ?: ($isAr ? 'غير محدد' : 'Unspecified'))
+            : ($isAr ? 'غير محدد' : 'Unspecified');
         $branchName = $this->branch ? ($this->branch->getTranslation('name', 'ar') ?? $this->branch->name ?? 'N/A') : 'N/A';
         $vendorName = $vendor ? ($vendor->getTranslation('name', 'ar') ?? $vendor->name ?? 'N/A') : 'N/A';
         $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();
