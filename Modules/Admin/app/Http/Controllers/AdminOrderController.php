@@ -493,16 +493,21 @@ class AdminOrderController extends Controller
                 $joinedServices = implode('، ', $serviceNames);
                 $quantity = (int) $primary->quantity;
 
-                $pieceImage = $primary->piece?->iconRelation?->full_path
-                    ?: ($primary->piece?->iconRelation?->path ? asset($primary->piece->iconRelation->path) : '')
-                    ?: ($primary->image ?? '');
+                // The piece's generic type icon (e.g. a "dress" icon shared by every dress) —
+                // distinct from the client's own photo of this specific item, if they
+                // uploaded one. Previously both were collapsed into the same value, so the
+                // client's actual photo never made it into the response once the piece had
+                // a generic icon (which is effectively always).
+                $pieceLogo = $primary->piece?->iconRelation?->full_path
+                    ?: ($primary->piece?->iconRelation?->path ? asset($primary->piece->iconRelation->path) : '');
+                $clientImage = $primary->image ?: $pieceLogo;
 
                 $itemData = [
-                    'icon' => $pieceImage,
-                    'image' => $pieceImage,
-                    'piece_image' => $pieceImage,
-                    'Piece_logo' => $pieceImage,
-                    'piece_logo' => $pieceImage,
+                    'icon' => $pieceLogo,
+                    'image' => $clientImage,
+                    'piece_image' => $clientImage,
+                    'Piece_logo' => $pieceLogo,
+                    'piece_logo' => $pieceLogo,
                     'Piece_count' => $quantity,
                     'Piece_name' => $pieceName,
                     'Total_without_tax' => round($totalPrice, 2),
@@ -518,7 +523,7 @@ class AdminOrderController extends Controller
                             'Additional_services' => $additionalServices,
                         ]],
                         'Comment' => $primary->notes ?? '',
-                        'Image' => $primary->image ?: $pieceImage,
+                        'Image' => $clientImage,
                     ],
                     'name_operation' => $joinedServices,
                 ];
