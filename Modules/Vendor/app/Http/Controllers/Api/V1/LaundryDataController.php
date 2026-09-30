@@ -230,7 +230,7 @@ class LaundryDataController extends Controller
                 'name' => $this->getTranslatableValue($branch, 'name', $lang),
                 'Email' => $vendor->email ?? null,
                 'Phone' => $branch->phone_number,
-                'Landline' => $branch->land_phone ?? $branch->landline ?? $vendor->official_number,
+                'Landline' => $branch->land_phone ?? $branch->landline,
                 'lat' => (float) ($branch->latitude ?? 0),
                 'lng' => (float) ($branch->longitude ?? 0),
                 'address_details' => $this->getTranslatableValue($branch, 'location', $lang) ?? '',

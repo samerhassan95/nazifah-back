@@ -111,15 +111,12 @@ class Branch extends Model
     }
 
     /**
-     * Branch has no unified-number column of its own — falls back to its own
-     * landline, then the parent vendor's official/unified number. Only reads
-     * the vendor relation if it's already eager-loaded, to avoid an N+1 query
-     * when this accessor fires while listing many branches.
+     * Branch has no unified-number column of its own, so expose only its own
+     * landline and never substitute the parent vendor's official number.
      */
     public function getUnifiedNumberAttribute(): ?string
     {
-        return $this->land_phone
-            ?: ($this->relationLoaded('vendor') ? $this->vendor?->official_number : null);
+        return $this->land_phone ?: ($this->landline ?: null);
     }
 
     /**
