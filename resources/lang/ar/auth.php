@@ -29,6 +29,8 @@ return [
     'password_reset_failed' => 'فشل إعادة تعيين كلمة المرور',
     'unauthenticated' => 'غير مصرح. يرجى تسجيل الدخول.',
     'account_banned' => 'تم حظر حسابك. يرجى التواصل مع الدعم.',
+    'account_banned_with_reason' => 'تم حظر حسابك بتاريخ :date. السبب: :reason. يرجى التواصل مع الدعم.',
+    'account_banned_no_reason' => 'تم حظر حسابك بتاريخ :date. يرجى التواصل مع الدعم.',
     'account_not_found' => 'الحساب غير موجود. يرجى التسجيل أولاً.',
     'phone_already_registered' => 'رقم الهاتف مسجل بالفعل. يرجى تسجيل الدخول.',
     'new_phone_same_as_current' => 'هذا هو رقم هاتفك الحالي بالفعل.',

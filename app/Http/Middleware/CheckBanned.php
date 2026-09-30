@@ -30,7 +30,7 @@ class CheckBanned
 
             return response()->json([
                 'success' => false,
-                'message' => __('auth.account_banned'),
+                'message' => accountBannedMessage($user->ban_reason, $user->banned_at),
                 'data' => [
                     'is_banned' => true,
                     'ban_reason' => $user->ban_reason,

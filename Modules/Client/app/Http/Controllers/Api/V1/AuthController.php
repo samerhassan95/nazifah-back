@@ -216,7 +216,7 @@ class AuthController extends Controller
                     // Check if client is banned
                     if ($client->is_banned) {
                         return ErrorResponse::make(
-                            __('auth.account_banned'),
+                            accountBannedMessage($client->ban_reason, $client->banned_at),
                             [
                                 'is_banned' => true,
                                 'ban_reason' => $client->ban_reason,
@@ -742,7 +742,7 @@ class AuthController extends Controller
             // Check if client is banned
             if ($client->is_banned) {
                 return ErrorResponse::make(
-                    __('auth.account_banned'),
+                    accountBannedMessage($client->ban_reason, $client->banned_at),
                     [
                         'is_banned' => true,
                         'ban_reason' => $client->ban_reason,

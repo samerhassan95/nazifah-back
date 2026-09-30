@@ -226,7 +226,7 @@ class AuthController extends Controller
             // Check if driver is banned
             if ($driver->is_banned) {
                 return ErrorResponse::make(
-                    __('auth.account_banned'),
+                    accountBannedMessage($driver->ban_reason, $driver->banned_at),
                     [
                         'is_banned' => true,
                         'ban_reason' => $driver->ban_reason,
@@ -581,7 +581,7 @@ class AuthController extends Controller
 
             if ($driver->is_banned) {
                 return ErrorResponse::make(
-                    __('auth.account_banned'),
+                    accountBannedMessage($driver->ban_reason, $driver->banned_at),
                     [
                         'is_banned' => true,
                         'ban_reason' => $driver->ban_reason,

@@ -62,7 +62,7 @@ class AuthController extends Controller
 
             if ($employee->is_banned) {
                 return errorResponse(
-                    __('auth.account_banned'),
+                    accountBannedMessage($employee->ban_reason, $employee->banned_at),
                     [
                         'is_banned' => true,
                         'ban_reason' => $employee->ban_reason,
@@ -272,7 +272,7 @@ class AuthController extends Controller
                 } else {
                     if ($vendor->is_banned) {
                         return errorResponse(
-                            __('auth.account_banned'),
+                            accountBannedMessage($vendor->ban_reason, $vendor->banned_at),
                             [
                                 'is_banned' => true,
                                 'ban_reason' => $vendor->ban_reason,
@@ -300,7 +300,7 @@ class AuthController extends Controller
 
                 if ($employee->is_banned) {
                     return errorResponse(
-                        __('auth.account_banned'),
+                        accountBannedMessage($employee->ban_reason, $employee->banned_at),
                         [
                             'is_banned' => true,
                             'ban_reason' => $employee->ban_reason,

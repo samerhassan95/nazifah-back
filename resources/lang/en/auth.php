@@ -29,6 +29,8 @@ return [
     'password_reset_failed' => 'Failed to reset password',
     'unauthenticated' => 'Unauthenticated. Please login.',
     'account_banned' => 'Your account has been banned. Please contact support.',
+    'account_banned_with_reason' => 'Your account was banned on :date. Reason: :reason. Please contact support.',
+    'account_banned_no_reason' => 'Your account was banned on :date. Please contact support.',
     'account_not_found' => 'Account not found. Please register first.',
     'phone_already_registered' => 'Phone number is already registered. Please login.',
     'new_phone_same_as_current' => 'This is already your current phone number.',

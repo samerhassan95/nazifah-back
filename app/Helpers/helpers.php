@@ -196,6 +196,24 @@ function tooManyRequestsResponse($message = 'Too many requests', $code = 429): J
     return jsonResponse(false, $code, $message);
 }
 
+if (! function_exists('accountBannedMessage')) {
+    /**
+     * Full, human-readable ban message (reason + date folded in), so the
+     * message alone is complete and clear even if a client app only shows
+     * `message` and ignores the structured `errors` payload.
+     */
+    function accountBannedMessage(?string $banReason, ?\Illuminate\Support\Carbon $bannedAt): string
+    {
+        $date = $bannedAt?->format('Y-m-d H:i') ?? '-';
+
+        if ($banReason !== null && trim($banReason) !== '') {
+            return __('auth.account_banned_with_reason', ['date' => $date, 'reason' => $banReason]);
+        }
+
+        return __('auth.account_banned_no_reason', ['date' => $date]);
+    }
+}
+
 if (! function_exists('adminErrorMessage')) {
     /**
      * Append the real exception message to a generic message for admin dashboard
