@@ -500,7 +500,7 @@ class AdminOrderController extends Controller
                 // a generic icon (which is effectively always).
                 $pieceLogo = $primary->piece?->iconRelation?->full_path
                     ?: ($primary->piece?->iconRelation?->path ? asset($primary->piece->iconRelation->path) : '');
-                $clientImage = $primary->image ?: $pieceLogo;
+                $clientImage = $primary->images ?: $pieceLogo;
 
                 $itemData = [
                     'icon' => $pieceLogo,
