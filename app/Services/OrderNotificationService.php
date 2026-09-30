@@ -188,8 +188,8 @@ class OrderNotificationService
                 $order,
                 'تم استلام طلبك',
                 'Order Placed',
-                "تم استلام طلبك #{$num} بنجاح.",
-                "Your order #{$num} has been placed successfully.",
+                "تم استلام طلبك رقم {$num} بنجاح.",
+                "Your order number {$num} has been placed successfully.",
                 'order_placed',
             ),
             'vendor_and_admin' => fn () => $this->sendToVendorAndAdmins(
@@ -197,7 +197,7 @@ class OrderNotificationService
                 'طلب جديد',
                 'New Order',
                 "طلب جديد رقم {$num} من العميل",
-                "New order #{$num} from customer",
+                "New order number {$num} from customer",
                 'new_order',
             ),
         ] as $target => $callback) {

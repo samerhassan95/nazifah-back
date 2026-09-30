@@ -20,11 +20,11 @@ class SendDriverAssignmentNotification
             $titleAr = $type === 'pickup' ? 'طلب استلام جديد' : 'طلب توصيل جديد';
             $titleEn = $type === 'pickup' ? 'New Pickup Assignment' : 'New Delivery Assignment';
             $bodyAr = $type === 'pickup'
-                ? "تم تعيينك لاستلام الطلب #{$num}."
-                : "تم تعيينك لتوصيل الطلب #{$num}.";
+                ? "تم تعيينك لاستلام الطلب رقم {$num}."
+                : "تم تعيينك لتوصيل الطلب رقم {$num}.";
             $bodyEn = $type === 'pickup'
-                ? "You have been assigned to pick up order #{$num}."
-                : "You have been assigned to deliver order #{$num}.";
+                ? "You have been assigned to pick up order number {$num}."
+                : "You have been assigned to deliver order number {$num}.";
 
             $this->notifications->sendToDriver(
                 $order,
@@ -56,11 +56,11 @@ class SendDriverAssignmentNotification
                         : "The delivery request was cancelled by the laundry.";
                 } else {
                     $bodyArOld = $type === 'pickup'
-                        ? "تم إلغاء تعيينك لاستلام الطلب #{$num} وتحويله لسائق آخر."
-                        : "تم إلغاء تعيينك لتوصيل الطلب #{$num} وتحويله لسائق آخر.";
+                        ? "تم إلغاء تعيينك لاستلام الطلب رقم {$num} وتحويله لسائق آخر."
+                        : "تم إلغاء تعيينك لتوصيل الطلب رقم {$num} وتحويله لسائق آخر.";
                     $bodyEnOld = $type === 'pickup'
-                        ? "You have been removed from picking up order #{$num}; it was reassigned to another driver."
-                        : "You have been removed from delivering order #{$num}; it was reassigned to another driver.";
+                        ? "You have been removed from picking up order number {$num}; it was reassigned to another driver."
+                        : "You have been removed from delivering order number {$num}; it was reassigned to another driver.";
                 }
 
                 $this->notifications->sendToDriver(
@@ -82,11 +82,11 @@ class SendDriverAssignmentNotification
                     $type === 'pickup' ? 'تم تعيين سائق استلام جديد' : 'تم تعيين سائق توصيل جديد',
                     $type === 'pickup' ? 'New Pickup Driver Assigned' : 'New Delivery Driver Assigned',
                     $type === 'pickup'
-                        ? "تم تعيين سائق استلام جديد للطلب #{$num}."
-                        : "تم تعيين سائق توصيل جديد للطلب #{$num}.",
+                        ? "تم تعيين سائق استلام جديد للطلب رقم {$num}."
+                        : "تم تعيين سائق توصيل جديد للطلب رقم {$num}.",
                     $type === 'pickup'
-                        ? "A new pickup driver was assigned to order #{$num}."
-                        : "A new delivery driver was assigned to order #{$num}.",
+                        ? "A new pickup driver was assigned to order number {$num}."
+                        : "A new delivery driver was assigned to order number {$num}.",
                     "driver_{$type}_reassigned",
                 );
             }

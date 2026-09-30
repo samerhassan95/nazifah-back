@@ -26,12 +26,12 @@ return [
 
     // Order Notifications
     'new_order' => 'طلب جديد',
-    'new_order_body' => 'لديك طلب جديد #:order_number من :client_name',
+    'new_order_body' => 'لديك طلب جديد رقم :order_number من :client_name',
     'order_status_updated' => 'تم تحديث حالة الطلب',
-    'order_status_pending' => 'طلبك #:order_number قيد الانتظار',
-    'order_status_confirmed' => 'تم تأكيد طلبك #:order_number',
-    'order_status_completed' => 'تم إكمال طلبك #:order_number',
-    'order_status_cancelled' => 'تم إلغاء طلبك #:order_number',
+    'order_status_pending' => 'طلبك رقم :order_number قيد الانتظار',
+    'order_status_confirmed' => 'تم تأكيد طلبك رقم :order_number',
+    'order_status_completed' => 'تم إكمال طلبك رقم :order_number',
+    'order_status_cancelled' => 'تم إلغاء طلبك رقم :order_number',
 
     // Chat Notifications
     'new_message' => 'رسالة جديدة',

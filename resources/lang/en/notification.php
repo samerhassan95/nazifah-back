@@ -26,12 +26,12 @@ return [
 
     // Order Notifications
     'new_order' => 'New Order',
-    'new_order_body' => 'You have a new order #:order_number from :client_name',
+    'new_order_body' => 'You have a new order number :order_number from :client_name',
     'order_status_updated' => 'Order Status Updated',
-    'order_status_pending' => 'Your order #:order_number is pending',
-    'order_status_confirmed' => 'Your order #:order_number has been confirmed',
-    'order_status_completed' => 'Your order #:order_number has been completed',
-    'order_status_cancelled' => 'Your order #:order_number has been cancelled',
+    'order_status_pending' => 'Your order number :order_number is pending',
+    'order_status_confirmed' => 'Your order number :order_number has been confirmed',
+    'order_status_completed' => 'Your order number :order_number has been completed',
+    'order_status_cancelled' => 'Your order number :order_number has been cancelled',
 
     // Chat Notifications
     'new_message' => 'New Message',

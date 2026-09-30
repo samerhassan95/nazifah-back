@@ -82,13 +82,13 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'تحديثات على طلبك', 'Updates on Your Order',
-            "قامت المغسلة بتعديل طلبك #{$num}. يرجى المراجعة والموافقة.",
-            "The laundry has modified your order #{$num}. Please review and approve.",
+            "قامت المغسلة بتعديل طلبك رقم {$num}. يرجى المراجعة والموافقة.",
+            "The laundry has modified your order number {$num}. Please review and approve.",
             'order_reviewed',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم إرسال المراجعة للعميل', 'Review Sent to Client',
-            "تم إرسال مراجعة الطلب #{$num} للعميل.", "Order #{$num} review was sent to the client.",
+            "تم إرسال مراجعة الطلب رقم {$num} للعميل.", "Order number {$num} review was sent to the client.",
             'order_reviewed',
         );
     }
@@ -97,7 +97,7 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'تم تأكيد الطلب', 'Order Confirmed',
-            "تم تأكيد طلبك #{$num}.", "Your order #{$num} has been confirmed.",
+            "تم تأكيد طلبك رقم {$num}.", "Your order number {$num} has been confirmed.",
             'order_confirmed',
         );
 
@@ -108,7 +108,7 @@ class SendOrderStatusNotification
 
         $this->notifyVendorAndAdmins($order, $actorType,
             'وافق العميل على الطلب', 'Client Approved Order',
-            "وافق العميل على الطلب #{$num}.", "Client approved order #{$num}.",
+            "وافق العميل على الطلب رقم {$num}.", "Client approved order number {$num}.",
             'client_approved',
         );
     }
@@ -117,13 +117,13 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'في انتظار الدفع', 'Payment Required',
-            "طلبك #{$num} بانتظار الدفع. يرجى إتمام الدفع لمواصلة المعالجة.",
-            "Your order #{$num} is waiting for payment. Please complete payment to continue.",
+            "طلبك رقم {$num} بانتظار الدفع. يرجى إتمام الدفع لمواصلة المعالجة.",
+            "Your order number {$num} is waiting for payment. Please complete payment to continue.",
             'waiting_payment',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'في انتظار دفع العميل', 'Waiting for Client Payment',
-            "الطلب #{$num} بانتظار دفع العميل.", "Order #{$num} is waiting for client payment.",
+            "الطلب رقم {$num} بانتظار دفع العميل.", "Order number {$num} is waiting for client payment.",
             'waiting_payment',
         );
     }
@@ -132,12 +132,12 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'تم تأكيد الدفع', 'Payment Confirmed',
-            "تم تأكيد الدفع لطلبك #{$num}.", "Payment for your order #{$num} has been confirmed.",
+            "تم تأكيد الدفع لطلبك رقم {$num}.", "Payment for your order number {$num} has been confirmed.",
             'payment_confirmed',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم تأكيد الدفع', 'Payment Confirmed',
-            "تم تأكيد الدفع للطلب #{$num}.", "Payment confirmed for order #{$num}.",
+            "تم تأكيد الدفع للطلب رقم {$num}.", "Payment confirmed for order number {$num}.",
             'payment_confirmed',
         );
     }
@@ -150,7 +150,7 @@ class SendOrderStatusNotification
         // "you have a driver" is only ever true when we say it.
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم تعيين سائق الاستلام', 'Pickup Driver Assigned',
-            "تم تعيين سائق استلام للطلب #{$num}.", "A pickup driver was assigned to order #{$num}.",
+            "تم تعيين سائق استلام للطلب رقم {$num}.", "A pickup driver was assigned to order number {$num}.",
             'driver_pickup_assigned',
         );
     }
@@ -161,12 +161,12 @@ class SendOrderStatusNotification
         // acceptance, not at assignment — see onDriverPickupAssigned().
         $this->notifyClient($order, $actorType,
             'تم تعيين سائق الاستلام', 'Pickup Driver Assigned',
-            "تم تعيين سائق لاستلام طلبك #{$num}.", "A driver has been assigned to pick up your order #{$num}.",
+            "تم تعيين سائق لاستلام طلبك رقم {$num}.", "A driver has been assigned to pick up your order number {$num}.",
             'driver_pickup_assigned',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'قبل سائق الاستلام', 'Pickup Driver Accepted',
-            "قبل سائق استلام الطلب #{$num}.", "Pickup driver accepted order #{$num}.",
+            "قبل سائق استلام الطلب رقم {$num}.", "Pickup driver accepted order number {$num}.",
             'driver_pickup_accepted',
         );
     }
@@ -175,17 +175,17 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'تم استلام الطلب', 'Order Picked Up',
-            "تم استلام طلبك #{$num}.", "Your order #{$num} has been picked up.",
+            "تم استلام طلبك رقم {$num}.", "Your order number {$num} has been picked up.",
             'order_picked_up',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم استلام الطلب', 'Clothes Picked Up',
-            "تم استلام الطلب #{$num}.", "Clothes for order #{$num} have been picked up.",
+            "تم استلام الطلب رقم {$num}.", "Clothes for order number {$num} have been picked up.",
             'order_picked_up',
         );
         $this->notifyOrderDrivers($order, 'pickup', $actorType, $actorId,
             'تم الاستلام', 'Pickup Completed',
-            "تم استلام الطلب #{$num}.", "Order #{$num} has been picked up.",
+            "تم استلام الطلب رقم {$num}.", "Order number {$num} has been picked up.",
             'order_picked_up',
         );
     }
@@ -194,18 +194,18 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'وصل طلبك للمغسلة', 'Clothes at the Laundry',
-            "وصل طلبك #{$num} إلى المغسلة وجاري معالجتها.",
-            "Clothes for your order #{$num} have arrived at the laundry and are being processed.",
+            "وصل طلبك رقم {$num} إلى المغسلة وجاري معالجتها.",
+            "Clothes for your order number {$num} have arrived at the laundry and are being processed.",
             'delivered_to_branch',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم تسليم الطلب للفرع', 'Clothes Delivered to Branch',
-            "تم تسليم الطلب #{$num} للفرع.", "Clothes for order #{$num} have been delivered to the branch.",
+            "تم تسليم الطلب رقم {$num} للفرع.", "Clothes for order number {$num} have been delivered to the branch.",
             'delivered_to_branch',
         );
         $this->notifyOrderDrivers($order, 'pickup', $actorType, $actorId,
             'تم التسليم للفرع', 'Delivered to Branch',
-            "تم تسليم الطلب #{$num} للفرع.", "Order #{$num} was delivered to the branch.",
+            "تم تسليم الطلب رقم {$num} للفرع.", "Order number {$num} was delivered to the branch.",
             'delivered_to_branch',
         );
     }
@@ -216,7 +216,7 @@ class SendOrderStatusNotification
         // onDriverPickupAssigned(): wait until the driver actually accepts.
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم تعيين سائق التوصيل', 'Delivery Driver Assigned',
-            "تم تعيين سائق توصيل للطلب #{$num}.", "A delivery driver was assigned to order #{$num}.",
+            "تم تعيين سائق توصيل للطلب رقم {$num}.", "A delivery driver was assigned to order number {$num}.",
             'driver_delivery_assigned',
         );
     }
@@ -227,12 +227,12 @@ class SendOrderStatusNotification
         // acceptance, not at assignment — see onDriverDeliveryAssigned().
         $this->notifyClient($order, $actorType,
             'تم تعيين سائق التوصيل', 'Delivery Driver Assigned',
-            "تم تعيين سائق لتوصيل طلبك #{$num}.", "A driver has been assigned to deliver your order #{$num}.",
+            "تم تعيين سائق لتوصيل طلبك رقم {$num}.", "A driver has been assigned to deliver your order number {$num}.",
             'driver_delivery_assigned',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'قبل سائق التوصيل', 'Delivery Driver Accepted',
-            "قبل سائق توصيل الطلب #{$num}.", "Delivery driver accepted order #{$num}.",
+            "قبل سائق توصيل الطلب رقم {$num}.", "Delivery driver accepted order number {$num}.",
             'driver_delivery_accepted',
         );
     }
@@ -245,14 +245,14 @@ class SendOrderStatusNotification
         if ((bool) $order->delivery_at_vendor) {
             $this->notifyClient($order, $actorType,
                 'طلبك جاهز للاستلام', 'Your Order is Ready',
-                "طلبك #{$num} جاهز، يمكنك استلامه من الفرع.",
-                "Your order #{$num} is ready — you can pick it up from the branch.",
+                "طلبك رقم {$num} جاهز، يمكنك استلامه من الفرع.",
+                "Your order number {$num} is ready — you can pick it up from the branch.",
                 'waiting_client_receipt',
                 ['delivery_at_vendor' => true],
             );
             $this->notifyVendorAndAdmins($order, $actorType,
                 'الطلب جاهز للاستلام', 'Order Ready for Pickup',
-                "الطلب #{$num} جاهز لاستلام العميل من الفرع.", "Order #{$num} is ready for the client to pick up from the branch.",
+                "الطلب رقم {$num} جاهز لاستلام العميل من الفرع.", "Order number {$num} is ready for the client to pick up from the branch.",
                 'waiting_client_receipt',
             );
 
@@ -261,18 +261,18 @@ class SendOrderStatusNotification
 
         $this->notifyClient($order, $actorType,
             'السائق في موقع التسليم', 'Driver Has Arrived',
-            "وصل السائق لموقع تسليم طلبك #{$num}. يرجى استلام الطلب.",
-            "The driver has arrived with your order #{$num}. Please receive your order.",
+            "وصل السائق لموقع تسليم طلبك رقم {$num}. يرجى استلام الطلب.",
+            "The driver has arrived with your order number {$num}. Please receive your order.",
             'waiting_client_receipt',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'السائق في موقع التسليم', 'Driver at Delivery Location',
-            "وصل السائق لموقع تسليم الطلب #{$num}.", "Driver arrived at delivery location for order #{$num}.",
+            "وصل السائق لموقع تسليم الطلب رقم {$num}.", "Driver arrived at delivery location for order number {$num}.",
             'waiting_client_receipt',
         );
         $this->notifyOrderDrivers($order, 'delivery', $actorType, $actorId,
             'في انتظار العميل', 'Waiting for Client',
-            "أنت في موقع تسليم الطلب #{$num} بانتظار العميل.", "You are at the delivery location for order #{$num}, waiting for the client.",
+            "أنت في موقع تسليم الطلب رقم {$num} بانتظار العميل.", "You are at the delivery location for order number {$num}, waiting for the client.",
             'waiting_client_receipt',
         );
     }
@@ -281,17 +281,17 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'تم التوصيل', 'Order Delivered',
-            "تم توصيل طلبك #{$num}.", "Your order #{$num} has been delivered.",
+            "تم توصيل طلبك رقم {$num}.", "Your order number {$num} has been delivered.",
             'order_delivered',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم التوصيل', 'Order Delivered',
-            "تم توصيل الطلب #{$num}.", "Order #{$num} has been delivered.",
+            "تم توصيل الطلب رقم {$num}.", "Order number {$num} has been delivered.",
             'order_delivered',
         );
         $this->notifyOrderDrivers($order, 'delivery', $actorType, $actorId,
             'تم التوصيل', 'Delivery Completed',
-            "تم توصيل الطلب #{$num}.", "Order #{$num} has been delivered.",
+            "تم توصيل الطلب رقم {$num}.", "Order number {$num} has been delivered.",
             'order_delivered',
         );
     }
@@ -300,12 +300,12 @@ class SendOrderStatusNotification
     {
         $this->notifyVendorAndAdmins($order, $actorType,
             'تأجيل موعد الاستلام', 'Pickup Postponed',
-            "أجل العميل موعد استلام الطلب #{$num}.", "Client postponed pickup for order #{$num}.",
+            "أجل العميل موعد استلام الطلب رقم {$num}.", "Client postponed pickup for order number {$num}.",
             'client_postponed_pickup',
         );
         $this->notifyOrderDrivers($order, 'pickup', $actorType, $actorId,
             'تأجيل موعد الاستلام', 'Pickup Postponed',
-            "أجل العميل موعد استلام الطلب #{$num}.", "Client postponed pickup for order #{$num}.",
+            "أجل العميل موعد استلام الطلب رقم {$num}.", "Client postponed pickup for order number {$num}.",
             'client_postponed_pickup',
         );
     }
@@ -314,12 +314,12 @@ class SendOrderStatusNotification
     {
         $this->notifyVendorAndAdmins($order, $actorType,
             'تأجيل موعد التسليم', 'Delivery Postponed',
-            "أجل العميل موعد تسليم الطلب #{$num}.", "Client postponed delivery for order #{$num}.",
+            "أجل العميل موعد تسليم الطلب رقم {$num}.", "Client postponed delivery for order number {$num}.",
             'client_postponed_delivery',
         );
         $this->notifyOrderDrivers($order, 'delivery', $actorType, $actorId,
             'تأجيل موعد التسليم', 'Delivery Postponed',
-            "أجل العميل موعد تسليم الطلب #{$num}.", "Client postponed delivery for order #{$num}.",
+            "أجل العميل موعد تسليم الطلب رقم {$num}.", "Client postponed delivery for order number {$num}.",
             'client_postponed_delivery',
         );
     }
@@ -328,13 +328,13 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'تم إكمال الطلب', 'Order Completed',
-            "تم إكمال طلبك #{$num}. يرجى تقييم الخدمة.",
-            "Your order #{$num} is completed. Please rate the service.",
+            "تم إكمال طلبك رقم {$num}. يرجى تقييم الخدمة.",
+            "Your order number {$num} is completed. Please rate the service.",
             'order_completed',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم إكمال الطلب', 'Order Completed',
-            "تم إكمال الطلب #{$num}.", "Order #{$num} has been completed.",
+            "تم إكمال الطلب رقم {$num}.", "Order number {$num} has been completed.",
             'order_completed',
         );
     }
@@ -343,17 +343,17 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'تم إلغاء الطلب', 'Order Cancelled',
-            "تم إلغاء طلبك #{$num}.", "Your order #{$num} has been cancelled.",
+            "تم إلغاء طلبك رقم {$num}.", "Your order number {$num} has been cancelled.",
             'order_cancelled',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
             'تم إلغاء الطلب', 'Order Cancelled',
-            "تم إلغاء الطلب #{$num}.", "Order #{$num} has been cancelled.",
+            "تم إلغاء الطلب رقم {$num}.", "Order number {$num} has been cancelled.",
             'order_cancelled',
         );
         $this->notifyOrderDrivers($order, 'both', $actorType, $actorId,
             'تم إلغاء الطلب', 'Order Cancelled',
-            "تم إلغاء الطلب #{$num}.", "Order #{$num} has been cancelled.",
+            "تم إلغاء الطلب رقم {$num}.", "Order number {$num} has been cancelled.",
             'order_cancelled',
         );
     }
@@ -373,22 +373,22 @@ class SendOrderStatusNotification
             $leg === 'pickup' ? 'السائق في الطريق للاستلام' : 'السائق في الطريق للتوصيل',
             $leg === 'pickup' ? 'Driver On the Way to Pickup' : 'Driver On the Way to Delivery',
             $leg === 'pickup'
-                ? "السائق في الطريق لاستلام الطلب #{$num}."
-                : "السائق في الطريق لتوصيل الطلب #{$num}.",
+                ? "السائق في الطريق لاستلام الطلب رقم {$num}."
+                : "السائق في الطريق لتوصيل الطلب رقم {$num}.",
             $leg === 'pickup'
-                ? "Driver is on the way to pick up order #{$num}."
-                : "Driver is on the way to deliver order #{$num}.",
+                ? "Driver is on the way to pick up order number {$num}."
+                : "Driver is on the way to deliver order number {$num}.",
             $leg === 'pickup' ? 'driver_on_the_way_pickup' : 'driver_on_the_way_delivery',
         );
 
         $this->notifyOrderDrivers($order, $driverLeg, $actorType, $actorId,
             'أنت في الطريق', 'You Are On the Way',
             $leg === 'pickup'
-                ? "أنت في الطريق لاستلام الطلب #{$num}."
-                : "أنت في الطريق لتوصيل الطلب #{$num}.",
+                ? "أنت في الطريق لاستلام الطلب رقم {$num}."
+                : "أنت في الطريق لتوصيل الطلب رقم {$num}.",
             $leg === 'pickup'
-                ? "You are on the way to pick up order #{$num}."
-                : "You are on the way to deliver order #{$num}.",
+                ? "You are on the way to pick up order number {$num}."
+                : "You are on the way to deliver order number {$num}.",
             $leg === 'pickup' ? 'driver_on_the_way_pickup' : 'driver_on_the_way_delivery',
         );
     }
