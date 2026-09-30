@@ -116,7 +116,7 @@ class ChatsController extends Controller
             'message' => ['required', 'string', 'max:5000'],
             'conversation_id' => ['nullable', 'string'],
             'order_id' => ['nullable', 'integer', 'exists:orders,id'],
-            'target' => ['nullable', 'string', 'in:client,delivery'],
+            'target' => ['nullable', 'string', 'in:client,delivery,admin'],
             'target_id' => ['nullable', 'integer'],
             'message_type' => ['nullable', 'string', 'in:text,image,file'],
             'file' => ['nullable', 'file', 'max:10240'],
@@ -130,7 +130,7 @@ class ChatsController extends Controller
             $hasTarget = $request->filled('target');
             $hasOrder = $request->filled('order_id');
 
-            if ($hasTarget && ! $request->filled('target_id')) {
+            if ($hasTarget && $request->input('target') !== 'admin' && ! $request->filled('target_id')) {
                 $v->errors()->add('target_id', __('chat.target_id_required'));
             }
 
@@ -150,6 +150,10 @@ class ChatsController extends Controller
         $orderId = $request->order_id ? (int) $request->order_id : null;
         $target = $request->target ?? ($orderId ? 'client' : null);
         $targetId = $request->target_id ? (int) $request->target_id : null;
+        if ($target === 'admin') {
+            $orderId = null;
+            $targetId = null;
+        }
         $clientId = null;
         $driverId = null;
 

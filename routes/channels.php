@@ -19,6 +19,10 @@ Broadcast::channel('conversation.{conversationId}', function ($user, string $con
     if (! $conversation) {
         return false;
     }
+    // Admin chat inbox can subscribe to any conversation, matching its API access.
+    if ($user instanceof \Modules\Admin\Models\Admin) {
+        return true;
+    }
     // Client (Modules\Client\Models\Client)
     if ($user instanceof \Modules\Client\Models\Client) {
         return (int) $user->id === (int) $conversation->client_id;

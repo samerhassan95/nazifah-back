@@ -59,7 +59,7 @@ Each incoming message object `e` has:
 
 ### E) Who can subscribe (private channel)
 
-Only **client**, **vendor employee**, or **driver** that belong to that conversation can subscribe. **Admin** is not authorized on `conversation.{id}` in `routes/channels.php` today — admin apps need polling or a backend change to add admin to the channel.
+Clients, vendor employees, and drivers can subscribe only to conversations they belong to. Admins can subscribe to any conversation, matching the admin chat API's system-wide access.
 
 ---
 

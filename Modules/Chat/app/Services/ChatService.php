@@ -621,10 +621,16 @@ class ChatService
             }
         }
 
-        if ($senderType !== 'admin' && $conversation->admin_id) {
-            $admin = Admin::find($conversation->admin_id);
-            if ($admin) {
-                $tokens = array_merge($tokens, $admin->getFcmTokenStrings());
+        if ($senderType !== 'admin') {
+            if ($conversation->admin_id) {
+                $admin = Admin::find($conversation->admin_id);
+                if ($admin) {
+                    $tokens = array_merge($tokens, $admin->getFcmTokenStrings());
+                }
+            } elseif ($conversation->type === 'support') {
+                foreach (Admin::query()->get() as $admin) {
+                    $tokens = array_merge($tokens, $admin->getFcmTokenStrings());
+                }
             }
         }
 
