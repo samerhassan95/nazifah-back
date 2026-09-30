@@ -66,6 +66,7 @@ class UserNotificationService
                 'title' => ['ar' => $titleAr, 'en' => $titleEn],
                 'message' => ['ar' => $bodyAr, 'en' => $bodyEn],
                 'type' => $type,
+                'notification_type' => $type,
                 'is_read' => false,
                 'image' => $image,
                 'data' => $data !== [] ? $data : null,
