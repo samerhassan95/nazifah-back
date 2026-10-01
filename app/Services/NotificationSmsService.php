@@ -31,6 +31,7 @@ class NotificationSmsService
     private const CLIENT_SMS_ALLOWED_TYPES = [
         'order_placed',                // تم استلام الطلب (بعد إتمام الدفع)
         'order_cancelled',             // تم إلغاء الطلب
+        'order_refund',                // تم استرداد مبلغ
         'order_reviewed',              // المغسلة عدّلت الطلب (بانتظار الموافقة)
         'driver_on_the_way_pickup',    // السائق في الطريق للاستلام
         'order_picked_up',             // تم استلام الطلب من العميل
@@ -54,6 +55,10 @@ class NotificationSmsService
         'order_cancelled' => [
             'ar' => 'تم إلغاء طلبك رقم {order_number} واسترجاع المبلغ إن وجد إلى المحفظة/طريقة الدفع.',
             'en' => 'Your order number {order_number} has been cancelled and refunded to your wallet/payment method.',
+        ],
+        'order_refund' => [
+            'ar' => 'تم استرداد المبلغ للطلب رقم {order_number}. يرجى مراجعة تفاصيل المحفظة أو الحساب البنكي.',
+            'en' => 'Amount refunded for order number {order_number}. Please check your wallet or account details.',
         ],
         'order_reviewed' => [
             'ar' => "تم تعديل طلبك رقم {order_number} من قِبل المغسلة.\nيرجى مراجعة التعديلات واختيار الإجراء المناسب.",

@@ -194,8 +194,8 @@ class SendOrderStatusNotification
     {
         $this->notifyClient($order, $actorType,
             'وصل طلبك للمغسلة', 'Clothes at the Laundry',
-            "وصل طلبك رقم {$num} إلى المغسلة وجاري معالجتها.",
-            "Clothes for your order number {$num} have arrived at the laundry and are being processed.",
+            "وصل طلبك رقم {$num} إلى المغسلة وسيتم البدء بتنفيذ الخدمات المطلوبة.",
+            "Clothes for your order number {$num} have arrived at the laundry and service processing will begin.",
             'delivered_to_branch',
         );
         $this->notifyVendorAndAdmins($order, $actorType,
