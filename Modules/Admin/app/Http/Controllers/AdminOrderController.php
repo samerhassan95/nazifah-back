@@ -13,6 +13,7 @@ use App\Services\OrderStatusService;
 use App\Support\OrderStatusLogPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Admin\Models\Icon;
 use Modules\Admin\Http\Resources\OrderResource;
 use Modules\Admin\Services\OrderService;
 use Modules\Driver\Models\Driver;
@@ -500,8 +501,13 @@ class AdminOrderController extends Controller
                 // uploaded one. Previously both were collapsed into the same value, so the
                 // client's actual photo never made it into the response once the piece had
                 // a generic icon (which is effectively always).
+                $pieceIcon = $primary->piece?->iconRelation;
+                if (! $pieceIcon && $primary->piece?->icon_id) {
+                    $pieceIcon = Icon::withTrashed()->find($primary->piece->icon_id);
+                }
+
                 $pieceLogo = $uploadFilesService->getFullUrl(
-                    $primary->piece?->iconRelation?->full_path ?? $primary->piece?->iconRelation?->path
+                    $pieceIcon?->full_path ?: $pieceIcon?->path
                 ) ?? '';
                 $clientImage = $uploadFilesService->getFullUrl($primary->images) ?: $pieceLogo;
 
