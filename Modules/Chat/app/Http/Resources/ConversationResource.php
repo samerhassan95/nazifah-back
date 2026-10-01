@@ -44,6 +44,7 @@ class ConversationResource extends JsonResource
         return [
             'conversation_id' => $this->id,
             'order_id' => $this->order_id,
+            'branch_id' => $this->branch_id,
             'type' => $this->type,
             'status' => $this->status,
             'last_message' => $this->last_message,
@@ -62,6 +63,10 @@ class ConversationResource extends JsonResource
                 'id' => $this->vendor->id,
                 'name' => $this->vendor->name ?? $this->vendor->getTranslatedName(app()->getLocale()),
                 'image' => $uploadService->getFullUrl($this->vendor->image ?? $this->vendor->logo ?? null),
+            ] : null,
+            'branch' => $this->branch ? [
+                'id' => $this->branch->id,
+                'name' => $this->branch->getTranslation('name', app()->getLocale()),
             ] : null,
             'driver' => $this->driver ? [
                 'id' => $this->driver->id,

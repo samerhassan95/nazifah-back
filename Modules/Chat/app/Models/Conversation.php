@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use Modules\Branch\Models\Branch;
 use Modules\Admin\Models\Admin;
 use Modules\Client\Models\Client;
 use Modules\Driver\Models\Driver;
@@ -36,6 +37,7 @@ class Conversation extends Model
     protected $fillable = [
         'client_id',
         'vendor_id',
+        'branch_id',
         'driver_id',
         'admin_id',
         'order_id',
@@ -67,6 +69,11 @@ class Conversation extends Model
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function driver(): BelongsTo

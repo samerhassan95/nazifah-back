@@ -43,7 +43,7 @@ class ConversationRepository implements ConversationRepositoryInterface
     {
         return Conversation::with(['messages' => function ($query) {
             $query->orderBy('created_at', 'asc');
-        }, 'client', 'vendor', 'driver', 'admin', 'order'])
+        }, 'client', 'vendor', 'branch', 'driver', 'admin', 'order'])
             ->withExists(['messages as has_client_participation' => fn ($q) => $q->where('sender_type', 'client')])
             ->withExists(['messages as has_vendor_participation' => fn ($q) => $q->where('sender_type', 'vendor')])
             ->withExists(['messages as has_driver_participation' => fn ($q) => $q->where('sender_type', 'driver')])
@@ -107,6 +107,7 @@ class ConversationRepository implements ConversationRepositoryInterface
         $column = match ($participantType) {
             'client' => 'client_id',
             'vendor' => 'vendor_id',
+            'branch' => 'branch_id',
             'driver' => 'driver_id',
             default => null,
         };
@@ -117,7 +118,7 @@ class ConversationRepository implements ConversationRepositoryInterface
         return Conversation::where($column, $participantId)
             ->where('type', 'support')
             ->whereNull('order_id')
-            ->with(['client', 'vendor', 'driver', 'admin', 'order'])
+            ->with(['client', 'vendor', 'branch', 'driver', 'admin', 'order'])
             ->first();
     }
 
@@ -153,7 +154,7 @@ class ConversationRepository implements ConversationRepositoryInterface
     public function getAllConversations(int $perPage = 20, array $filters = []): LengthAwarePaginator
     {
         $query = Conversation::has('messages')
-            ->with(['client', 'vendor', 'driver', 'admin', 'order', 'lastMessage'])
+            ->with(['client', 'vendor', 'branch', 'driver', 'admin', 'order', 'lastMessage'])
             ->withExists(['messages as has_client_participation' => fn ($q) => $q->where('sender_type', 'client')])
             ->withExists(['messages as has_vendor_participation' => fn ($q) => $q->where('sender_type', 'vendor')])
             ->withExists(['messages as has_driver_participation' => fn ($q) => $q->where('sender_type', 'driver')]);
@@ -164,6 +165,10 @@ class ConversationRepository implements ConversationRepositoryInterface
 
         if (! empty($filters['vendor_id'])) {
             $query->where('vendor_id', $filters['vendor_id']);
+        }
+
+        if (! empty($filters['branch_id'])) {
+            $query->where('branch_id', $filters['branch_id']);
         }
 
         if (! empty($filters['driver_id'])) {

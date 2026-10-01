@@ -7,6 +7,7 @@ use App\Services\UploadFilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Modules\Branch\Models\Branch;
 use Modules\Chat\Http\Resources\ConversationWithMessagesResource;
 use Modules\Chat\Services\ChatService;
 
@@ -26,6 +27,7 @@ class AdminChatsController extends Controller
         $filters = array_filter([
             'client_id' => $request->filled('client_id') ? (int) $request->get('client_id') : null,
             'vendor_id' => $request->filled('vendor_id') ? (int) $request->get('vendor_id') : null,
+            'branch_id' => $request->filled('branch_id') ? (int) $request->get('branch_id') : null,
             'driver_id' => $request->filled('driver_id') ? (int) $request->get('driver_id') : null,
         ]);
         $conversations = $this->chatService->getAllConversationsForAdmin($perPage, $filters);
@@ -35,6 +37,7 @@ class AdminChatsController extends Controller
                 'id' => $conversation->id,
                 'client_id' => $conversation->client_id,
                 'vendor_id' => $conversation->vendor_id,
+                'branch_id' => $conversation->branch_id,
                 'driver_id' => $conversation->driver_id,
                 'order_id' => $conversation->order_id,
                 'type' => $conversation->type,
@@ -50,6 +53,10 @@ class AdminChatsController extends Controller
                 'vendor' => $conversation->vendor ? [
                     'id' => $conversation->vendor->id,
                     'name' => $conversation->vendor->getTranslatedName(app()->getLocale()),
+                ] : null,
+                'branch' => $conversation->branch ? [
+                    'id' => $conversation->branch->id,
+                    'name' => $conversation->branch->getTranslation('name', app()->getLocale()),
                 ] : null,
                 'driver' => $conversation->driver ? [
                     'id' => $conversation->driver->id,
@@ -117,14 +124,21 @@ class AdminChatsController extends Controller
         $validator = Validator::make($request->all(), [
             'message' => ['required', 'string', 'max:5000'],
             'conversation_id' => ['nullable', 'string'],
-            'target_type' => ['nullable', 'string', 'in:client,vendor,driver'],
-            'target_id' => ['nullable', 'integer'],
+            'target_type' => ['nullable', 'string', 'in:client,vendor,driver,branch'],
+            'target_id' => ['nullable', 'integer', 'required_if:target_type,branch'],
             'message_type' => ['nullable', 'string', 'in:text,image,file'],
             'file' => ['nullable', 'file', 'max:10240'],
         ]);
 
         if ($validator->fails()) {
             return validationErrorResponse($validator->errors());
+        }
+
+        if ($request->input('target_type') === 'branch'
+            && ! Branch::whereKey($request->input('target_id'))->exists()) {
+            return validationErrorResponse([
+                'target_id' => ['The selected branch does not exist.'],
+            ]);
         }
 
         $admin = $request->user();

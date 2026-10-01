@@ -36,19 +36,33 @@ class ChatsController extends Controller
 
         $conversationsQuery = Conversation::where('vendor_id', $vendorId)
             ->has('messages')
-            ->with(['client', 'driver', 'admin', 'order', 'lastMessage'])
+            ->with(['client', 'branch', 'driver', 'admin', 'order', 'lastMessage'])
             ->withExists(['messages as has_client_participation' => fn ($q) => $q->where('sender_type', 'client')])
             ->withExists(['messages as has_vendor_participation' => fn ($q) => $q->where('sender_type', 'vendor')])
             ->withExists(['messages as has_driver_participation' => fn ($q) => $q->where('sender_type', 'driver')])
             ->orderBy('last_message_at', 'desc');
 
-        if (VendorBranchFilter::hasFilter($request)) {
-            $branchIds = VendorBranchFilter::resolveIds($request, $vendorId);
+        $branchFilterRequested = VendorBranchFilter::hasFilter($request);
+        if ($branchFilterRequested || ! $employee->isOwner()) {
+            $requestedBranchIds = VendorBranchFilter::requestedIds($request);
+            $accessibleBranchIds = array_map('intval', $employee->getAccessibleBranchIds());
+            $branchIds = VendorBranchFilter::resolveIds($request, $vendorId)
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => in_array($id, $accessibleBranchIds, true))
+                ->values();
+
+            if ($branchFilterRequested && $requestedBranchIds !== null
+                && count(array_diff($requestedBranchIds, $branchIds->all())) > 0) {
+                return errorResponse(__('vendor.unauthorized_action'), null, 403);
+            }
 
             if ($branchIds->isEmpty()) {
                 $conversationsQuery->whereRaw('1 = 0');
             } else {
-                $conversationsQuery->whereHas('order', fn ($q) => $q->whereIn('branch_id', $branchIds));
+                $conversationsQuery->where(function ($query) use ($branchIds) {
+                    $query->whereIn('branch_id', $branchIds)
+                        ->orWhereHas('order', fn ($q) => $q->whereIn('branch_id', $branchIds));
+                });
             }
         }
 
@@ -69,6 +83,10 @@ class ChatsController extends Controller
         $vendorId = $employee->vendor_id;
         $perPage = $request->get('per_page', 50);
 
+        if (! $this->canAccessVendorConversation($employee, $vendorId, $conversationId)) {
+            return notFoundResponse(__('chat.conversation_not_found'));
+        }
+
         $conversation = $this->chatService->getConversationWithMessagesForVendor($conversationId, $vendorId, $perPage);
         if (! $conversation) {
             return notFoundResponse(__('chat.conversation_not_found'));
@@ -88,6 +106,10 @@ class ChatsController extends Controller
         $employee = $request->user();
         $vendorId = $employee->vendor_id;
         $perPage = (int) $request->get('per_page', 50);
+
+        if (! $this->canAccessVendorConversation($employee, $vendorId, $conversationId)) {
+            return notFoundResponse(__('chat.conversation_not_found'));
+        }
 
         $messages = $this->chatService->getMessagesForVendor($conversationId, $vendorId, $perPage);
         if ($messages === null) {
@@ -116,6 +138,7 @@ class ChatsController extends Controller
             'message' => ['required', 'string', 'max:5000'],
             'conversation_id' => ['nullable', 'string'],
             'order_id' => ['nullable', 'integer', 'exists:orders,id'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'target' => ['nullable', 'string', 'in:client,delivery,admin'],
             'target_id' => ['nullable', 'integer'],
             'message_type' => ['nullable', 'string', 'in:text,image,file'],
@@ -145,11 +168,36 @@ class ChatsController extends Controller
 
         $employee = $request->user();
         $vendorId = (int) $employee->vendor_id;
+        $branchId = $request->filled('branch_id') ? (int) $request->branch_id : null;
+
+        if ($branchId !== null && ! $employee->canAccessBranch($branchId)) {
+            return validationErrorResponse([
+                'branch_id' => [__('vendor.unauthorized_action')],
+            ]);
+        }
 
         $convId = $convIdFromUrl;
         $orderId = $request->order_id ? (int) $request->order_id : null;
         $target = $request->target ?? ($orderId ? 'client' : null);
         $targetId = $request->target_id ? (int) $request->target_id : null;
+
+        if ($convId && ! $this->canAccessVendorConversation($employee, $vendorId, $convId)) {
+            return notFoundResponse(__('chat.conversation_not_found'));
+        }
+
+        if ($branchId !== null && ! $convId) {
+            if ($orderId !== null || ($target !== null && $target !== 'admin')) {
+                return validationErrorResponse([
+                    'branch_id' => ['Branch support chats cannot be combined with order or other chat targets.'],
+                ]);
+            }
+            $target = 'admin';
+        }
+        if ($target === 'admin' && $branchId === null && ! $employee->isOwner()) {
+            return validationErrorResponse([
+                'branch_id' => ['A branch is required when a branch employee contacts admin.'],
+            ]);
+        }
         if ($target === 'admin') {
             $orderId = null;
             $targetId = null;
@@ -239,7 +287,8 @@ class ChatsController extends Controller
                 $clientId,
                 $request->message_type ?? 'text',
                 $fileUrl,
-                $driverId
+                $driverId,
+                $branchId
             );
         } catch (\Exception $e) {
             return notFoundResponse($e->getMessage());
@@ -259,5 +308,27 @@ class ChatsController extends Controller
             new ConversationWithMessagesResource($conversation),
             __('chat.message_sent')
         );
+    }
+
+    private function canAccessVendorConversation($employee, int $vendorId, string $conversationId): bool
+    {
+        $conversation = Conversation::where('id', $conversationId)
+            ->where('vendor_id', $vendorId)
+            ->first();
+
+        if (! $conversation) {
+            return false;
+        }
+
+        if ($employee->isOwner()) {
+            return true;
+        }
+
+        $branchId = $conversation->branch_id;
+        if ($branchId === null && $conversation->order_id !== null) {
+            $branchId = Order::whereKey($conversation->order_id)->value('branch_id');
+        }
+
+        return $branchId === null || $employee->canAccessBranch((int) $branchId);
     }
 }

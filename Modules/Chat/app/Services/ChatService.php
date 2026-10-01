@@ -5,6 +5,7 @@ namespace Modules\Chat\Services;
 use App\Services\FirebaseService as PushFirebaseService;
 use Illuminate\Support\Facades\Log;
 use Modules\Admin\Models\Admin;
+use Modules\Branch\Models\Branch;
 use Modules\Chat\Events\MessageSent;
 use Modules\Chat\Models\Conversation;
 use Modules\Chat\Models\Message;
@@ -372,12 +373,25 @@ class ChatService
      * - driverId only (no order)         → find/create vendor↔driver direct chat
      * - neither → support chat with admin
      */
-    public function vendorSend(int $vendorId, string $message, ?string $conversationId = null, ?int $orderId = null, ?int $clientId = null, string $messageType = 'text', ?string $fileUrl = null, ?int $driverId = null): array
+    public function vendorSend(int $vendorId, string $message, ?string $conversationId = null, ?int $orderId = null, ?int $clientId = null, string $messageType = 'text', ?string $fileUrl = null, ?int $driverId = null, ?int $branchId = null): array
     {
         if ($conversationId) {
             $conversation = $this->conversationRepository->getConversationById($conversationId);
-            if (! $conversation || (int) $conversation->vendor_id !== $vendorId) {
+            if (! $conversation || (int) $conversation->vendor_id !== $vendorId
+                || ($branchId !== null && (int) $conversation->branch_id !== $branchId)) {
                 throw new \Exception(__('chat.conversation_not_found'));
+            }
+        } elseif ($branchId !== null) {
+            $conversation = $this->conversationRepository->findAdminChat('branch', $branchId);
+            if (! $conversation) {
+                $conversation = $this->conversationRepository->create([
+                    'vendor_id' => $vendorId,
+                    'branch_id' => $branchId,
+                    'type' => 'support',
+                    'status' => 'active',
+                    'last_message' => $message,
+                    'last_message_at' => now(),
+                ]);
             }
         } elseif ($orderId !== null && $driverId !== null) {
             // Vendor → driver for a specific order
@@ -515,6 +529,13 @@ class ChatService
                     'last_message_at' => now(),
                     'admin_id' => $adminId,
                 ];
+                if ($targetType === 'branch') {
+                    $branch = Branch::find($targetId);
+                    if (! $branch) {
+                        throw new \Exception(__('chat.conversation_not_found'));
+                    }
+                    $data['vendor_id'] = $branch->vendor_id;
+                }
                 $data["{$targetType}_id"] = $targetId;
                 $conversation = $this->conversationRepository->create($data);
             } elseif (! $conversation->admin_id) {

@@ -65,6 +65,30 @@ Clients, vendor employees, and drivers can subscribe only to conversations they 
 
 ## Backend setup
 
+### Branch support chats
+
+Branches use the owning vendor account for authentication, but support conversations are scoped to one branch. Start or continue a branch support chat with:
+
+```http
+POST /api/v1/vendor/chats/send
+Authorization: Bearer <vendor-employee-token>
+Content-Type: application/json
+```
+
+```json
+{
+    "branch_id": 23,
+    "message": "Please contact this branch",
+    "message_type": "text"
+}
+```
+
+The response contains `conversation_id`, `branch_id`, and branch details. Use that `conversation_id` for follow-up sends and message reads. The vendor app may list branch conversations with `GET /api/v1/vendor/chats?branch_id=23`.
+
+Admins can list branch conversations with `GET /api/v1/admin/chats?branch_id=23`, or start one with `POST /api/v1/admin/chats/send` and body `{"target_type":"branch","target_id":23,"message":"..."}`.
+
+Existing vendor-wide support chats remain unchanged when `branch_id` is omitted.
+
 Ensure `laravel/reverb` and `pusher/pusher-php-server` are installed (`composer require laravel/reverb pusher/pusher-php-server`). If you see "Class Pusher\Pusher not found", run `composer dump-autoload`.
 
 ### 1. Environment
