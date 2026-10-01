@@ -28,7 +28,7 @@ class StoreServiceRequest extends FormRequest
             'description' => ['nullable', 'array'],
             'description.ar' => ['nullable', 'string', 'max:1000'],
             'description.en' => ['nullable', 'string', 'max:1000'],
-            'price' => 'required|numeric',
+            'price' => 'prohibited',
             'icon_id' => 'required|integer|exists:icons,id',
             'is_active' => 'sometimes|boolean',
         ];
