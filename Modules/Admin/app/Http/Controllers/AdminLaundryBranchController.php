@@ -134,8 +134,8 @@ class AdminLaundryBranchController extends Controller
             'description.ar' => 'nullable|string',
             'description.en' => 'nullable|string',
             'address' => 'required|array',
-            'address.ar' => 'required|string',
-            'address.en' => 'required|string',
+            'address.ar' => 'nullable|string|required_without:address.en',
+            'address.en' => 'nullable|string|required_without:address.ar',
             'national_address' => 'nullable|string',
             'Phone' => 'required|string',
             'land_phone' => 'nullable|string',
@@ -153,8 +153,9 @@ class AdminLaundryBranchController extends Controller
         // Handle Translations
         $branch->setTranslation('name', 'ar', $validated['name']['ar']);
         $branch->setTranslation('name', 'en', $validated['name']['en']);
-        $branch->setTranslation('location', 'ar', $validated['address']['ar']);
-        $branch->setTranslation('location', 'en', $validated['address']['en']);
+        $branchAddress = $this->resolveBranchAddress($validated['address']);
+        $branch->setTranslation('location', 'ar', $branchAddress);
+        $branch->setTranslation('location', 'en', $branchAddress);
         $branch->setTranslation('description', 'ar', $validated['description']['ar'] ?? '');
         $branch->setTranslation('description', 'en', $validated['description']['en'] ?? '');
 
@@ -246,8 +247,8 @@ class AdminLaundryBranchController extends Controller
             'name.ar' => 'sometimes|string',
             'name.en' => 'sometimes|string',
             'address' => 'sometimes|array',
-            'address.ar' => 'required_with:address|string',
-            'address.en' => 'required_with:address|string',
+            'address.ar' => 'sometimes|nullable|string|required_without:address.en',
+            'address.en' => 'sometimes|nullable|string|required_without:address.ar',
             'national_address' => 'sometimes|nullable|string',
             'description' => 'sometimes|array',
             'description.ar' => 'sometimes|string',
@@ -269,8 +270,14 @@ class AdminLaundryBranchController extends Controller
             $branch->setTranslation('name', 'en', $validated['name']['en']);
         }
         if ($request->has('address')) {
-            $branch->setTranslation('location', 'ar', $validated['address']['ar']);
-            $branch->setTranslation('location', 'en', $validated['address']['en']);
+            $branchAddress = $this->resolveBranchAddress($validated['address'] ?? []);
+            if ($branchAddress === '') {
+                return validationErrorResponse([
+                    'address' => ['A branch address is required.'],
+                ]);
+            }
+            $branch->setTranslation('location', 'ar', $branchAddress);
+            $branch->setTranslation('location', 'en', $branchAddress);
         }
         if ($request->has('description')) {
             $branch->setTranslation('description', 'ar', $validated['description']['ar'] ?? '');
@@ -572,11 +579,38 @@ class AdminLaundryBranchController extends Controller
         $english = trim((string) ($address['en'] ?? ''));
         $singleValue = $arabic !== '' ? $arabic : $english;
 
+        if ($singleValue === '') {
+            foreach ($address as $value) {
+                if (is_scalar($value) && trim((string) $value) !== '') {
+                    $singleValue = trim((string) $value);
+                    break;
+                }
+            }
+        }
+
         if ($singleValue !== '') {
             $address['ar'] = $arabic !== '' ? $arabic : $singleValue;
             $address['en'] = $english !== '' ? $english : $singleValue;
             $request->merge(['address' => $address]);
         }
+    }
+
+    private function resolveBranchAddress(array $address): string
+    {
+        foreach (['ar', 'en'] as $locale) {
+            $value = trim((string) ($address[$locale] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        foreach ($address as $value) {
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        return '';
     }
 
     /**
