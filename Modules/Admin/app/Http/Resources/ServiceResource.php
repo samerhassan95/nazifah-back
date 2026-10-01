@@ -25,7 +25,6 @@ class ServiceResource extends JsonResource
             'image' => $uploadFilesService->getFullUrl($this->image),
             'icon_id' => $this->icon_id,
             'icon' => $this->icon,
-            'discount_price' => $this->discount_price,
             'preparation_time' => $this->preparation_time,
             'is_active' => $this->is_active,
             'category' => new CategoryResource($this->whenLoaded('category')),
