@@ -503,7 +503,7 @@ class AdminOrderController extends Controller
                 $pieceLogo = $uploadFilesService->getFullUrl(
                     $primary->piece?->iconRelation?->full_path ?? $primary->piece?->iconRelation?->path
                 ) ?? '';
-                $clientImage = $uploadFilesService->getFullUrl($primary->images) ?? '';
+                $clientImage = $uploadFilesService->getFullUrl($primary->images) ?: $pieceLogo;
 
                 $itemData = [
                     'icon' => $pieceLogo,
