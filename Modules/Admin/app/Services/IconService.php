@@ -153,7 +153,13 @@ class IconService
 
     public function deleteIcon(int $id)
     {
-        // Keep the file for historical orders that still reference this soft-deleted icon.
+        $icon = $this->iconRepository->find($id);
+
+        // Delete the file if it exists
+        if ($icon->path) {
+            $this->uploadFilesService->deleteFile($icon->path);
+        }
+
         return $this->iconRepository->delete($id);
     }
 }
