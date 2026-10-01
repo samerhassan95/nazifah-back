@@ -8,6 +8,7 @@ use App\Events\OrderStatusChanged;
 use App\Exceptions\InvalidStatusTransitionException;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ErrorResponse;
+use App\Services\UploadFilesService;
 use App\Services\OrderStatusService;
 use App\Support\OrderStatusLogPresenter;
 use Illuminate\Http\JsonResponse;
@@ -439,6 +440,7 @@ class AdminOrderController extends Controller
         $rejectedItems = collect();
         $branchId = (int) ($order->branch_id ?? 0);
         $lang = app()->getLocale();
+        $uploadFilesService = app(UploadFilesService::class);
 
         foreach (\Modules\Order\Support\OrderItemGrouper::buckets($order->items) as $groupItems) {
             $primary = $groupItems->first();
@@ -498,9 +500,10 @@ class AdminOrderController extends Controller
                 // uploaded one. Previously both were collapsed into the same value, so the
                 // client's actual photo never made it into the response once the piece had
                 // a generic icon (which is effectively always).
-                $pieceLogo = $primary->piece?->iconRelation?->full_path
-                    ?: ($primary->piece?->iconRelation?->path ? asset($primary->piece->iconRelation->path) : '');
-                $clientImage = $primary->images ?: $pieceLogo;
+                $pieceLogo = $uploadFilesService->getFullUrl(
+                    $primary->piece?->iconRelation?->full_path ?? $primary->piece?->iconRelation?->path
+                ) ?? '';
+                $clientImage = $uploadFilesService->getFullUrl($primary->images) ?: $pieceLogo;
 
                 $itemData = [
                     'icon' => $pieceLogo,
