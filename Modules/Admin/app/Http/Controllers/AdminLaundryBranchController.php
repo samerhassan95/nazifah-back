@@ -121,6 +121,7 @@ class AdminLaundryBranchController extends Controller
         if (! $request->hasFile('Branch_logo') && $request->hasFile('logo')) {
             $request->files->set('Branch_logo', $request->file('logo'));
         }
+        $this->normalizeBranchAddress($request);
 
         $validated = $request->validate([
             'vendor_id' => 'required|exists:vendors,id',
@@ -236,6 +237,7 @@ class AdminLaundryBranchController extends Controller
         if (! $request->hasFile('Branch_logo') && $request->hasFile('logo')) {
             $request->files->set('Branch_logo', $request->file('logo'));
         }
+        $this->normalizeBranchAddress($request);
 
         $validated = $request->validate([
             'Branch_banner' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
@@ -244,8 +246,8 @@ class AdminLaundryBranchController extends Controller
             'name.ar' => 'sometimes|string',
             'name.en' => 'sometimes|string',
             'address' => 'sometimes|array',
-            'address.ar' => 'sometimes|string',
-            'address.en' => 'sometimes|string',
+            'address.ar' => 'required_with:address|string',
+            'address.en' => 'required_with:address|string',
             'national_address' => 'sometimes|nullable|string',
             'description' => 'sometimes|array',
             'description.ar' => 'sometimes|string',
@@ -552,6 +554,29 @@ class AdminLaundryBranchController extends Controller
             'Is_Active' => (bool) $branch->is_active,
             'Created_at' => $branch->created_at ? $branch->created_at->format('Y-m-d') : null,
         ];
+    }
+
+    private function normalizeBranchAddress(Request $request): void
+    {
+        $address = $request->input('address');
+
+        if (is_string($address)) {
+            $address = ['ar' => $address, 'en' => $address];
+        }
+
+        if (! is_array($address)) {
+            return;
+        }
+
+        $arabic = trim((string) ($address['ar'] ?? ''));
+        $english = trim((string) ($address['en'] ?? ''));
+        $singleValue = $arabic !== '' ? $arabic : $english;
+
+        if ($singleValue !== '') {
+            $address['ar'] = $arabic !== '' ? $arabic : $singleValue;
+            $address['en'] = $english !== '' ? $english : $singleValue;
+            $request->merge(['address' => $address]);
+        }
     }
 
     /**
