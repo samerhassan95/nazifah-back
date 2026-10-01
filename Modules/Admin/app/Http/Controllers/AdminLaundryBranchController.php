@@ -424,10 +424,10 @@ class AdminLaundryBranchController extends Controller
     }
 
     /**
-     * Full branch detail page: branch info, working hours, stats, the
-     * branch's own drivers/services (with live ratings), and the vendor's
-     * pieces/additional services catalog. Composes several existing
-     * endpoints into one call for the branch detail screen.
+     * Full branch detail page: branch info, working hours, stats, and the
+     * branch's own drivers/services/pieces/additional services (with live
+     * ratings). Composes several existing endpoints into one call for the
+     * branch detail screen.
      * GET /admin/laundries/branches/{id}/detail
      */
     public function detail(int $id): JsonResponse
@@ -476,18 +476,17 @@ class AdminLaundryBranchController extends Controller
             ];
         })->values();
 
-        $pieces = Piece::with('iconRelation')->where('vendor_id', $branch->vendor_id)->get()->map(fn ($piece) => [
+        $pieces = $branch->pieces()->with('iconRelation')->get()->map(fn ($piece) => [
             'id' => $piece->id,
             'name' => $piece->getTranslation('name', $locale),
             'icon' => $piece->iconRelation?->full_path,
         ]);
 
-        $branchAdditionalServices = $branch->serviceAdditions()->get()->keyBy('id');
-        $additionalServices = ServiceAddition::where('vendor_id', $branch->vendor_id)->get()->map(function ($addition) use ($locale, $branchAdditionalServices) {
+        $additionalServices = $branch->serviceAdditions()->get()->map(function ($addition) use ($locale) {
             $rating = Order::whereHas('items.additionalServicesRelation', function ($q) use ($addition) {
                 $q->where('service_additions.id', $addition->id);
             })->whereNotNull('rating')->avg('rating') ?? 0;
-            $branchPrice = $branchAdditionalServices->get($addition->id)?->pivot?->price;
+            $branchPrice = $addition->pivot->price;
 
             return [
                 'id' => $addition->id,
