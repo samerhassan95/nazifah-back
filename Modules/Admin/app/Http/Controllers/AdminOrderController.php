@@ -507,6 +507,7 @@ class AdminOrderController extends Controller
 
                 $itemData = [
                     'icon' => $pieceLogo,
+                    'logo' => $pieceLogo,
                     'image' => $clientImage,
                     'piece_image' => $clientImage,
                     'Piece_logo' => $pieceLogo,
@@ -591,6 +592,7 @@ class AdminOrderController extends Controller
                     'piece_logo' => $pieceIcon,
                     'image' => $clientImage,
                     'icon' => $pieceIcon,
+                    'logo' => $pieceIcon,
                     'service' => $item['name_operation'] ?: ($item['Services'][0]['service_name'] ?? ''),
                     'additional_services' => $item['Item_details']['Services'][0]['Additional_services'] ?? [],
                     'price' => $item['Item_details']['Price'],
