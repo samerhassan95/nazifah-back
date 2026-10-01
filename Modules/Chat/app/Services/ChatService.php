@@ -3,6 +3,7 @@
 namespace Modules\Chat\Services;
 
 use App\Services\FirebaseService as PushFirebaseService;
+use Illuminate\Support\Facades\Log;
 use Modules\Admin\Models\Admin;
 use Modules\Chat\Events\MessageSent;
 use Modules\Chat\Models\Conversation;
@@ -94,7 +95,7 @@ class ChatService
         $this->firebaseService->sendMessageToFirebase($conversation->id, $newMessage);
 
         // Broadcast for WebSocket real-time chat (Reverb/Pusher)
-        MessageSent::dispatch($newMessage);
+        $this->broadcastMessage($newMessage);
 
         $this->notifyRecipients($conversation, 'client', $newMessage);
 
@@ -231,7 +232,7 @@ class ChatService
             'last_message_at' => now(),
         ]);
         $this->firebaseService->sendMessageToFirebase($conversation->id, $newMessage);
-        MessageSent::dispatch($newMessage);
+        $this->broadcastMessage($newMessage);
         $this->notifyRecipients($conversation, 'vendor', $newMessage);
 
         return ['conversation_id' => $conversation->id, 'message' => $newMessage];
@@ -290,7 +291,7 @@ class ChatService
             'last_message_at' => now(),
         ]);
         $this->firebaseService->sendMessageToFirebase($conversation->id, $newMessage);
-        MessageSent::dispatch($newMessage);
+        $this->broadcastMessage($newMessage);
         $this->notifyRecipients($conversation, 'driver', $newMessage);
 
         return ['conversation_id' => $conversation->id, 'message' => $newMessage];
@@ -357,7 +358,7 @@ class ChatService
             'last_message_at' => now(),
         ]);
         $this->firebaseService->sendMessageToFirebase($conversation->id, $newMessage);
-        MessageSent::dispatch($newMessage);
+        $this->broadcastMessage($newMessage);
         $this->notifyRecipients($conversation, 'admin', $newMessage);
 
         return ['conversation_id' => $conversation->id, 'message' => $newMessage];
@@ -546,10 +547,23 @@ class ChatService
         ]);
 
         $this->firebaseService->sendMessageToFirebase($conversation->id, $newMessage);
-        MessageSent::dispatch($newMessage);
+        $this->broadcastMessage($newMessage);
         $this->notifyRecipients($conversation, $senderType, $newMessage);
 
         return ['conversation_id' => $conversation->id, 'message' => $newMessage];
+    }
+
+    private function broadcastMessage(Message $message): void
+    {
+        try {
+            MessageSent::dispatch($message);
+        } catch (\Throwable $exception) {
+            Log::warning('Chat message saved but realtime broadcast failed', [
+                'conversation_id' => $message->conversation_id,
+                'message_id' => $message->id,
+                'exception' => $exception::class,
+            ]);
+        }
     }
 
     /**
