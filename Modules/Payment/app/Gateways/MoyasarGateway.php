@@ -248,12 +248,31 @@ class MoyasarGateway extends AbstractPaymentGateway
             $invoiceId = $body['id'] ?? null;
             $hostedInvoiceUrl = $body['url'];
 
-            // Same hosted invoice URL orders already use. Samsung Pay on that page
-            // comes from the Moyasar account, not MOYASAR_SAMSUNG_PAY_SERVICE_ID.
+            // Render OUR OWN checkout page instead of redirecting to Moyasar's
+            // hosted invoice page. `invoice_id` is a documented Moyasar.init()
+            // parameter ("pay an invoice that is already created but not paid"),
+            // so moyasar.js collects payment details for the SAME invoice created
+            // above — settlement, the webhook, and verifyPayment()'s invoice
+            // fallback are all unaffected. The only thing that changes is WHERE
+            // the customer enters payment details, which lets us control exactly
+            // which methods render: moyasar_checkout.blade.php already excludes
+            // samsungpay/mada client-side. This avoids touching the Moyasar
+            // Dashboard's Samsung Pay certificate/Service ID, which the native
+            // mobile SDK integration also depends on.
+            $localMoyasarConfig = $this->buildMoyasarJsConfig(
+                $request,
+                $merchantReference,
+                $callbackUrl,
+                $metadata,
+                $allowedMethods,
+                $invoiceId,
+            );
+            $localCheckoutUrl = $this->localCheckoutUrl($merchantReference);
+
             return new PaymentResponse(
                 success: true,
                 transactionId: $merchantReference,
-                paymentUrl: $hostedInvoiceUrl,
+                paymentUrl: $localCheckoutUrl,
                 status: 'pending',
                 amount: $request->amount,
                 currency: $payload['currency'],
@@ -266,12 +285,10 @@ class MoyasarGateway extends AbstractPaymentGateway
                     'moyasar_status' => $body['status'] ?? null,
                     'callback_url' => $callbackUrl,
                     'payment_params' => null,
-                    'redirect_url' => $hostedInvoiceUrl,
+                    'redirect_url' => $localCheckoutUrl,
+                    'hosted_invoice_url' => $hostedInvoiceUrl,
                     'raw_response' => $body,
-                    'moyasar' => [
-                        'methods' => ['creditcard', 'stcpay', 'applepay'],
-                        'supported_networks' => ['mada', 'visa', 'mastercard'],
-                    ],
+                    'moyasar' => $localMoyasarConfig,
                     'available_methods' => [
                         'credit_card',
                         'visa',
