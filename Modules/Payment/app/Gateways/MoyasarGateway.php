@@ -157,9 +157,9 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     public function initializePayment(PaymentRequest $request): PaymentResponse
     {
-        // Same hosted invoice path for orders and wallet deposits. Samsung Pay is
-        // intentionally excluded from this web checkout because the mobile app
-        // handles it through its native SDK flow.
+        // Same hosted invoice path for orders and wallet deposits. The mobile app
+        // handles Samsung Pay through its own native SDK flow, separate from this
+        // web checkout.
         if ($this->mode === 'embedded' || $this->mode === 'hosted_local') {
             return $this->initializeEmbeddedPayment($request);
         }
@@ -206,8 +206,16 @@ class MoyasarGateway extends AbstractPaymentGateway
             // value sent is ignored. Upload the logo in the Moyasar Dashboard account
             // branding settings instead.
 
-            // Restrict hosted invoice methods so Samsung Pay is handled only by
-            // the native mobile SDK flow.
+            // NOTE: Moyasar's POST /v1/invoices does NOT accept a payment_methods /
+            // methods field (confirmed against their API reference — the only body
+            // params are amount, currency, description, callback_url, success_url,
+            // back_url, expired_at). Which payment methods appear on the hosted
+            // invoice page (including Samsung Pay) is controlled entirely by the
+            // merchant account's Payment Methods settings in the Moyasar Dashboard,
+            // not by anything sent per-request. Sending this key is a harmless no-op
+            // that Moyasar silently ignores — kept only because `payment_params`/
+            // `available_methods` below still describe to API consumers what we
+            // expect to be enabled, not because it has any effect on Moyasar's side.
             $paymentOption = $request->paymentOption ?? ($request->metadata['payment_option'] ?? null);
             $allowedMethods = $this->mapToMoyasarAllowedMethods($paymentOption);
             $payload['payment_methods'] = $allowedMethods !== [] ? $allowedMethods : ['creditcard', 'stcpay', 'applepay'];
