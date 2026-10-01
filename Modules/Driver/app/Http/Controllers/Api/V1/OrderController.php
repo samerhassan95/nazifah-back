@@ -1104,7 +1104,7 @@ class OrderController extends Controller
             'رفض السائق الطلب – يرجى تعيين سائق آخر',
             'Driver rejected order – please assign another driver',
             "السائق رفض طلب رقم {$order->order_number}. يرجى تعيين سائق آخر.",
-            "Driver rejected order #{$order->order_number}. Please assign another driver.",
+            "Driver rejected order number {$order->order_number}. Please assign another driver.",
             'order_driver_rejected',
             ['driver_id' => (string) $driver->id]
         );
@@ -1113,8 +1113,8 @@ class OrderController extends Controller
             $order,
             'تحديث على طلبك',
             'Order Update',
-            "تعذر على السائق إكمال طلبك #{$order->order_number}. جاري تعيين سائق آخر.",
-            "The assigned driver could not complete your order #{$order->order_number}. We are assigning another driver.",
+            "تعذر على السائق إكمال طلبك رقم {$order->order_number}. جاري تعيين سائق آخر.",
+            "The assigned driver could not complete your order number {$order->order_number}. We are assigning another driver.",
             'driver_rejected',
         );
     }

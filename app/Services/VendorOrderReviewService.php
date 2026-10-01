@@ -688,8 +688,8 @@ class VendorOrderReviewService
         $rejectedCount = $order->items->where('vendor_status', 'rejected')->count();
         $modifiedCount = $order->items->where('vendor_status', 'modified')->count();
 
-        $messageAr = "قامت المغسلة بتعديل طلبك #{$order->order_number}. ";
-        $messageEn = "The laundry has modified your order #{$order->order_number}. ";
+        $messageAr = "قامت المغسلة بتعديل طلبك رقم {$order->order_number}. ";
+        $messageEn = "The laundry has modified your order number {$order->order_number}. ";
 
         if ($rejectedCount > 0 && $acceptedCount > 0) {
             $messageAr .= 'المغسلة تقدم بعض الخدمات فقط. يرجى مراجعة العناصر غير المتوفرة.';
@@ -723,8 +723,8 @@ class VendorOrderReviewService
             $order,
             'تم قبول طلبك',
             'Order Accepted',
-            "تم قبول طلبك #{$order->order_number}. يمكنك الآن الدفع.",
-            "Your order #{$order->order_number} has been accepted. You can now proceed to payment.",
+            "تم قبول طلبك رقم {$order->order_number}. يمكنك الآن الدفع.",
+            "Your order number {$order->order_number} has been accepted. You can now proceed to payment.",
             'order_approved',
         );
     }
@@ -735,8 +735,8 @@ class VendorOrderReviewService
             $order,
             'وافق العميل على التعديلات',
             'Client Approved Modifications',
-            "وافق العميل على التعديلات للطلب #{$order->order_number}",
-            "Client approved modifications for order #{$order->order_number}",
+            "وافق العميل على التعديلات للطلب رقم {$order->order_number}",
+            "Client approved modifications for order number {$order->order_number}",
             'client_approved_modifications',
         );
     }
@@ -747,8 +747,8 @@ class VendorOrderReviewService
             $order,
             'رفض العميل التعديلات',
             'Client Rejected Modifications',
-            "رفض العميل التعديلات وتم إلغاء الطلب #{$order->order_number}",
-            "Client rejected modifications and order #{$order->order_number} was cancelled",
+            "رفض العميل التعديلات وتم إلغاء الطلب رقم {$order->order_number}",
+            "Client rejected modifications and order number {$order->order_number} was cancelled",
             'client_rejected_modifications',
         );
     }

@@ -3116,8 +3116,8 @@ class OrderController extends Controller
                 $order,
                 'تذكير بطلب جديد',
                 'Reminder: New Order',
-                "تذكير: لديك طلب جديد رقم #{$order->order_number} في انتظار المراجعة",
-                "Reminder: You have a new order #{$order->order_number} waiting for review",
+                "تذكير: لديك طلب جديد رقم {$order->order_number} في انتظار المراجعة",
+                "Reminder: You have a new order number {$order->order_number} waiting for review",
                 'order_reminder',
             );
 
