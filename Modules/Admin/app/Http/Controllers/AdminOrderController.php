@@ -581,14 +581,16 @@ class AdminOrderController extends Controller
 
         $orderInvoice = [
             'pieces' => $acceptedItems->map(function ($item) {
-                $img = $item['piece_image'] ?? $item['Piece_logo'] ?? $item['image'] ?? $item['icon'] ?? $item['Item_details']['Image'] ?? '';
+                $clientImage = $item['piece_image'] ?? $item['image'] ?? $item['Item_details']['Image'] ?? '';
+                $pieceIcon = $item['Piece_logo'] ?? $item['piece_logo'] ?? $item['icon'] ?? '';
+
                 return [
                     'piece_count' => $item['Piece_count'],
                     'piece_name' => $item['Piece_name'],
-                    'piece_image' => $img,
-                    'piece_logo' => $img,
-                    'image' => $img,
-                    'icon' => $img,
+                    'piece_image' => $clientImage,
+                    'piece_logo' => $pieceIcon,
+                    'image' => $clientImage,
+                    'icon' => $pieceIcon,
                     'service' => $item['name_operation'] ?: ($item['Services'][0]['service_name'] ?? ''),
                     'additional_services' => $item['Item_details']['Services'][0]['Additional_services'] ?? [],
                     'price' => $item['Item_details']['Price'],
