@@ -8,6 +8,7 @@ use App\Services\UploadFilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Modules\Branch\Models\Branch;
 use Modules\Driver\Models\Driver;
 use Modules\Order\Models\Order;
@@ -77,7 +78,7 @@ class DriversController extends Controller
             'name.ar' => ['required_without:name', 'string', 'max:255'],
             'name.en' => ['required_without:name', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:drivers,email'],
-            'phone_number' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', 'unique:drivers,phone'],
+            'phone_number' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('drivers', 'phone')->whereNull('deleted_at')],
             'id_number' => ['nullable', 'string', 'max:50'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
@@ -685,7 +686,7 @@ class DriversController extends Controller
             'name.ar' => ['sometimes', 'string', 'max:255'],
             'name.en' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', 'unique:drivers,email,'.$driverId],
-            'phone_number' => ['sometimes', 'string', 'regex:/^\+?[0-9]{10,15}$/', 'unique:drivers,phone,'.$driverId],
+            'phone_number' => ['sometimes', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('drivers', 'phone')->ignore($driverId)->whereNull('deleted_at')],
             'id_number' => ['sometimes', 'string', 'max:50'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],

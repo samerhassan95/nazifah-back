@@ -10,6 +10,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Modules\Driver\Models\Driver;
 use Modules\Driver\Models\DriverAuthSession;
 
@@ -103,7 +104,7 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'full_name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', 'unique:drivers,phone'],
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('drivers', 'phone')->whereNull('deleted_at')],
         ]);
 
         if ($validator->fails()) {
