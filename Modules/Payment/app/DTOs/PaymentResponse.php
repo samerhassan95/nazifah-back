@@ -117,7 +117,7 @@ class PaymentResponse
             'method' => 'GET',
             'url' => $url,
             'params' => null,
-            'note' => 'Open payment_url in the browser (Moyasar hosted page).',
+            'note' => 'Open payment_url in the browser to complete payment.',
         ];
     }
 }

@@ -11,7 +11,7 @@
 | Topic | Required app behavior |
 |-------|----------------------|
 | **Order checkout** | Moyasar SDK (already in place) — **do not** open a WebView to `checkout.moyasar.com` |
-| **Wallet top-up** | **Same** flow as order checkout (Moyasar SDK) — **do not** open `payment_url` in a WebView |
+| **Wallet top-up** | `mode=invoice`: use the existing Moyasar SDK flow. `mode=hosted_local`: open the returned local `payment_url` in a WebView for card/STC Pay. |
 | **Samsung Pay / Apple Pay** | After payment, API returns `payment_method = samsung_pay` or `apple_pay` plus `card_brand = visa/mastercard/mada` |
 | **UI display** | Show the wallet method (Samsung Pay) + network logo/label (Visa/Mada) from `card_brand` |
 
@@ -149,9 +149,11 @@ Or: Samsung Pay icon + Visa icon from `card_brand`.
 
 | Field | Action |
 |-------|--------|
-| `payment_url` | **Do not** open in WebView for Moyasar — use SDK |
-| `moyasar.methods` | Reference for available methods (optional for SDK) |
-| `verify_url` | After SDK success, call verify or rely on callback |
+| `payment_url` | Follow `mode`: open in WebView for `hosted_local`; use the SDK for `invoice` |
+| `moyasar.methods` | Available methods for the local form or SDK |
+| `verify_url` | After payment, call verify or rely on callback |
+
+When the response has `mode: "hosted_local"`, open `payment_url` in a WebView instead of starting the Moyasar SDK. The local form enables card and STC Pay and excludes Samsung Pay; keep Samsung Pay on the app's native flow. For `mode: "invoice"`, retain the existing SDK behavior.
 
 ---
 

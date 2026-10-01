@@ -356,10 +356,10 @@ class MoyasarGateway extends AbstractPaymentGateway
             data: [
                 'gateway' => 'moyasar',
                 'environment' => $this->isTestMode() ? 'test' : 'production',
-                'mode' => 'embedded',
+                'mode' => $this->mode,
                 'integration' => 'moyasar.js',
-                // Kept null so controllers treat this as neither a hosted redirect nor
-                // an auto-submit form — the client renders the embedded form instead.
+                // The client renders this config for `embedded`, or opens paymentUrl
+                // for `hosted_local`; neither mode submits a server-side form.
                 'payment_params' => null,
                 'callback_url' => $callbackUrl,
                 'moyasar' => $moyasarConfig,
