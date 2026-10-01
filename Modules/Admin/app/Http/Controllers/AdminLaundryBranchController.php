@@ -510,7 +510,7 @@ class AdminLaundryBranchController extends Controller
     private function formatBranch($branch): array
     {
         $lang = app()->getLocale();
-        $unifiedNumber = $branch->land_phone ?: null;
+        $unifiedNumber = $branch->land_phone ?: ($branch->vendor->official_number ?? null);
         $logoUrl = $this->uploadFilesService->getFullUrl($branch->logo);
         $bannerUrl = $this->uploadFilesService->getFullUrl($branch->store_front);
 
