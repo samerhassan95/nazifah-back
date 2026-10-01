@@ -508,7 +508,7 @@ class AdminLaundryBranchController extends Controller
     private function formatBranch($branch): array
     {
         $lang = app()->getLocale();
-        $unifiedNumber = $branch->unified_number;
+        $unifiedNumber = $branch->land_phone ?: null;
         $logoUrl = $this->uploadFilesService->getFullUrl($branch->logo);
         $bannerUrl = $this->uploadFilesService->getFullUrl($branch->store_front);
 
@@ -541,6 +541,8 @@ class AdminLaundryBranchController extends Controller
             'National_Address' => $branch->national_address,
             'Phone' => $branch->phone_number,
             'unified_number' => $unifiedNumber,
+            'Land_Phone' => $unifiedNumber,
+            'Landline' => $unifiedNumber,
             'Latitude' => $branch->latitude !== null ? (float) $branch->latitude : null,
             'Longitude' => $branch->longitude !== null ? (float) $branch->longitude : null,
             'Home_Pickup' => (bool) $branch->home_pickup,

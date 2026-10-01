@@ -110,13 +110,10 @@ class Branch extends Model
         return $this->belongsTo(Vendor::class);
     }
 
-    /**
-     * Branch has no unified-number column of its own, so expose only its own
-     * landline and never substitute the parent vendor's official number.
-     */
+    /** Expose only the branch's own contact number; never use vendor data. */
     public function getUnifiedNumberAttribute(): ?string
     {
-        return $this->land_phone ?: ($this->landline ?: null);
+        return $this->land_phone ?: null;
     }
 
     /**
