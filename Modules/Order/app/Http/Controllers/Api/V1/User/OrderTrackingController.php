@@ -110,6 +110,59 @@ class OrderTrackingController extends Controller
             ->where('client_id', $user->id)
             ->find($order_id);
 
+        if (! $order) {
+            // $order_id may actually be a pending_order_id: checkout returns order_id=null
+            // and only pending_order_id until the gateway payment settles and a real Order
+            // row is created (a separate auto-increment sequence from pending_orders), so a
+            // client navigating straight to tracking right after payment can land here with
+            // that id instead of the real order id. Resolve it the same way
+            // OrderController::getPaymentStatus() does rather than failing outright.
+            $pendingOrder = \Modules\Order\Models\PendingOrder::where('id', $order_id)
+                ->where('client_id', $user->id)
+                ->first();
+
+            if ($pendingOrder) {
+                $transaction = PaymentTransaction::where('response_data->pending_order_id', $pendingOrder->id)
+                    ->latest()
+                    ->first();
+
+                if ($transaction && ! $transaction->order_id) {
+                    try {
+                        app(\Modules\Payment\Http\Controllers\PaymentController::class)
+                            ->confirmByTransaction($request, $transaction->transaction_id);
+                        $transaction = $transaction->fresh();
+                    } catch (\Throwable $e) {
+                        // Fall through with whatever we already know.
+                    }
+                }
+
+                if ($transaction && $transaction->order_id) {
+                    $order = Order::with([
+                        'vendor',
+                        'branch.vendor',
+                        'latestPayment',
+                        'client.addresses',
+                        'statusLogs',
+                        'pickupAddress',
+                        'deliveryAddress',
+                        'items' => fn ($q) => $q->with([
+                            'piece.iconRelation',
+                            'service.iconRelation',
+                            'additionalServicesPivot.serviceAddition.iconRelation',
+                        ]),
+                        'driver',
+                        'pickupDriver',
+                        'deliveryDriver',
+                        'discount',
+                        'driverRejections' => fn ($q) => $q->orderBy('rejected_at', 'asc'),
+                        'driverRejections.driver',
+                    ])
+                        ->where('client_id', $user->id)
+                        ->find($transaction->order_id);
+                }
+            }
+        }
+
         // Set locale for translations
         $originalLocale = app()->getLocale();
         app()->setLocale($lang);
