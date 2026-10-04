@@ -1153,11 +1153,15 @@ class OrderPaymentService
 
         // Unique reference; the gateway echoes this back as merchant_reference and
         // the callback matches the exact leg by it (transaction_id is unique).
-        // Prefix distinguishes a primary split leg (LEG) from a surcharge (ADD).
-        // The per-leg sequence guards against a uniqid() collision when several
-        // gateway legs of one split are created within the same microsecond.
-        $prefix = $opts['reference_prefix'] ?? (($opts['is_surcharge'] ?? true) ? 'ADD' : 'LEG');
-        $reference = $order->order_number.'-'.$prefix.'-'.($opts['sequence'] ?? 0).'-'.uniqid();
+        // For single primary payments (sequence 0, non-surcharge), use order_number directly.
+        // Prefix distinguishes a primary split leg (LEG) from a surcharge (ADD) only when needed.
+        $isSinglePrimaryLeg = ! ($opts['is_surcharge'] ?? false) && (($opts['sequence'] ?? 0) === 0) && empty($opts['reference_prefix']);
+        if ($isSinglePrimaryLeg) {
+            $reference = $order->order_number;
+        } else {
+            $prefix = $opts['reference_prefix'] ?? (($opts['is_surcharge'] ?? true) ? 'ADD' : 'LEG');
+            $reference = $order->order_number.'-'.$prefix.'-'.($opts['sequence'] ?? 0).'-'.uniqid();
+        }
 
         $customerEmail = $client->email ?? config('payment.default_customer_email', 'noreply@nathefah.com');
         $customerName = $client->full_name ?? $client->name ?? 'Customer';
@@ -2622,8 +2626,13 @@ class OrderPaymentService
         $this->paymentService->setGateway($gateway);
 
         $orderNumber = $pendingOrder->order_data['order_number'];
-        $prefix = $opts['reference_prefix'] ?? 'LEG';
-        $reference = $orderNumber.'-'.$prefix.'-'.($opts['sequence'] ?? 0).'-'.uniqid();
+        $isSinglePrimaryLeg = ! ($opts['is_surcharge'] ?? false) && (($opts['sequence'] ?? 0) === 0) && empty($opts['reference_prefix']);
+        if ($isSinglePrimaryLeg) {
+            $reference = $orderNumber;
+        } else {
+            $prefix = $opts['reference_prefix'] ?? 'LEG';
+            $reference = $orderNumber.'-'.$prefix.'-'.($opts['sequence'] ?? 0).'-'.uniqid();
+        }
 
         $customerEmail = $client->email ?? config('payment.default_customer_email', 'noreply@nathefah.com');
         $customerName = $client->full_name ?? $client->name ?? 'Customer';
