@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Modules\Admin\Models\Admin;
 use Modules\Driver\Models\Driver;
@@ -169,13 +170,44 @@ class OrderNotificationService
     /**
      * Send "order placed" notifications once checkout payment is settled.
      * Skips if already sent (idempotent for webhook replays).
+     *
+     * The gateway webhook, the browser redirect callback, and the client's own
+     * active payment-status poll can all land here within milliseconds of each
+     * other for the same order. The "already sent?" check below reads the
+     * `notifications` table, which is NOT atomic against two concurrent callers
+     * both passing the check before either has written its row — so without a
+     * lock, vendors (and clients) would get the "new order" notification twice.
+     * A cache lock serializes the check-and-send so only one caller wins.
      */
     public function sendOrderCreatedNotificationsIfNeeded(Order $order): void
     {
-        if ($this->orderCreatedNotificationsAlreadySent($order)) {
+        if (! $order->id) {
             return;
         }
 
+        $lock = Cache::lock("order-created-notifications:{$order->id}", 30);
+
+        try {
+            $lock->block(10);
+        } catch (\Throwable $e) {
+            // Another request is already sending these notifications; don't
+            // double up by proceeding without the lock.
+            return;
+        }
+
+        try {
+            if ($this->orderCreatedNotificationsAlreadySent($order)) {
+                return;
+            }
+
+            $this->dispatchOrderCreatedNotifications($order);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function dispatchOrderCreatedNotifications(Order $order): void
+    {
         $order = $order->fresh();
         if (! $order) {
             return;
