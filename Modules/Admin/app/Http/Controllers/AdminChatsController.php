@@ -49,10 +49,12 @@ class AdminChatsController extends Controller
                     'name' => is_array($conversation->client->full_name ?? null)
                         ? ($conversation->client->full_name[app()->getLocale()] ?? $conversation->client->full_name['en'] ?? '')
                         : ($conversation->client->full_name ?? ''),
+                    'image' => $this->uploadService->getFullUrl($conversation->client->image ?? null),
                 ] : null,
                 'vendor' => $conversation->vendor ? [
                     'id' => $conversation->vendor->id,
                     'name' => $conversation->vendor->getTranslatedName(app()->getLocale()),
+                    'image' => $this->uploadService->getFullUrl($conversation->vendor->image ?? $conversation->vendor->logo ?? null),
                 ] : null,
                 'branch' => $conversation->branch ? [
                     'id' => $conversation->branch->id,
@@ -63,6 +65,7 @@ class AdminChatsController extends Controller
                     'name' => is_array($conversation->driver->full_name ?? null)
                         ? ($conversation->driver->full_name[app()->getLocale()] ?? $conversation->driver->full_name['en'] ?? '')
                         : ($conversation->driver->full_name ?? ''),
+                    'image' => $this->uploadService->getFullUrl($conversation->driver->image ?? null),
                 ] : null,
             ];
         });

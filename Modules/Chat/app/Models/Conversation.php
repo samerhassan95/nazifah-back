@@ -7,6 +7,7 @@ use App\Traits\HasSoftDeletes;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Str;
 use Modules\Branch\Models\Branch;
 use Modules\Admin\Models\Admin;
@@ -63,12 +64,12 @@ class Conversation extends Model
 
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        return $this->belongsTo(Client::class)->withoutGlobalScope(SoftDeletingScope::class);
     }
 
     public function vendor(): BelongsTo
     {
-        return $this->belongsTo(Vendor::class);
+        return $this->belongsTo(Vendor::class)->withoutGlobalScope(SoftDeletingScope::class);
     }
 
     public function branch(): BelongsTo
@@ -78,7 +79,7 @@ class Conversation extends Model
 
     public function driver(): BelongsTo
     {
-        return $this->belongsTo(Driver::class);
+        return $this->belongsTo(Driver::class)->withoutGlobalScope(SoftDeletingScope::class);
     }
 
     public function admin(): BelongsTo
