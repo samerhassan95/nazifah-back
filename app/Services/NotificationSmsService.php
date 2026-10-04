@@ -57,8 +57,8 @@ class NotificationSmsService
             'en' => 'Your order number {order_number} has been cancelled and refunded to your wallet/payment method.',
         ],
         'order_refund' => [
-            'ar' => 'تم استرداد المبلغ للطلب رقم {order_number} إلى {method}.',
-            'en' => 'Amount refunded for order number {order_number} to {method}.',
+            'ar' => 'تم استرداد مبلغ {amount} ر.س للطلب رقم {order_number} عبر {method}.',
+            'en' => 'An amount of {amount} SAR was refunded for order number {order_number} via {method}.',
         ],
         'order_reviewed' => [
             'ar' => "تم تعديل طلبك رقم {order_number} من قِبل المغسلة.\nيرجى مراجعة التعديلات واختيار الإجراء المناسب.",
@@ -181,6 +181,7 @@ class NotificationSmsService
                 ? (string) ($data['refund_method_label_en'] ?? '')
                 : (string) ($data['refund_method_label_ar'] ?? '');
             $text = str_replace('{method}', $method !== '' ? $method : ($lang === 'en' ? 'your wallet/payment method' : 'المحفظة/طريقة الدفع'), $text);
+            $text = str_replace('{amount}', (string) ($data['refund_total'] ?? ''), $text);
         }
 
         return str_replace('{order_number}', (string) ($data['order_number'] ?? ''), $text);
