@@ -38,6 +38,9 @@ class NotificationSmsService
         'driver_on_the_way_delivery',  // السائق في الطريق للتوصيل
         'waiting_client_receipt',      // الطلب جاهز (فرع) / السائق في موقع التسليم
         'order_delivered',             // تم التوصيل
+        'payment_failed',              // فشل الدفع (no dedicated template below —
+                                        // falls through to the push body, which is
+                                        // already the localized gateway failure reason)
     ];
 
     /**

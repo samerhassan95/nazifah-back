@@ -828,6 +828,20 @@ class PaymentController extends Controller
             $message = __('order.payment_verification_failed');
         }
 
+        // The client only ever heard from us on SUCCESS — a genuinely failed
+        // payment (gateway settled it as 'failed', not merely still pending)
+        // left them watching the app poll with no explanation. Tell them why,
+        // once, using the same localized reason shown in this response.
+        try {
+            app(\App\Services\OrderNotificationService::class)
+                ->notifyClientOfPaymentFailureIfNeeded($transaction, $message);
+        } catch (\Throwable $e) {
+            Log::channel('payment')->warning('Payment failure notification dispatch failed', [
+                'transaction_id' => $transaction->transaction_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return response()->json([
             'success' => $paid && $order !== null,
             'message' => $message,

@@ -7,9 +7,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Modules\Admin\Models\Admin;
+use Modules\Client\Models\Client;
 use Modules\Driver\Models\Driver;
 use Modules\Notification\Models\Notification;
 use Modules\Order\Models\Order;
+use Modules\Payment\Models\PaymentTransaction;
 use Modules\Vendor\Models\VendorEmployee;
 
 class OrderNotificationService
@@ -259,6 +261,75 @@ class OrderNotificationService
             ->where('data->order_id', (int) $order->id)
             ->whereIn('data->notification_type', ['order_placed', 'new_order'])
             ->exists();
+    }
+
+    /**
+     * Tell the client their payment genuinely failed (gateway status 'failed' —
+     * not merely 'pending'/still-processing). Checkout/webhook settlement only
+     * ever notifies on SUCCESS; a client whose card is declined currently gets
+     * no push/SMS at all and is left watching the app poll indefinitely. Safe
+     * to call from every poll/webhook/redirect that resolves a transaction —
+     * locked and checked against the notifications table so only the first
+     * caller for a given transaction actually sends it.
+     */
+    public function notifyClientOfPaymentFailureIfNeeded(PaymentTransaction $transaction, string $message): void
+    {
+        if ($transaction->status !== 'failed') {
+            return;
+        }
+
+        $clientId = $transaction->response_data['client_id'] ?? null;
+        if (! $clientId) {
+            return;
+        }
+
+        $lock = Cache::lock("payment-failed-notification:{$transaction->id}", 30);
+
+        try {
+            $lock->block(10);
+        } catch (\Throwable $e) {
+            return;
+        }
+
+        try {
+            $alreadySent = Notification::query()
+                ->where('type', 'orders')
+                ->where('data->transaction_id', $transaction->transaction_id)
+                ->where('data->notification_type', 'payment_failed')
+                ->exists();
+
+            if ($alreadySent) {
+                return;
+            }
+
+            $client = Client::find($clientId);
+            if (! $client) {
+                return;
+            }
+
+            $this->userNotifications->notify(
+                $client,
+                'client',
+                'فشل الدفع',
+                'Payment Failed',
+                $message,
+                $message,
+                'orders',
+                [
+                    'transaction_id' => $transaction->transaction_id,
+                    'order_number' => $transaction->response_data['order_number'] ?? null,
+                    'notification_type' => 'payment_failed',
+                    'payment_method' => $transaction->payment_method,
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Payment failure notification failed', [
+                'transaction_id' => $transaction->transaction_id,
+                'error' => $e->getMessage(),
+            ]);
+        } finally {
+            $lock->release();
+        }
     }
 
     /**
