@@ -199,11 +199,8 @@ class AdminPieceController extends Controller
             return notFoundResponse('Piece not found');
         }
 
-        // is_active column has been removed from pieces table
-        return successResponse(
-            $piece,
-            'Piece status toggle is no longer supported'
-        );
+        $piece->is_active = ! $piece->is_active;
+        $piece->save();
 
         return successResponse(
             $piece,
