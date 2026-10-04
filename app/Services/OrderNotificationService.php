@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Admin\Models\Admin;
 use Modules\Client\Models\Client;
@@ -187,25 +188,39 @@ class OrderNotificationService
             return;
         }
 
-        $lock = Cache::lock("order-created-notifications:{$order->id}", 30);
+        // Callers (PendingOrderService::createOrderFromPending() in particular) run
+        // this from inside an open DB::transaction(). Locking and checking here
+        // immediately was not enough: the lock would be acquired and released, and
+        // the Notification::create() row written, all before that OUTER transaction
+        // ever committed — so a second, concurrent caller (the gateway webhook, the
+        // browser redirect, and the client's own active poll can all race each
+        // other) acquired the now-free lock, ran its own "already sent?" SELECT
+        // against a connection that couldn't see the first caller's still-uncommitted
+        // INSERT, and sent a duplicate. Deferring to afterCommit() guarantees the
+        // lock+check+send only runs once the order (and any notification already
+        // written by a prior caller) is actually visible to every connection — it
+        // runs immediately if there is no open transaction.
+        DB::afterCommit(function () use ($order) {
+            $lock = Cache::lock("order-created-notifications:{$order->id}", 30);
 
-        try {
-            $lock->block(10);
-        } catch (\Throwable $e) {
-            // Another request is already sending these notifications; don't
-            // double up by proceeding without the lock.
-            return;
-        }
-
-        try {
-            if ($this->orderCreatedNotificationsAlreadySent($order)) {
+            try {
+                $lock->block(10);
+            } catch (\Throwable $e) {
+                // Another request is already sending these notifications; don't
+                // double up by proceeding without the lock.
                 return;
             }
 
-            $this->dispatchOrderCreatedNotifications($order);
-        } finally {
-            $lock->release();
-        }
+            try {
+                if ($this->orderCreatedNotificationsAlreadySent($order)) {
+                    return;
+                }
+
+                $this->dispatchOrderCreatedNotifications($order);
+            } finally {
+                $lock->release();
+            }
+        });
     }
 
     private function dispatchOrderCreatedNotifications(Order $order): void
