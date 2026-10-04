@@ -3468,7 +3468,50 @@ class OrderController extends Controller
             ->first();
 
         if (! $order) {
-            return notFoundResponse(__('order.order_not_found'));
+            // $orderId may actually be a pending_order_id: checkout returns order_id=null
+            // and only pending_order_id until the gateway payment settles and a real Order
+            // row is created, so a client polling with that id lands here instead of a real
+            // order id. Resolve it the same flexible way confirmByTransaction() does rather
+            // than failing outright with "order not found".
+            $pendingOrder = \Modules\Order\Models\PendingOrder::where('id', $orderId)
+                ->where('client_id', $client->id)
+                ->first();
+
+            if (! $pendingOrder) {
+                return notFoundResponse(__('order.order_not_found'));
+            }
+
+            $transaction = PaymentTransaction::where('response_data->pending_order_id', $pendingOrder->id)
+                ->latest()
+                ->first();
+
+            if ($transaction && ! $transaction->order_id) {
+                try {
+                    app(\Modules\Payment\Http\Controllers\PaymentController::class)
+                        ->confirmByTransaction($request, $transaction->transaction_id);
+                    $transaction = $transaction->fresh();
+                } catch (\Throwable $e) {
+                    // Fall through with whatever we already know.
+                }
+            }
+
+            if ($transaction && $transaction->order_id) {
+                $order = Order::with(['latestPayment'])
+                    ->where('client_id', $client->id)
+                    ->where('id', $transaction->order_id)
+                    ->first();
+            }
+
+            if (! $order) {
+                return successResponse([
+                    'order_id' => null,
+                    'pending_order_id' => $pendingOrder->id,
+                    'order_number' => $pendingOrder->order_data['order_number'] ?? null,
+                    'payment_status' => 'pending',
+                    'payment_status_label' => \App\Support\PaymentStatusPresenter::label('pending'),
+                    'is_paid' => false,
+                ], __('order.no_payment_initiated'));
+            }
         }
 
         // Sync with PayFort when any transaction is still pending/authorized but unsettled
