@@ -2317,6 +2317,8 @@ class OrderPaymentService
                     'order_number' => $orderNumber,
                     'refund_total' => (string) $total,
                     'refund_methods' => $methods,
+                    'refund_method_label_ar' => $methodsAr,
+                    'refund_method_label_en' => $methodsEn,
                     'refund_context' => $context,
                     'gateway_failed' => $hadCardFailure ? '1' : '0',
                     'reason' => $reason,
