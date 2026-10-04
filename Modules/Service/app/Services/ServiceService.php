@@ -113,7 +113,7 @@ class ServiceService
                     'rating' => $branch->rating,
                     'rate_count' => $branch->rate_count,
                     'image_cover' => $uploadService->getFullUrl($branch->store_front),
-                    'image_logo' => $branch->vendor ? $uploadService->getFullUrl($branch->vendor->logo) : null,
+                    'image_logo' => $uploadService->getFullUrl($branch->logo),
                     'service_id' => $serviceId,
                     'service_price' => $branch->getServicePrice($serviceId),
                     'vendor' => [
