@@ -78,7 +78,7 @@ class OrderTrackingController extends Controller
     /**
      * Get order tracking information
      */
-    public function getTracking(Request $request, int $order_id): JsonResponse
+    public function getTracking(Request $request, string $order_id): JsonResponse
     {
         $user = $request->user();
 
@@ -86,7 +86,7 @@ class OrderTrackingController extends Controller
         $accept = $request->header('Accept-Language', 'en');
         $lang = Str::contains(strtolower($accept), 'ar') ? 'ar' : 'en';
 
-        $order = Order::with([
+        $relations = [
             'vendor',
             'branch.vendor',
             'latestPayment',
@@ -106,60 +106,62 @@ class OrderTrackingController extends Controller
             'discount',
             'driverRejections' => fn ($q) => $q->orderBy('rejected_at', 'asc'),
             'driverRejections.driver',
-        ])
+        ];
+
+        // $order_id might be: a real Order id, an order_number, a pending_order_id, or a
+        // raw payment transaction_id (e.g. "ORD-...-LEG-0-..."). Checkout returns order_id
+        // =null and only pending_order_id/transaction_id until the gateway payment settles
+        // and a real Order row is created (a separate auto-increment sequence from
+        // pending_orders), so a client navigating straight to tracking right after payment
+        // can land here with any of those instead of the real order id.
+        $numericId = ctype_digit($order_id) ? (int) $order_id : null;
+
+        $order = Order::with($relations)
             ->where('client_id', $user->id)
-            ->find($order_id);
+            ->where(function ($q) use ($order_id, $numericId) {
+                $q->where('order_number', $order_id);
+                if ($numericId !== null) {
+                    $q->orWhere('id', $numericId);
+                }
+            })
+            ->first();
 
         if (! $order) {
-            // $order_id may actually be a pending_order_id: checkout returns order_id=null
-            // and only pending_order_id until the gateway payment settles and a real Order
-            // row is created (a separate auto-increment sequence from pending_orders), so a
-            // client navigating straight to tracking right after payment can land here with
-            // that id instead of the real order id. Resolve it the same way
-            // OrderController::getPaymentStatus() does rather than failing outright.
-            $pendingOrder = \Modules\Order\Models\PendingOrder::where('id', $order_id)
-                ->where('client_id', $user->id)
-                ->first();
+            $transaction = null;
 
-            if ($pendingOrder) {
-                $transaction = PaymentTransaction::where('response_data->pending_order_id', $pendingOrder->id)
-                    ->latest()
+            if ($numericId !== null) {
+                $pendingOrder = \Modules\Order\Models\PendingOrder::where('id', $numericId)
+                    ->where('client_id', $user->id)
                     ->first();
 
-                if ($transaction && ! $transaction->order_id) {
-                    try {
-                        app(\Modules\Payment\Http\Controllers\PaymentController::class)
-                            ->confirmByTransaction($request, $transaction->transaction_id);
-                        $transaction = $transaction->fresh();
-                    } catch (\Throwable $e) {
-                        // Fall through with whatever we already know.
-                    }
+                if ($pendingOrder) {
+                    $transaction = PaymentTransaction::where('response_data->pending_order_id', $pendingOrder->id)
+                        ->latest()
+                        ->first();
                 }
+            }
 
-                if ($transaction && $transaction->order_id) {
-                    $order = Order::with([
-                        'vendor',
-                        'branch.vendor',
-                        'latestPayment',
-                        'client.addresses',
-                        'statusLogs',
-                        'pickupAddress',
-                        'deliveryAddress',
-                        'items' => fn ($q) => $q->with([
-                            'piece.iconRelation',
-                            'service.iconRelation',
-                            'additionalServicesPivot.serviceAddition.iconRelation',
-                        ]),
-                        'driver',
-                        'pickupDriver',
-                        'deliveryDriver',
-                        'discount',
-                        'driverRejections' => fn ($q) => $q->orderBy('rejected_at', 'asc'),
-                        'driverRejections.driver',
-                    ])
-                        ->where('client_id', $user->id)
-                        ->find($transaction->order_id);
+            if (! $transaction) {
+                $transaction = PaymentTransaction::where('transaction_id', $order_id)->latest()->first();
+            }
+
+            if ($transaction && ! $transaction->order_id) {
+                try {
+                    // Resolve the shared settlement with whichever identifier Moyasar
+                    // itself will recognize — confirmByTransaction() already matches by
+                    // transaction_id, order_id, or pending_order_id internally.
+                    app(\Modules\Payment\Http\Controllers\PaymentController::class)
+                        ->confirmByTransaction($request, $transaction->transaction_id);
+                    $transaction = $transaction->fresh();
+                } catch (\Throwable $e) {
+                    // Fall through with whatever we already know.
                 }
+            }
+
+            if ($transaction && $transaction->order_id) {
+                $order = Order::with($relations)
+                    ->where('client_id', $user->id)
+                    ->find($transaction->order_id);
             }
         }
 
