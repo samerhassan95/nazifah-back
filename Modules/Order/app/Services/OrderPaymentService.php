@@ -362,7 +362,7 @@ class OrderPaymentService
         $sequence = 0;
         $reserveWalletUntilGatewayPays = $this->splitHasGatewayLeg($legs);
 
-        $totalLegs = count($legs);
+        $gatewayLegsCount = count(array_filter($legs, fn ($l) => ! $this->isWalletMethod($l['payment_method'] ?? '')));
         foreach ($legs as $leg) {
             $method = $leg['payment_method'];
             $amount = $leg['amount'];
@@ -377,7 +377,7 @@ class OrderPaymentService
             ];
             if ($isSurcharge) {
                 $legOpts['reference_prefix'] = 'ADD';
-            } elseif ($totalLegs > 1) {
+            } elseif ($gatewayLegsCount > 1) {
                 $legOpts['reference_prefix'] = 'LEG';
             }
 
@@ -2549,7 +2549,7 @@ class OrderPaymentService
         $sequence = 0;
         $reserveWalletUntilGatewayPays = $this->splitHasGatewayLeg($legs);
 
-        $totalLegs = count($legs);
+        $gatewayLegsCount = count(array_filter($legs, fn ($l) => ! $this->isWalletMethod($l['payment_method'] ?? '')));
         foreach ($legs as $leg) {
             $method = $leg['payment_method'];
             $amount = round((float) $leg['amount'], 2);
@@ -2559,7 +2559,7 @@ class OrderPaymentService
                 'sequence' => $sequence++,
                 'meta' => $opts['meta'] ?? null,
             ];
-            if ($totalLegs > 1) {
+            if ($gatewayLegsCount > 1) {
                 $legOpts['reference_prefix'] = 'LEG';
             }
 
