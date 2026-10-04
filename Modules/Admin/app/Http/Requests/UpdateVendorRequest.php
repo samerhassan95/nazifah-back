@@ -32,7 +32,7 @@ class UpdateVendorRequest extends FormRequest
             'email' => ['nullable', 'email', Rule::unique('vendors', 'email')->ignore($vendorId)->whereNull('deleted_at')],
             'official_number' => ['nullable', 'string', 'digits:10'],
             'vat_number' => 'nullable|string',
-            'phone' => ['nullable', 'string', 'digits:9', Rule::unique('vendors', 'phone')->ignore($vendorId)->whereNull('deleted_at')],
+            'phone' => ['nullable', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendors', 'phone')->ignore($vendorId)->whereNull('deleted_at')],
             'delivery_price_per_km' => 'nullable|numeric|min:0',
             'is_verified' => 'nullable|boolean',
             'rejection_reason' => 'nullable|string|max:1000',

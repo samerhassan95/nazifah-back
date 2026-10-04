@@ -53,6 +53,9 @@ class AdminVendorController extends Controller
         $validated = $request->validated();
         $validated['is_verified'] = $validated['is_verified'] ?? true;
         $validated['is_active'] = $validated['is_active'] ?? true;
+        if (isset($validated['phone'])) {
+            $validated['phone'] = normalizePhone($validated['phone']);
+        }
 
         // Handle logo upload
         if ($request->hasFile('logo')) {
@@ -146,6 +149,9 @@ class AdminVendorController extends Controller
         }
 
         $validated = $request->validated();
+        if (isset($validated['phone'])) {
+            $validated['phone'] = normalizePhone($validated['phone']);
+        }
 
         // Handle logo upload
         if ($request->hasFile('logo')) {

@@ -30,7 +30,7 @@ class StoreVendorRequest extends FormRequest
             'email' => ['required', 'email', Rule::unique('vendors', 'email')->whereNull('deleted_at')],
             'official_number' => ['nullable', 'string', 'digits:10'],
             'vat_number' => 'nullable|string',
-            'phone' => ['required', 'string', 'digits:9', Rule::unique('vendors', 'phone')->whereNull('deleted_at')],
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendors', 'phone')->whereNull('deleted_at')],
             'delivery_price_per_km' => 'nullable|numeric|min:0',
             'is_verified' => 'boolean',
             'is_active' => 'boolean',
