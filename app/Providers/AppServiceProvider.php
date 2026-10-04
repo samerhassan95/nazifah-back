@@ -15,7 +15,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Without this, a server whose php.ini leaves serialize_precision at an old
+        // fixed value (not -1) can json_encode an already-rounded float like
+        // round(4.06, 2) as "4.0600000000000005" — the float's exact IEEE-754 binary
+        // value leaking through instead of its shortest round-trip representation.
+        // -1 (PHP's own recommended default since 7.1) always encodes the shortest
+        // string that reads back to the same float, so a rounded price stays clean
+        // in every JSON response regardless of the host's php.ini.
+        ini_set('serialize_precision', -1);
     }
 
     /**
