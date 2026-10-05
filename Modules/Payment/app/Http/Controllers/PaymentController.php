@@ -496,6 +496,23 @@ class PaymentController extends Controller
 
             $transaction->update($updateData);
 
+            // Tell the client about a genuine gateway failure here too, not just when
+            // they happen to poll: the webhook and browser redirect settle payments
+            // whether or not the app is still open.
+            if ($mappedStatus === 'failed' && strtolower((string) $transaction->gateway) === 'moyasar') {
+                try {
+                    app(\App\Services\OrderNotificationService::class)->notifyClientOfPaymentFailureIfNeeded(
+                        $transaction->fresh(),
+                        (string) ($response->message ?: __('payment.payment_failed'))
+                    );
+                } catch (\Throwable $e) {
+                    Log::channel('payment')->warning('Payment failure notification dispatch failed', [
+                        'transaction_id' => $transaction->transaction_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Persist Moyasar wallet method (samsung_pay / apple_pay) + card network
             // (visa / mastercard / mada). For plain card checkout keep resolving brand.
             if ($response->isSuccessful()) {

@@ -289,7 +289,15 @@ class OrderNotificationService
      */
     public function notifyClientOfPaymentFailureIfNeeded(PaymentTransaction $transaction, string $message): void
     {
-        if ($transaction->status !== 'failed') {
+        // Settlement calls this from inside an open transaction; the idempotency
+        // check must only run once the transaction's own writes are visible.
+        DB::afterCommit(fn () => $this->sendPaymentFailureNotification($transaction->id, $message));
+    }
+
+    private function sendPaymentFailureNotification(int $transactionId, string $message): void
+    {
+        $transaction = PaymentTransaction::find($transactionId);
+        if (! $transaction || $transaction->status !== 'failed') {
             return;
         }
 
