@@ -125,6 +125,10 @@
 
         <!-- The Moyasar Form Container -->
         <div class="mysr-form-wrap">
+            <label class="save-card-opt" style="display:none;align-items:center;gap:0.5rem;font-size:0.9rem;color:#374151;margin-bottom:1rem;">
+                <input type="checkbox" id="save-card-toggle">
+                <span>{{ app()->getLocale() === 'ar' ? 'احفظ البطاقة لاستخدامها في الدفع لاحقًا' : 'Save this card for future payments' }}</span>
+            </label>
             <div class="mysr-form"></div>
         </div>
 
@@ -176,11 +180,26 @@
             if (config.apple_pay && methods.indexOf('applepay') !== -1) {
                 init.apple_pay = config.apple_pay;
             }
-            if (config.credit_card && methods.indexOf('creditcard') !== -1) {
-                init.credit_card = config.credit_card;
+            var saveToggle = document.getElementById('save-card-toggle');
+            var saveWrap = document.querySelector('.save-card-opt');
+            var canSaveCard = methods.indexOf('creditcard') !== -1;
+
+            function renderForm() {
+                var formEl = document.querySelector('.mysr-form');
+                formEl.innerHTML = '';
+                var cfg = Object.assign({}, init);
+                if (canSaveCard && saveToggle && saveToggle.checked) {
+                    cfg.credit_card = { save_card: true };
+                }
+                Moyasar.init(cfg);
             }
 
-            Moyasar.init(init);
+            if (canSaveCard && saveWrap) {
+                saveWrap.style.display = 'flex';
+                saveToggle.addEventListener('change', renderForm);
+            }
+
+            renderForm();
         });
     </script>
 </body>

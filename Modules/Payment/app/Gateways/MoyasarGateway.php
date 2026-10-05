@@ -1028,11 +1028,6 @@ class MoyasarGateway extends AbstractPaymentGateway
             $config['manual'] = true;
         }
 
-        // Shows moyasar.js's optional "save card" checkbox on the card form. The
-        // resulting token only comes back when the payer ticks it.
-        if (in_array('creditcard', $jsMethods, true)) {
-            $config['credit_card'] = ['save_card' => true];
-        }
 
         if (in_array('applepay', $jsMethods, true)) {
             $config['apple_pay'] = [
