@@ -246,6 +246,22 @@ class WalletController extends Controller
             } catch (\Exception $e) {
             }
 
+            $savedMoyasarToken = null;
+            if ($request->filled('card_id')) {
+                $savedCard = ClientCard::query()
+                    ->where('id', $request->card_id)
+                    ->where('client_id', $user->id)
+                    ->first();
+
+                if (! $savedCard) {
+                    return errorResponse(__('client.card_not_found'), 404);
+                }
+
+                if ($savedCard->gateway === 'moyasar') {
+                    $savedMoyasarToken = $savedCard->gateway_token;
+                }
+            }
+
             // Create payment request
             $paymentRequest = new PaymentRequest(
                 amount: (float) $request->amount,
@@ -263,6 +279,7 @@ class WalletController extends Controller
                     'payment_method' => $paymentMethod,
                     'payment_option' => $gatewayName === 'moyasar' ? null : $this->getPayfortPaymentOption($paymentMethod),
                     'card_id' => $request->card_id ?? null,
+                    'moyasar_token' => $savedMoyasarToken,
                     'wallet_bonus_discount_id' => $walletPromotion['applied'] ? $walletPromotion['discount']?->id : null,
                     'wallet_bonus_amount' => $walletPromotion['applied'] ? (float) $walletPromotion['bonus_amount'] : 0,
                 ],

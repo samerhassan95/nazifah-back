@@ -157,6 +157,11 @@ class MoyasarGateway extends AbstractPaymentGateway
      */
     public function initializePayment(PaymentRequest $request): PaymentResponse
     {
+        $savedToken = $request->metadata['moyasar_token'] ?? null;
+        if (is_string($savedToken) && $savedToken !== '') {
+            return $this->chargeSavedToken($request, $savedToken);
+        }
+
         // Same hosted invoice path for orders and wallet deposits. The mobile app
         // handles Samsung Pay through its own native SDK flow, separate from this
         // web checkout.
@@ -390,6 +395,89 @@ class MoyasarGateway extends AbstractPaymentGateway
                 'moyasar' => $moyasarConfig,
             ]
         );
+    }
+
+    /**
+     * Charge a previously saved card token server-side. Tokens skip 3DS by default
+     * (the card was verified when it was saved), so a synchronous 'paid' result is
+     * the normal path. Issuers that still demand a challenge return an 'initiated'
+     * payment with source.transaction_url, which the caller redirects to.
+     */
+    private function chargeSavedToken(PaymentRequest $request, string $token): PaymentResponse
+    {
+        try {
+            if (! $this->validateConfiguration()) {
+                throw new \Exception('Moyasar configuration is invalid: missing secret_key.');
+            }
+
+            $merchantReference = $request->orderId !== '' ? $request->orderId : 'ORD-'.date('Ymd').'-'.strtoupper(Str::random(5));
+            $callbackUrl = $this->appendQuery((string) $request->returnUrl, ['merchant_reference' => $merchantReference]);
+
+            $metadata = $this->buildMetadata($request, $merchantReference, $callbackUrl);
+            unset($metadata['moyasar_token']);
+
+            $source = ['type' => 'token', 'token' => $token];
+            if ($this->isAuthorizationMode()) {
+                $source['manual'] = true;
+            }
+
+            $payload = [
+                'amount' => $this->formatAmount($request->amount),
+                'currency' => strtoupper($request->currency !== '' ? $request->currency : $this->currency),
+                'description' => $this->buildDescription($request, $merchantReference),
+                'callback_url' => $callbackUrl,
+                'source' => $source,
+                'metadata' => $metadata,
+            ];
+
+            $response = $this->httpClient()->post($this->apiBase.'/payments', $payload);
+            $body = $response->json() ?? [];
+
+            $this->log('info', 'Moyasar saved-token charge response', [
+                'http_status' => $response->status(),
+                'payment_id' => $body['id'] ?? null,
+                'moyasar_status' => $body['status'] ?? null,
+            ]);
+
+            if (! $response->successful()) {
+                throw new \Exception($this->extractError($body) ?? 'Moyasar token charge failed (HTTP '.$response->status().').');
+            }
+
+            $status = strtolower((string) ($body['status'] ?? ''));
+            $redirect = $body['source']['transaction_url'] ?? null;
+            $isPaid = in_array($status, ['paid', 'captured', 'authorized'], true);
+            $needsChallenge = $status === 'initiated' && ! empty($redirect);
+
+            return new PaymentResponse(
+                success: $isPaid || $needsChallenge,
+                transactionId: $merchantReference,
+                paymentUrl: $needsChallenge ? $redirect : null,
+                status: in_array($status, ['paid', 'captured'], true) ? 'completed' : $this->mapStatus($status),
+                amount: $request->amount,
+                currency: strtoupper($request->currency !== '' ? $request->currency : $this->currency),
+                message: $isPaid ? __('payment.payment_successful') : ($this->paymentMessage($body, false) ?? __('payment.payment_failed')),
+                data: [
+                    'gateway' => 'moyasar',
+                    'environment' => $this->isTestMode() ? 'test' : 'production',
+                    'mode' => 'saved_token',
+                    'fort_id' => $body['id'] ?? null,
+                    'moyasar_payment_id' => $body['id'] ?? null,
+                    'moyasar_status' => $status,
+                    'source' => $body['source'] ?? null,
+                    'callback_url' => $callbackUrl,
+                    'payment_params' => null,
+                    'raw_response' => $body,
+                ],
+            );
+        } catch (\Throwable $e) {
+            $this->log('error', 'Moyasar saved-token charge failed', ['error' => $e->getMessage()]);
+
+            return new PaymentResponse(
+                success: false,
+                status: 'failed',
+                message: app(MoyasarErrorLocalizer::class)->localize($e->getMessage())
+            );
+        }
     }
 
     /**
