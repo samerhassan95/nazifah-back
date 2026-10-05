@@ -1102,7 +1102,7 @@ class MoyasarGateway extends AbstractPaymentGateway
             'currency' => $currency,
             'description' => $this->buildDescription($request, $merchantReference),
             'callback_url' => $callbackUrl,
-            'language' => $this->language,
+            'language' => str_starts_with(app()->getLocale(), 'en') ? 'en' : 'ar',
             'methods' => $jsMethods,
             'supported_networks' => ['mada', 'visa', 'mastercard'],
             'metadata' => $metadata,
