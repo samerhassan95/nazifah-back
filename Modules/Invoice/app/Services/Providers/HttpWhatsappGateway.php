@@ -41,7 +41,9 @@ class HttpWhatsappGateway implements WhatsappInvoiceGatewayInterface
 
             return new WhatsappDeliveryResult(
                 success: $response->getStatusCode() >= 200 && $response->getStatusCode() < 300,
-                status: (string) ($decoded['status'] ?? 'sent'),
+                // The provider only accepted the message here; delivery and read states
+                // arrive later via status webhooks, so never record "delivered" by default.
+                status: (string) ($decoded['status'] ?? 'accepted'),
                 providerMessageId: $decoded['message_id'] ?? null,
                 requestPayload: $payload,
                 responsePayload: $decoded,

@@ -2,6 +2,7 @@
 
 namespace Modules\Invoice\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Modules\Invoice\Contracts\InvoiceComplianceGatewayInterface;
@@ -179,6 +180,28 @@ class InvoiceService
     }
 
     public function sendWhatsapp(Invoice $invoice): Invoice
+    {
+        // Sends are not idempotent on the provider side: a queue retry after a timeout
+        // would deliver the same invoice again. Only one caller may send at a time, and
+        // a prior successful send is never repeated.
+        $lock = Cache::lock("invoice-whatsapp:{$invoice->id}", 60);
+        if (! $lock->get()) {
+            return $invoice->fresh();
+        }
+
+        try {
+            $fresh = $invoice->fresh();
+            if ($fresh && $fresh->whatsapp_sent_at) {
+                return $fresh;
+            }
+
+            return $this->dispatchWhatsapp($invoice);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function dispatchWhatsapp(Invoice $invoice): Invoice
     {
         $invoice->loadMissing('order.client');
         $shareUrl = $this->shareUrl($invoice);
