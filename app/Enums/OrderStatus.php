@@ -369,6 +369,24 @@ enum OrderStatus: string
      *
      * @return list<OrderStatus>
      */
+    /**
+     * Statuses in which the CLIENT may cancel their own order: nothing has been
+     * accepted by a driver or picked up yet. Vendor/admin cancellation keeps the
+     * wider transition rules in nextStatuses().
+     */
+    public static function clientCancellableStatuses(): array
+    {
+        return [
+            self::PENDING,
+            self::BRANCH_REVIEW,
+            self::CONFIRMED,
+            self::WAITING_PAYMENT,
+            self::PAYMENT_CONFIRMED,
+            self::AWAITING_REMAINING_PAYMENT,
+            self::DRIVER_PICKUP_ASSIGNED,
+        ];
+    }
+
     public static function vendorPickupDriverAssignableStatuses(): array
     {
         return [

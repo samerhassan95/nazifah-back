@@ -3640,7 +3640,10 @@ class OrderController extends Controller
         }
 
         $statusService = app(\App\Services\OrderStatusService::class);
-        if (! $statusService->canTransition($order, OrderStatus::CANCELLED)) {
+        if (
+            ! in_array(OrderStatus::from($order->status), OrderStatus::clientCancellableStatuses(), true)
+            || ! $statusService->canTransition($order, OrderStatus::CANCELLED)
+        ) {
             $message = __('order.order_cannot_cancel_status');
             app()->setLocale($originalLocale);
 
