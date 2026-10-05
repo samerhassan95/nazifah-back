@@ -14,6 +14,8 @@ class ClientCard extends Model
     protected $fillable = [
         'client_id',
         'payfort_token_name',
+        'gateway',
+        'gateway_token',
         'card_brand',
         'card_holder_name',
         'last_four',

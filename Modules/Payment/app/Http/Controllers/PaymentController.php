@@ -515,6 +515,13 @@ class PaymentController extends Controller
                 );
             }
 
+            if ($response->isSuccessful() && is_array($response->data['source'] ?? null)) {
+                $this->clientCardService->upsertFromMoyasarSource(
+                    $transaction->fresh(),
+                    $response->data['source']
+                );
+            }
+
             // Handle wallet deposit
             if ($isWalletDeposit) {
                 // A wallet top-up has no fulfillment step, so an AUTHORIZATION hold must be

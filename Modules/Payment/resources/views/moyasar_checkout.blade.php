@@ -176,6 +176,9 @@
             if (config.apple_pay && methods.indexOf('applepay') !== -1) {
                 init.apple_pay = config.apple_pay;
             }
+            if (config.credit_card && methods.indexOf('creditcard') !== -1) {
+                init.credit_card = config.credit_card;
+            }
 
             Moyasar.init(init);
         });

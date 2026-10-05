@@ -68,6 +68,62 @@ class ClientCardService
         return $card;
     }
 
+    /**
+     * Persist a Moyasar-tokenized card. Moyasar only returns source.token when the
+     * payer ticked "save card", so a token's presence is the opt-in signal. CVC is
+     * never stored — Moyasar tokens don't carry it.
+     */
+    public function upsertFromMoyasarSource(PaymentTransaction $transaction, array $source): ?ClientCard
+    {
+        $token = $source['token'] ?? null;
+        if (! is_string($token) || $token === '') {
+            return null;
+        }
+
+        $clientId = $this->resolveClientId($transaction);
+        if (! $clientId) {
+            return null;
+        }
+
+        $brand = strtolower((string) ($source['company'] ?? ''));
+        if (! in_array($brand, ['visa', 'mastercard', 'mada'], true)) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D/', '', (string) ($source['number'] ?? ''));
+        $lastFour = strlen($digits) >= 4 ? substr($digits, -4) : null;
+        if (! $lastFour) {
+            return null;
+        }
+
+        $expiry = (! empty($source['month']) && ! empty($source['year']))
+            ? sprintf('%02d/%s', (int) $source['month'], substr((string) $source['year'], -2))
+            : null;
+
+        $card = ClientCard::query()->firstOrNew(['gateway_token' => $token]);
+        $isNew = ! $card->exists;
+
+        $card->fill([
+            'client_id' => $clientId,
+            'gateway' => 'moyasar',
+            'gateway_token' => $token,
+            'card_brand' => $brand,
+            'card_holder_name' => $source['name'] ?? $transaction->customer_name,
+            'last_four' => $lastFour,
+            'expiry_date' => $expiry,
+            'source_payment_transaction_id' => $transaction->id,
+            'last_used_at' => now(),
+        ]);
+
+        if ($isNew && ! ClientCard::where('client_id', $clientId)->where('is_default', true)->exists()) {
+            $card->is_default = true;
+        }
+
+        $card->save();
+
+        return $card;
+    }
+
     private function resolveClientId(PaymentTransaction $transaction): ?int
     {
         $fromMetadata = $transaction->response_data['client_id'] ?? null;
