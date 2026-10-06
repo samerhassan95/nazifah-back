@@ -235,6 +235,26 @@ class AdminLaundryAdditionalServiceController extends Controller
     }
 
     /**
+     * Toggle additional service active status
+     * POST /laundries/additional_services/:id/toggle-status
+     */
+    public function toggleStatus(int $id): JsonResponse
+    {
+        $service = ServiceAddition::find($id);
+
+        if (! $service) {
+            return notFoundResponse('Additional service not found');
+        }
+
+        $service->update(['is_active' => ! $service->is_active]);
+
+        return successResponse(
+            $this->formatAdditionalService($service->fresh(['services', 'pieces'])),
+            'Additional service status updated successfully'
+        );
+    }
+
+    /**
      * Delete additional service
      * DELETE /laundries/additional_services/:id
      */
