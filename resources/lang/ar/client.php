@@ -15,6 +15,7 @@ return [
     'card_deleted' => 'تم حذف البطاقة بنجاح',
     'cards_saved_via_checkout' => 'يتم حفظ البطاقات تلقائياً عند الدفع بفيزا أو ماستركارد أو مدى.',
     'wallet_details_retrieved' => 'تم جلب بيانات المحفظة',
+    'deposit_added' => 'تمت إضافة المبلغ إلى المحفظة بنجاح',
     'transactions_retrieved' => 'تم استرجاع معاملات المحفظة بنجاح',
     'validation' => [
         'full_name_required' => 'الاسم الكامل مطلوب',

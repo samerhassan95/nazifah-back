@@ -15,6 +15,7 @@ return [
     'card_deleted' => 'Card deleted successfully',
     'cards_saved_via_checkout' => 'Cards are saved automatically when you pay with Visa, Mastercard, or Mada.',
     'wallet_details_retrieved' => 'Wallet details retrieved',
+    'deposit_added' => 'Amount added to your wallet successfully',
     'transactions_retrieved' => 'Wallet transactions retrieved successfully',
     'validation' => [
         'full_name_required' => 'Full name is required',
