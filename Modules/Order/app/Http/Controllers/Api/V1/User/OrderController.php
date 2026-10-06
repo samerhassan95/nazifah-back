@@ -1383,6 +1383,25 @@ class OrderController extends Controller
             $orderPaymentMethod = $this->resolvePrimaryPaymentMethodFromLegs($checkoutLegs);
             $hasGatewayLeg = $this->orderPaymentService->splitHasGatewayLeg($checkoutLegs);
 
+            $savedCardOpts = [];
+            if ($hasGatewayLeg && $request->filled('card_id')) {
+                $savedCard = \Modules\Client\Models\ClientCard::query()
+                    ->where('id', $request->card_id)
+                    ->where('client_id', $user->id)
+                    ->first();
+
+                if (! $savedCard) {
+                    return errorResponse(__('client.card_not_found'), null, 404);
+                }
+
+                if ($savedCard->gateway === 'moyasar') {
+                    $savedCardOpts = [
+                        'moyasar_token' => $savedCard->gateway_token,
+                        'card_brand' => $savedCard->card_brand,
+                    ];
+                }
+            }
+
             if ($hasGatewayLeg) {
                 $pendingOrder = \Modules\Order\Models\PendingOrder::create([
                     'client_id' => $user->id,
@@ -1421,9 +1440,9 @@ class OrderController extends Controller
                 ]);
 
                 try {
-                    $settle = $this->orderPaymentService->settleSplitLegsForPendingOrder($pendingOrder, $checkoutLegs, $user, [
+                    $settle = $this->orderPaymentService->settleSplitLegsForPendingOrder($pendingOrder, $checkoutLegs, $user, array_merge([
                         'meta' => ['reason' => 'order_create'],
-                    ]);
+                    ], $savedCardOpts ? ['saved_card' => $savedCardOpts] : []));
                     $checkoutGatewayPayments = $settle['gateway_payments'];
                     $checkoutWalletPayments = $settle['wallet_payments'] ?? [];
                     $checkoutPaymentSummary = $settle['summary'] ?? [];

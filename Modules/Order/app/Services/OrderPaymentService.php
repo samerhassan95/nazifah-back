@@ -2558,6 +2558,8 @@ class OrderPaymentService
                 'is_surcharge' => $isSurcharge,
                 'sequence' => $sequence++,
                 'meta' => $opts['meta'] ?? null,
+                // A saved card can only cover the whole gateway amount, never one of several legs.
+                'saved_card' => $gatewayLegsCount === 1 ? ($opts['saved_card'] ?? null) : null,
             ];
             if ($gatewayLegsCount > 1) {
                 $legOpts['reference_prefix'] = 'LEG';
@@ -2659,13 +2661,14 @@ class OrderPaymentService
             returnUrl: $returnUrl,
             cancelUrl: $cancelUrl,
             paymentOption: $paymentOption,
-            metadata: [
+            metadata: array_filter([
                 'pending_order_id' => $pendingOrder->id,
                 'order_number' => $orderNumber,
                 'client_id' => $pendingOrder->client_id,
                 'payment_option' => $paymentOption,
                 'is_additional_charge' => false,
-            ],
+                'moyasar_token' => $opts['saved_card']['moyasar_token'] ?? null,
+            ], fn ($v) => $v !== null),
         );
 
         $response = $this->paymentService->initializePayment($paymentRequest);
@@ -2693,6 +2696,7 @@ class OrderPaymentService
             'currency' => $response->currency ?? 'SAR',
             'status' => $response->status ?? 'pending',
             'payment_method' => $paymentMethod,
+            'card_brand' => $opts['saved_card']['card_brand'] ?? null,
             'is_additional_charge' => false,
             'customer_email' => $customerEmail,
             'customer_name' => $customerName,
