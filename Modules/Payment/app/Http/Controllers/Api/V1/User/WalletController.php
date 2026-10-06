@@ -247,6 +247,7 @@ class WalletController extends Controller
             }
 
             $savedMoyasarToken = null;
+            $savedCardBrand = null;
             if ($request->filled('card_id')) {
                 $savedCard = ClientCard::query()
                     ->where('id', $request->card_id)
@@ -257,6 +258,7 @@ class WalletController extends Controller
                     return errorResponse(__('client.card_not_found'), 404);
                 }
 
+                $savedCardBrand = $savedCard->card_brand;
                 if ($savedCard->gateway === 'moyasar') {
                     $savedMoyasarToken = $savedCard->gateway_token;
                 }
@@ -307,6 +309,7 @@ class WalletController extends Controller
                 'currency' => $paymentResponse->currency ?? config('payment.currency', 'SAR'),
                 'status' => $paymentResponse->status ?? 'pending',
                 'payment_method' => $paymentMethod,
+                'card_brand' => $savedCardBrand,
                 'customer_email' => $customerEmail,
                 'customer_name' => $customerName,
                 'customer_phone' => $customerPhone,
