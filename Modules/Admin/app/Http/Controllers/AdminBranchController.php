@@ -224,7 +224,7 @@ class AdminBranchController extends Controller
     public function getPieces(int $id): JsonResponse
     {
         $branch = Branch::with(['pieces' => function ($query) {
-            $query->orderBy('order', 'asc');
+            $query->orderBy('pieces.id', 'asc');
         }])->find($id);
 
         if (! $branch) {
@@ -260,7 +260,7 @@ class AdminBranchController extends Controller
 
         return successResponse([
             'branch_id' => $branch->id,
-            'pieces' => $branch->pieces()->orderBy('order', 'asc')->get(),
+            'pieces' => $branch->pieces()->orderBy('pieces.id', 'asc')->get(),
         ], 'Pieces added to branch successfully');
     }
 
@@ -287,7 +287,7 @@ class AdminBranchController extends Controller
 
         return successResponse([
             'branch_id' => $branch->id,
-            'pieces' => $branch->pieces()->orderBy('order', 'asc')->get(),
+            'pieces' => $branch->pieces()->orderBy('pieces.id', 'asc')->get(),
         ], 'Pieces removed from branch successfully');
     }
 
@@ -311,7 +311,7 @@ class AdminBranchController extends Controller
 
         return successResponse([
             'branch_id' => $branch->id,
-            'pieces' => $branch->pieces()->orderBy('order', 'asc')->get(),
+            'pieces' => $branch->pieces()->orderBy('pieces.id', 'asc')->get(),
         ], 'Branch pieces synced successfully');
     }
 
