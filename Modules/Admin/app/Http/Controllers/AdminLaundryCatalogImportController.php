@@ -14,9 +14,13 @@ class AdminLaundryCatalogImportController extends Controller
     ) {}
 
     /**
-     * Import the Nathefah catalog Excel template (categories/services globally,
-     * pieces/additional services for the given vendor, then links everything to
-     * the given branches).
+     * Import the Nathefah catalog Excel template.
+     *
+     * scope=categories - only sheet 01 (global, no vendor/branch needed)
+     * scope=services   - only sheet 02 (global, matched against existing categories)
+     * scope=full       - everything (categories/services/pieces/additional services),
+     *                     pieces+additional services created for vendor_id and linked
+     *                     to every branch in branch_ids
      *
      * POST /laundries/catalog-import
      */
@@ -24,20 +28,23 @@ class AdminLaundryCatalogImportController extends Controller
     {
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls'],
-            'vendor_id' => ['required', 'exists:vendors,id'],
-            'branch_ids' => ['required', 'array', 'min:1'],
+            'scope' => ['sometimes', 'in:categories,services,full'],
+            'vendor_id' => ['required_if:scope,full', 'nullable', 'exists:vendors,id'],
+            'branch_ids' => ['required_if:scope,full', 'nullable', 'array', 'min:1'],
             'branch_ids.*' => ['exists:branches,id'],
             'dry_run' => ['sometimes', 'boolean'],
         ]);
 
+        $scope = $validated['scope'] ?? 'full';
         $dryRun = $request->boolean('dry_run', false);
 
         try {
             $stats = $this->catalogImportService->import(
                 $validated['file']->getRealPath(),
-                (int) $validated['vendor_id'],
-                array_map('intval', $validated['branch_ids']),
-                $dryRun
+                isset($validated['vendor_id']) ? (int) $validated['vendor_id'] : null,
+                isset($validated['branch_ids']) ? array_map('intval', $validated['branch_ids']) : [],
+                $dryRun,
+                $scope
             );
         } catch (\Throwable $e) {
             return errorResponse($e->getMessage(), null, 422);

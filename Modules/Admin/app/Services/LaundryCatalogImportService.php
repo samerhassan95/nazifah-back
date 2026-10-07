@@ -17,11 +17,22 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  *   04_الإضافية         addon_id | اسم الخدمة الإضافية | السعر | طريقة الاحتساب | ملاحظات | الحالة
  *   05_ربط_الإضافية     service_addon_id | service_id | اسم الخدمة | addon_id | الخدمة الإضافية | الحالة
  *
- * Categories and services are global (shared by every laundry); a name match skips re-creating
- * them. Pieces and additional services are created under the given vendor_id; a name match (within
- * that vendor) skips re-creating them too. A piece name that repeats under several services in the
- * file (e.g. "بنطلون" under both "ملابس يومية" and "كوي بالبخار") is ONE piece attached to several
- * services, each with its own price - not several duplicate pieces.
+ * Categories and services are global (shared by every laundry) - the admin adds them once and
+ * each vendor then picks from that shared catalog, it's never duplicated per vendor. Pieces and
+ * additional services ARE vendor-scoped and only make sense together with the vendor/branch they
+ * belong to, so they only import under scope=full.
+ *
+ * Scopes:
+ *   'categories' - only sheet 01. No vendor_id/branch_ids needed.
+ *   'services'   - only sheet 02, matched against categories that already exist (by Arabic name);
+ *                  does not create new categories. No vendor_id/branch_ids needed.
+ *   'full'       - everything (sheets 01-05) plus linking pieces to the given branches.
+ *                  Requires vendor_id and branch_ids.
+ *
+ * A name match (global for categories/services, per-vendor for pieces/additional services) skips
+ * re-creating that row. A piece name that repeats under several services in the file (e.g. "بنطلون"
+ * under both "ملابس يومية" and "كوي بالبخار") is ONE piece attached to several services, each with
+ * its own price - not several duplicate pieces.
  */
 class LaundryCatalogImportService
 {
@@ -38,15 +49,30 @@ class LaundryCatalogImportService
     /**
      * @param  int[]  $branchIds
      */
-    public function import(string $filePath, int $vendorId, array $branchIds, bool $dryRun = true): array
-    {
+    public function import(
+        string $filePath,
+        ?int $vendorId,
+        array $branchIds,
+        bool $dryRun = true,
+        string $scope = 'full'
+    ): array {
         $spreadsheet = IOFactory::load($filePath);
 
-        $sections = $this->sheetRows($spreadsheet, self::SECTIONS_SHEET, 'section_id');
-        $servicesIn = $this->sheetRows($spreadsheet, self::SERVICES_SHEET, 'service_id');
-        $piecesIn = $this->sheetRows($spreadsheet, self::PIECES_SHEET, 'piece_id');
-        $addonsIn = $this->sheetRows($spreadsheet, self::ADDONS_SHEET, 'addon_id');
-        $addonLinksIn = $this->sheetRows($spreadsheet, self::ADDON_LINKS_SHEET, 'service_addon_id');
+        $sections = $scope === 'categories' || $scope === 'full'
+            ? $this->sheetRows($spreadsheet, self::SECTIONS_SHEET, 'section_id')
+            : [];
+        $servicesIn = $scope === 'services' || $scope === 'full'
+            ? $this->sheetRows($spreadsheet, self::SERVICES_SHEET, 'service_id')
+            : [];
+        $piecesIn = $scope === 'full'
+            ? $this->sheetRows($spreadsheet, self::PIECES_SHEET, 'piece_id')
+            : [];
+        $addonsIn = $scope === 'full'
+            ? $this->sheetRows($spreadsheet, self::ADDONS_SHEET, 'addon_id')
+            : [];
+        $addonLinksIn = $scope === 'full'
+            ? $this->sheetRows($spreadsheet, self::ADDON_LINKS_SHEET, 'service_addon_id')
+            : [];
 
         $stats = [
             'categories_created' => 0, 'categories_skipped' => 0,
@@ -61,11 +87,12 @@ class LaundryCatalogImportService
 
         $run = function () use (
             $sections, $servicesIn, $piecesIn, $addonsIn, $addonLinksIn,
-            $vendorId, $branchIds, &$stats, $dryRun
+            $vendorId, $branchIds, &$stats, $dryRun, $scope
         ) {
-            // ---- 1. Categories (global) ----
+            // ---- 1. Categories (global). Created only under scope categories/full. ----
             $existingCategories = Category::all()->keyBy(fn ($c) => trim($c->getTranslation('name', 'ar')));
             $categoryIdMap = [];
+            $canCreateCategories = $scope === 'categories' || $scope === 'full';
 
             foreach ($sections as $row) {
                 $name = trim((string) $row['اسم القسم']);
@@ -76,6 +103,10 @@ class LaundryCatalogImportService
                     $categoryIdMap[$row['section_id']] = $existingCategories[$name]->id;
                     $stats['categories_skipped']++;
 
+                    continue;
+                }
+
+                if (! $canCreateCategories) {
                     continue;
                 }
 
@@ -95,7 +126,8 @@ class LaundryCatalogImportService
                 $stats['categories_created']++;
             }
 
-            // ---- 2. Services (global) ----
+            // ---- 2. Services (global). Category is matched by name against EXISTING categories
+            // only (never created here) when scope is 'services' - categories are that tab's job. ----
             $existingServices = Service::all()->keyBy(fn ($s) => trim($s->getTranslation('service_name', 'ar')));
             $serviceIdMap = [];
 
@@ -112,6 +144,11 @@ class LaundryCatalogImportService
                 }
 
                 $catId = $categoryIdMap[$row['section_id']] ?? null;
+                if (! is_int($catId) && $scope === 'services') {
+                    // scope=services never creates categories; resolve purely from what already exists
+                    $sectionName = trim((string) ($row['القسم'] ?? ''));
+                    $catId = $existingCategories[$sectionName]->id ?? null;
+                }
 
                 if ($dryRun) {
                     $serviceIdMap[$row['service_id']] = 'NEW:'.$row['service_id'];
@@ -128,6 +165,10 @@ class LaundryCatalogImportService
                 ]);
                 $serviceIdMap[$row['service_id']] = $svc->id;
                 $stats['services_created']++;
+            }
+
+            if ($scope !== 'full') {
+                return;
             }
 
             // ---- 3. Addons / additional services (vendor-scoped) ----
