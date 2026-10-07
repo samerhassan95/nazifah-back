@@ -21,6 +21,7 @@ use Modules\Admin\Http\Controllers\AdminLaundryBankAccountController;
 use Modules\Admin\Http\Controllers\AdminLaundryBranchController;
 use Modules\Admin\Http\Controllers\AdminLaundryCategoryController;
 use Modules\Admin\Http\Controllers\AdminLaundryController;
+use Modules\Admin\Http\Controllers\AdminLaundryCatalogImportController;
 use Modules\Admin\Http\Controllers\AdminLaundryDriverController;
 use Modules\Admin\Http\Controllers\AdminLaundryOrderController;
 use Modules\Admin\Http\Controllers\AdminLaundryPieceController;
@@ -417,6 +418,9 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
 
     // Laundry Management Routes
     Route::prefix('laundries')->group(function () {
+        // Catalog Import (Excel: categories/services/pieces/additional services)
+        Route::post('catalog-import', [AdminLaundryCatalogImportController::class, 'import']);
+
         // Laundry Data
         Route::get('laundry_data', [AdminLaundryController::class, 'laundryData']);
 
