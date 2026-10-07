@@ -1162,7 +1162,7 @@ class OrderController extends Controller
                 'payment_status' => $order->fresh()->payment_status ?? 'pending',
                 'payment_status_label' => \App\Support\PaymentStatusPresenter::label($order->fresh()->payment_status ?? 'pending'),
             ], (int) $driver->id), app()->getLocale() === 'ar'
-                ? 'تم الوصول لموقع التسليم — في انتظار تأكيد العميل للاستلام'
+                ? 'تم الوصول — بانتظار العميل'
                 : 'At delivery location — waiting for client to confirm receipt');
         }
 

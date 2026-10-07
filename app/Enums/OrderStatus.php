@@ -94,7 +94,7 @@ enum OrderStatus: string
             self::DRIVER_DELIVERY_ASSIGNED => 'تم تعيين سائق التوصيل',
             self::DRIVER_DELIVERY_ACCEPTED => 'قبل سائق التوصيل',
             self::ON_WAY_TO_DELIVERY => 'في الطريق للتوصيل',
-            self::WAITING_CLIENT_RECEIPT => 'تم الوصول لموقع التسليم في انتظار استلام العميل',
+            self::WAITING_CLIENT_RECEIPT => 'تم الوصول — بانتظار العميل',
             self::DELIVERED => 'تم التوصيل',
             self::CLIENT_POSTPONED_PICKUP => 'أجل العميل موعد الاستلام',
             self::CLIENT_POSTPONED_DELIVERY => 'أجل العميل موعد التسليم',
