@@ -47,8 +47,10 @@ class AdminLaundryPieceController extends Controller
             $locale = app()->getLocale();
 
             // Get additional services directly associated with this piece
+            // (unique: the pivot has one row per branch, but the UI only needs the service once)
             $additionalServices = $piece->additionalServices()
                 ->get()
+                ->unique('id')
                 ->map(function ($service) use ($locale) {
                     return [
                         'id' => $service->id,
@@ -56,6 +58,7 @@ class AdminLaundryPieceController extends Controller
                         'icon_id' => $service->icon_id,
                     ];
                 })
+                ->values()
                 ->toArray();
 
             $branches = Branch::where('vendor_id', $vendorId)
@@ -159,8 +162,10 @@ class AdminLaundryPieceController extends Controller
 
         if ($vendorId) {
             // Get additional services directly associated with this piece
+            // (unique: the pivot has one row per branch, but the UI only needs the service once)
             $additionalServices = $piece->additionalServices()
                 ->get()
+                ->unique('id')
                 ->map(function ($service) {
                     return [
                         'id' => $service->id,
@@ -171,6 +176,7 @@ class AdminLaundryPieceController extends Controller
                         'icon_id' => $service->icon_id,
                     ];
                 })
+                ->values()
                 ->toArray();
 
             $branches = Branch::where('vendor_id', $vendorId)
@@ -419,8 +425,10 @@ class AdminLaundryPieceController extends Controller
 
         if ($vendorId) {
             // Get additional services directly associated with this piece
+            // (unique: the pivot has one row per branch, but the UI only needs the service once)
             $additionalServices = $piece->additionalServices()
                 ->get()
+                ->unique('id')
                 ->map(function ($service) {
                     return [
                         'id' => $service->id,
@@ -431,6 +439,7 @@ class AdminLaundryPieceController extends Controller
                         'icon_id' => $service->icon_id,
                     ];
                 })
+                ->values()
                 ->toArray();
 
             $branches = Branch::where('vendor_id', $vendorId)
