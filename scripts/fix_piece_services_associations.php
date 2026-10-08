@@ -108,10 +108,10 @@ echo "\n==================================================\n";
 echo "Would you like to fix the missing associations? (yes/no): ";
 $handle = fopen("php://stdin", "r");
 $line = fgets($handle);
-$answer = trim($line);
+$answer = strtolower(trim($line));
 fclose($handle);
 
-if (strtolower($answer) !== 'yes') {
+if ($answer !== 'yes' && $answer !== 'y') {
     echo "Exiting without making changes.\n";
     exit(0);
 }
