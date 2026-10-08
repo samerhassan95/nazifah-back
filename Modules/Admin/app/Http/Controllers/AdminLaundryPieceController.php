@@ -126,7 +126,7 @@ class AdminLaundryPieceController extends Controller
             'name' => $service->getTranslation('service_name', $locale),
         ]);
 
-        $additionalServices = ServiceAddition::where('vendor_id', $vendorId)->get()->map(fn ($addition) => [
+        $additionalServices = ServiceAddition::where('vendor_id', $vendorId)->where('is_active', true)->get()->map(fn ($addition) => [
             'id' => $addition->id,
             'name' => $addition->getTranslation('name', $locale),
         ]);
