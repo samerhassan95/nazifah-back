@@ -11,6 +11,7 @@ use Modules\Invoice\Services\Providers\HttpWhatsappGateway;
 use Modules\Invoice\Services\Providers\HttpZatcaGateway;
 use Modules\Invoice\Services\Providers\MockWhatsappGateway;
 use Modules\Invoice\Services\Providers\MockZatcaGateway;
+use Modules\Invoice\Services\Providers\TwilioWhatsappGateway;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -49,6 +50,7 @@ class InvoiceServiceProvider extends ServiceProvider
 
             return match ($settings->get('invoice_whatsapp_driver', 'mock')) {
                 'http' => new HttpWhatsappGateway($settings),
+                'twilio' => new TwilioWhatsappGateway($settings),
                 default => new MockWhatsappGateway,
             };
         });

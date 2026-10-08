@@ -54,13 +54,14 @@ class AdminInvoiceSettingController extends Controller
             'settings.invoice_zatca_api_key' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'settings.invoice_zatca_timeout' => ['sometimes', 'integer', 'min:1', 'max:120'],
             'settings.invoice_whatsapp_enabled' => ['sometimes', 'boolean'],
-            'settings.invoice_whatsapp_driver' => ['sometimes', 'string', 'in:http,mock'],
+            'settings.invoice_whatsapp_driver' => ['sometimes', 'string', 'in:http,twilio,mock'],
             'settings.invoice_whatsapp_base_url' => ['sometimes', 'nullable', 'url', 'max:500'],
             'settings.invoice_whatsapp_send_path' => ['sometimes', 'nullable', 'string', 'max:255'],
             'settings.invoice_whatsapp_api_key' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'settings.invoice_whatsapp_template' => ['sometimes', 'nullable', 'string', 'max:255'],
             'settings.invoice_whatsapp_sender' => ['sometimes', 'nullable', 'string', 'max:255'],
             'settings.invoice_whatsapp_timeout' => ['sometimes', 'integer', 'min:1', 'max:120'],
+            'settings.invoice_whatsapp_twilio_content_sid' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
         if ($validator->fails()) {

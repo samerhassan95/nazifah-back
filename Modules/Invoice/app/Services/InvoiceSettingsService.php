@@ -166,6 +166,17 @@ class InvoiceSettingsService
                 'type' => AdminSetting::TYPE_NUMBER,
                 'default' => (int) config('invoice.whatsapp.timeout', 20),
             ],
+            // Twilio Content SID (starts with "HX") for the approved invoice template.
+            // Separate from invoice_whatsapp_template (a plain name, used by the generic
+            // HTTP driver) because Twilio identifies templates by this SID, not a name.
+            // Each future template (a 2nd, 3rd notification type, ...) gets its own
+            // settings key the same way, mapped in TwilioWhatsappGateway's caller.
+            'invoice_whatsapp_twilio_content_sid' => [
+                'group' => self::GROUP_WHATSAPP,
+                'label' => 'Twilio Content SID (Invoice Template)',
+                'type' => AdminSetting::TYPE_TEXT,
+                'default' => null,
+            ],
         ];
     }
 
