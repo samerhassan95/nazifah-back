@@ -102,9 +102,6 @@
     <div class="checkout-container">
         <div class="topbar">
             <h1>{{ __('payment.complete_your_payment') }}</h1>
-            <svg class="back-arrow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M{{ app()->getLocale() === 'ar' ? '14 5l7 7-7 7M21 12H3' : '10 19l-7-7 7-7M3 12h18' }}" />
-            </svg>
         </div>
         <div class="topbar-spacer"></div>
 
@@ -128,14 +125,6 @@
             <div class="mysr-form"></div>
         </div>
 
-        <!-- Parked here until JS moves it inside the rendered card form, just above
-             its pay button (moyasar.js renders the whole form as one block, so this
-             is the only container we control ahead of time). -->
-        <label class="save-card-opt" style="display:none;align-items:center;gap:0.5rem;font-size:0.9rem;color:#374151;margin:0.75rem 0;">
-            <input type="checkbox" id="save-card-toggle">
-            <span>{{ app()->getLocale() === 'ar' ? 'احفظ البطاقة لاستخدامها في الدفع لاحقًا' : 'Save this card for future payments' }}</span>
-        </label>
-
         <div class="secure-badge">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -151,8 +140,6 @@
             var config = @json($moyasarConfig);
             var ua = navigator.userAgent || '';
             var isIos = /iP(hone|ad|od)/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            // Flutter WebView often hides the model ("Android 13; K") so SM-/SAMSUNG
-            // is missing. If the Service ID is present, let Moyasar show/hide the button.
 
             var methods = (config.methods || ['creditcard', 'stcpay']).filter(function (method) {
                 if (method === 'applepay') return isIos;
@@ -175,6 +162,10 @@
                 supported_networks: config.supported_networks || ['mada', 'visa', 'mastercard']
             };
 
+            if (methods.indexOf('creditcard') !== -1) {
+                init.credit_card = { save_card: true };
+            }
+
             if (config.invoice_id) {
                 init.invoice_id = config.invoice_id;
             }
@@ -184,69 +175,8 @@
             if (config.apple_pay && methods.indexOf('applepay') !== -1) {
                 init.apple_pay = config.apple_pay;
             }
-            var saveToggle = document.getElementById('save-card-toggle');
-            var saveWrap = document.querySelector('.save-card-opt');
-            var canSaveCard = methods.indexOf('creditcard') !== -1;
 
-            // Moyasar renders the whole card form (fields + its own pay button) as one
-            // block into .mysr-form, so there is no mount point of our own between the
-            // CVC field and the pay button. Instead: park the checkbox outside .mysr-form
-            // (so clearing it on re-render never destroys it), then once Moyasar has
-            // rendered, move the checkbox into the form, just above its pay button
-            // (the last <button> — the card form's submit button renders after STC Pay's).
-            function placeCheckboxAboveSubmit() {
-                if (!canSaveCard || !saveWrap) return false;
-                var formEl = document.querySelector('.mysr-form');
-                if (!formEl) return false;
-                var buttons = formEl.querySelectorAll('button');
-                var submitBtn = buttons.length ? buttons[buttons.length - 1] : null;
-                if (!submitBtn || !submitBtn.parentNode) return false;
-                submitBtn.parentNode.insertBefore(saveWrap, submitBtn);
-                saveWrap.style.display = 'flex';
-                return true;
-            }
-
-            function renderForm() {
-                // Detach the checkbox first so removing the old form node doesn't delete it.
-                document.body.appendChild(saveWrap);
-
-                // Replace (not just clear) the container: re-calling Moyasar.init() on the
-                // SAME node left its "card will be saved" notice showing even after a later
-                // init without credit_card.save_card — some internal state survived innerHTML
-                // being cleared. A brand-new node for every render avoids that entirely.
-                var oldFormEl = document.querySelector('.mysr-form');
-                var formEl = document.createElement('div');
-                formEl.className = 'mysr-form';
-                oldFormEl.parentNode.replaceChild(formEl, oldFormEl);
-
-                var cfg = Object.assign({}, init);
-                if (canSaveCard && saveToggle && saveToggle.checked) {
-                    cfg.credit_card = { save_card: true };
-                }
-                Moyasar.init(cfg);
-
-                if (canSaveCard) {
-                    var attempts = 0;
-                    var observer = new MutationObserver(function (_mutations, obs) {
-                        if (placeCheckboxAboveSubmit() || ++attempts > 40) {
-                            obs.disconnect();
-                        }
-                    });
-                    observer.observe(formEl, { childList: true, subtree: true });
-                    // Fallback in case Moyasar renders without triggering further
-                    // mutations the observer catches in time.
-                    setTimeout(function () {
-                        placeCheckboxAboveSubmit();
-                        observer.disconnect();
-                    }, 2000);
-                }
-            }
-
-            if (canSaveCard && saveToggle) {
-                saveToggle.addEventListener('change', renderForm);
-            }
-
-            renderForm();
+            Moyasar.init(init);
         });
     </script>
 </body>
