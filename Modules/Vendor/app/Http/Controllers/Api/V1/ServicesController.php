@@ -211,7 +211,8 @@ class ServicesController extends Controller
 
         $services = Service::where('services.is_active', true)
             ->whereHas('vendors', function ($q) use ($vendorId) {
-                $q->where('vendors.id', $vendorId);
+                $q->where('vendors.id', $vendorId)
+                    ->where('vendor_service.is_active', true);
             })
             ->with(['vendors' => function ($q) use ($vendorId) {
                 $q->where('vendors.id', $vendorId)
