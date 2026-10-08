@@ -102,9 +102,6 @@
     <div class="checkout-container">
         <div class="topbar">
             <h1>{{ __('payment.complete_your_payment') }}</h1>
-            <svg class="back-arrow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M{{ app()->getLocale() === 'ar' ? '14 5l7 7-7 7M21 12H3' : '10 19l-7-7 7-7M3 12h18' }}" />
-            </svg>
         </div>
         <div class="topbar-spacer"></div>
 
@@ -228,15 +225,49 @@
                 if (canSaveCard) {
                     var attempts = 0;
                     var observer = new MutationObserver(function (_mutations, obs) {
-                        if (placeCheckboxAboveSubmit() || ++attempts > 40) {
+                        var placed = placeCheckboxAboveSubmit();
+
+                        // If checkbox is NOT checked, find and hide any Moyasar internal
+                        // "card will be saved" notice. Moyasar renders it as a <p> or small
+                        // element containing keywords like "save" / "حفظ" / "saved" at the
+                        // bottom of the form — hide it via inline style.
+                        if (!saveToggle || !saveToggle.checked) {
+                            var formEl2 = document.querySelector('.mysr-form');
+                            if (formEl2) {
+                                formEl2.querySelectorAll('p, small, span, div').forEach(function (el) {
+                                    var txt = (el.innerText || '').toLowerCase();
+                                    if (
+                                        (txt.indexOf('save') !== -1 || txt.indexOf('حفظ') !== -1 || txt.indexOf('saved') !== -1 || txt.indexOf('بيانات') !== -1) &&
+                                        el.children.length === 0
+                                    ) {
+                                        el.style.display = 'none';
+                                    }
+                                });
+                            }
+                        }
+
+                        if ((placed || !canSaveCard) && ++attempts > 40) {
                             obs.disconnect();
                         }
                     });
                     observer.observe(formEl, { childList: true, subtree: true });
-                    // Fallback in case Moyasar renders without triggering further
-                    // mutations the observer catches in time.
                     setTimeout(function () {
                         placeCheckboxAboveSubmit();
+                        // Final sweep after Moyasar finishes rendering
+                        if (!saveToggle || !saveToggle.checked) {
+                            var formEl3 = document.querySelector('.mysr-form');
+                            if (formEl3) {
+                                formEl3.querySelectorAll('p, small, span, div').forEach(function (el) {
+                                    var txt = (el.innerText || '').toLowerCase();
+                                    if (
+                                        (txt.indexOf('save') !== -1 || txt.indexOf('حفظ') !== -1 || txt.indexOf('saved') !== -1 || txt.indexOf('بيانات') !== -1) &&
+                                        el.children.length === 0
+                                    ) {
+                                        el.style.display = 'none';
+                                    }
+                                });
+                            }
+                        }
                         observer.disconnect();
                     }, 2000);
                 }
