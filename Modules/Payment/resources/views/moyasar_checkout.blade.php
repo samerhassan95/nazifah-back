@@ -207,10 +207,18 @@
             }
 
             function renderForm() {
-                var formEl = document.querySelector('.mysr-form');
-                // Detach the checkbox first so clearing the form's HTML doesn't delete it.
+                // Detach the checkbox first so removing the old form node doesn't delete it.
                 document.body.appendChild(saveWrap);
-                formEl.innerHTML = '';
+
+                // Replace (not just clear) the container: re-calling Moyasar.init() on the
+                // SAME node left its "card will be saved" notice showing even after a later
+                // init without credit_card.save_card — some internal state survived innerHTML
+                // being cleared. A brand-new node for every render avoids that entirely.
+                var oldFormEl = document.querySelector('.mysr-form');
+                var formEl = document.createElement('div');
+                formEl.className = 'mysr-form';
+                oldFormEl.parentNode.replaceChild(formEl, oldFormEl);
+
                 var cfg = Object.assign({}, init);
                 if (canSaveCard && saveToggle && saveToggle.checked) {
                     cfg.credit_card = { save_card: true };
