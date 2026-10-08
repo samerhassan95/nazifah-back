@@ -239,7 +239,6 @@ class FinanceController extends Controller
                 'payment_transactions.id',
                 'payment_transactions.transaction_id as transaction_number',
                 'clients.full_name as customer_name',
-                'orders.order_number',
                 'branches.name',
                 'vendors.name as vendor_name',
                 'orders.created_at as transaction_date',
@@ -276,9 +275,8 @@ class FinanceController extends Controller
 
                 return [
                     'id' => $transaction->id,
-                    'transaction_number' => '#'.$transaction->transaction_number,
+                    'transaction_number' => $transaction->transaction_number,
                     'customer_name' => $customerName,
-                    'order_number' => '#'.$transaction->order_number,
                     'laundry_branch' => $vendorName.' - '.$branchName,
                     'transaction_date' => Carbon::parse($transaction->transaction_date)->format('Y-m-d'),
                     'total_amount' => [
