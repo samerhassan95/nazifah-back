@@ -231,10 +231,12 @@
                         // "card will be saved" notice. Moyasar renders it as a <p> or small
                         // element containing keywords like "save" / "حفظ" / "saved" at the
                         // bottom of the form — hide it via inline style.
+                        // IMPORTANT: skip elements that belong to our own save-card-opt label.
                         if (!saveToggle || !saveToggle.checked) {
                             var formEl2 = document.querySelector('.mysr-form');
                             if (formEl2) {
                                 formEl2.querySelectorAll('p, small, span, div').forEach(function (el) {
+                                    if (saveWrap && saveWrap.contains(el)) return; // skip our own label
                                     var txt = (el.innerText || '').toLowerCase();
                                     if (
                                         (txt.indexOf('save') !== -1 || txt.indexOf('حفظ') !== -1 || txt.indexOf('saved') !== -1 || txt.indexOf('بيانات') !== -1) &&
@@ -258,6 +260,7 @@
                             var formEl3 = document.querySelector('.mysr-form');
                             if (formEl3) {
                                 formEl3.querySelectorAll('p, small, span, div').forEach(function (el) {
+                                    if (saveWrap && saveWrap.contains(el)) return; // skip our own label
                                     var txt = (el.innerText || '').toLowerCase();
                                     if (
                                         (txt.indexOf('save') !== -1 || txt.indexOf('حفظ') !== -1 || txt.indexOf('saved') !== -1 || txt.indexOf('بيانات') !== -1) &&
