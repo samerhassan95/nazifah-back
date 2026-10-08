@@ -36,7 +36,7 @@ class AdminLaundryServiceController extends Controller
     {
         $vendorId = $request->input('vendor_id');
         $branchId = $request->input('branch_id');
-        $scope = $request->input('scope');
+        $scope    = $request->input('scope');
 
         $query = Service::with(['category']);
 
@@ -52,22 +52,37 @@ class AdminLaundryServiceController extends Controller
 
         $services = $query->paginate($request->input('per_page', 15));
 
-        $locale = app()->getLocale();
+        $locale          = app()->getLocale();
         $vendorBranchIds = $vendorId ? Branch::where('vendor_id', $vendorId)->pluck('id')->all() : [];
 
-        $servicesData = $services->getCollection()->map(function ($service) use ($vendorId, $locale, $vendorBranchIds, $scope) {
+        // Pre-compute ratings for all services in one query to avoid N+1 avg() calls.
+        $ratingsMap = [];
+        if ($vendorId && ! empty($vendorBranchIds)) {
+            $serviceIds = $services->getCollection()->pluck('id')->all();
+            $ratingsMap = Order::query()
+                ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->whereIn('orders.branch_id', $vendorBranchIds)
+                ->whereIn('order_items.service_id', $serviceIds)
+                ->whereNotNull('orders.rating')
+                ->groupBy('order_items.service_id')
+                ->selectRaw('order_items.service_id, AVG(orders.rating) as avg_rating')
+                ->pluck('avg_rating', 'service_id')
+                ->all();
+        }
+
+        $servicesData = $services->getCollection()->map(function ($service) use ($vendorId, $locale, $vendorBranchIds, $scope, $ratingsMap) {
             if ($vendorId) {
-                return $this->formatVendorService($service, (int) $vendorId, $locale, $vendorBranchIds, $scope === 'available');
+                return $this->formatVendorService($service, (int) $vendorId, $locale, $vendorBranchIds, $scope === 'available', $ratingsMap);
             }
 
             return [
-                'id' => $service->id,
-                'category_id' => $service->category_id,
-                'icon' => $this->uploadFilesService->getFullUrl($service->iconRelation?->full_path ?? $service->iconRelation?->path),
-                'Service_name' => $service->getTranslation('service_name', $locale),
+                'id'                  => $service->id,
+                'category_id'         => $service->category_id,
+                'icon'                => $this->uploadFilesService->getFullUrl($service->iconRelation?->full_path ?? $service->iconRelation?->path),
+                'Service_name'        => $service->getTranslation('service_name', $locale),
                 'Service_description' => $service->getTranslation('description', $locale),
-                'Category' => $service->category ? $service->category->getTranslation('name', $locale) : null,
-                'is_active' => (bool) $service->is_active,
+                'Category'            => $service->category ? $service->category->getTranslation('name', $locale) : null,
+                'is_active'           => (bool) $service->is_active,
             ];
         });
 
@@ -75,6 +90,7 @@ class AdminLaundryServiceController extends Controller
 
         return successResponse($services, __('vendor.services_retrieved_successfully'));
     }
+
 
     /**
      * Get single service
@@ -206,10 +222,10 @@ class AdminLaundryServiceController extends Controller
             return notFoundResponse(__('service.not_found'));
         }
 
-        $branchIds = Branch::where('vendor_id', $vendorId)->pluck('id')->all();
-
+        // Pass empty branchIds to skip the heavy Order avg(rating) query —
+        // rating is not needed for a toggle response and causes noticeable latency.
         return successResponse(
-            $this->formatVendorService($service, $vendorId, app()->getLocale(), $branchIds),
+            $this->formatVendorService($service, $vendorId, app()->getLocale(), []),
             __('service.updated_successfully')
         );
     }
@@ -286,28 +302,33 @@ class AdminLaundryServiceController extends Controller
      * A service as one laundry sees it: the laundry's own name/description/icon when it
      * overrides them, otherwise the catalog values, plus its active flags and rating.
      */
-    private function formatVendorService(Service $service, int $vendorId, string $locale, array $branchIds, bool $availableOnly = false): array
+    private function formatVendorService(Service $service, int $vendorId, string $locale, array $branchIds, bool $availableOnly = false, array $ratingsMap = []): array
     {
-        $iconId = ServiceVendorOffering::iconIdForVendor($vendorId, $service);
-        $icon = $iconId ? Icon::find($iconId) : null;
+        $iconId   = ServiceVendorOffering::iconIdForVendor($vendorId, $service);
+        $icon     = $iconId ? Icon::find($iconId) : null;
         $iconPath = $icon ? ($icon->full_path ?? $icon->path) : ($service->iconRelation?->full_path ?? $service->iconRelation?->path);
 
-        $rating = empty($branchIds) ? 0 : (Order::whereHas('items.service', fn ($q) => $q->where('services.id', $service->id))
-            ->whereIn('branch_id', $branchIds)
-            ->whereNotNull('rating')
-            ->avg('rating') ?? 0);
+        // Use precomputed rating if available, otherwise query (fallback for single-service endpoints).
+        if (array_key_exists($service->id, $ratingsMap)) {
+            $rating = $ratingsMap[$service->id] ?? 0;
+        } else {
+            $rating = empty($branchIds) ? 0 : (Order::whereHas('items.service', fn ($q) => $q->where('services.id', $service->id))
+                ->whereIn('branch_id', $branchIds)
+                ->whereNotNull('rating')
+                ->avg('rating') ?? 0);
+        }
 
         return array_merge([
-            'id' => $service->id,
-            'category_id' => $service->category_id,
-            'icon' => $this->uploadFilesService->getFullUrl($iconPath),
-            'Service_name' => ServiceVendorOffering::displayNameForVendor($service, $vendorId, $locale),
+            'id'                  => $service->id,
+            'category_id'         => $service->category_id,
+            'icon'                => $this->uploadFilesService->getFullUrl($iconPath),
+            'Service_name'        => ServiceVendorOffering::displayNameForVendor($service, $vendorId, $locale),
             'Service_description' => ServiceVendorOffering::descriptionForVendor($service, $vendorId, $locale),
-            'Category' => $service->category ? $service->category->getTranslation('name', $locale) : null,
-            'rating' => round((float) $rating, 2),
-            'vendor_id' => $vendorId,
-            'in_vendor_catalog' => ServiceVendorOffering::find($vendorId, $service->id) !== null,
-            'source' => $availableOnly ? 'available_for_vendor' : 'vendor_catalog',
+            'Category'            => $service->category ? $service->category->getTranslation('name', $locale) : null,
+            'rating'              => round((float) $rating, 2),
+            'vendor_id'           => $vendorId,
+            'in_vendor_catalog'   => ServiceVendorOffering::find($vendorId, $service->id) !== null,
+            'source'              => $availableOnly ? 'available_for_vendor' : 'vendor_catalog',
         ], CatalogActivePresenter::service($service, null, null, $vendorId));
     }
 
