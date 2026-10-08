@@ -125,12 +125,16 @@
 
         <!-- The Moyasar Form Container -->
         <div class="mysr-form-wrap">
-            <label class="save-card-opt" style="display:none;align-items:center;gap:0.5rem;font-size:0.9rem;color:#374151;margin-bottom:1rem;">
-                <input type="checkbox" id="save-card-toggle">
-                <span>{{ app()->getLocale() === 'ar' ? 'احفظ البطاقة لاستخدامها في الدفع لاحقًا' : 'Save this card for future payments' }}</span>
-            </label>
             <div class="mysr-form"></div>
         </div>
+
+        <!-- Parked here until JS moves it inside the rendered card form, just above
+             its pay button (moyasar.js renders the whole form as one block, so this
+             is the only container we control ahead of time). -->
+        <label class="save-card-opt" style="display:none;align-items:center;gap:0.5rem;font-size:0.9rem;color:#374151;margin:0.75rem 0;">
+            <input type="checkbox" id="save-card-toggle">
+            <span>{{ app()->getLocale() === 'ar' ? 'احفظ البطاقة لاستخدامها في الدفع لاحقًا' : 'Save this card for future payments' }}</span>
+        </label>
 
         <div class="secure-badge">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -184,18 +188,53 @@
             var saveWrap = document.querySelector('.save-card-opt');
             var canSaveCard = methods.indexOf('creditcard') !== -1;
 
+            // Moyasar renders the whole card form (fields + its own pay button) as one
+            // block into .mysr-form, so there is no mount point of our own between the
+            // CVC field and the pay button. Instead: park the checkbox outside .mysr-form
+            // (so clearing it on re-render never destroys it), then once Moyasar has
+            // rendered, move the checkbox into the form, just above its pay button
+            // (the last <button> — the card form's submit button renders after STC Pay's).
+            function placeCheckboxAboveSubmit() {
+                if (!canSaveCard || !saveWrap) return false;
+                var formEl = document.querySelector('.mysr-form');
+                if (!formEl) return false;
+                var buttons = formEl.querySelectorAll('button');
+                var submitBtn = buttons.length ? buttons[buttons.length - 1] : null;
+                if (!submitBtn || !submitBtn.parentNode) return false;
+                submitBtn.parentNode.insertBefore(saveWrap, submitBtn);
+                saveWrap.style.display = 'flex';
+                return true;
+            }
+
             function renderForm() {
                 var formEl = document.querySelector('.mysr-form');
+                // Detach the checkbox first so clearing the form's HTML doesn't delete it.
+                document.body.appendChild(saveWrap);
                 formEl.innerHTML = '';
                 var cfg = Object.assign({}, init);
                 if (canSaveCard && saveToggle && saveToggle.checked) {
                     cfg.credit_card = { save_card: true };
                 }
                 Moyasar.init(cfg);
+
+                if (canSaveCard) {
+                    var attempts = 0;
+                    var observer = new MutationObserver(function (_mutations, obs) {
+                        if (placeCheckboxAboveSubmit() || ++attempts > 40) {
+                            obs.disconnect();
+                        }
+                    });
+                    observer.observe(formEl, { childList: true, subtree: true });
+                    // Fallback in case Moyasar renders without triggering further
+                    // mutations the observer catches in time.
+                    setTimeout(function () {
+                        placeCheckboxAboveSubmit();
+                        observer.disconnect();
+                    }, 2000);
+                }
             }
 
-            if (canSaveCard && saveWrap) {
-                saveWrap.style.display = 'flex';
+            if (canSaveCard && saveToggle) {
                 saveToggle.addEventListener('change', renderForm);
             }
 
