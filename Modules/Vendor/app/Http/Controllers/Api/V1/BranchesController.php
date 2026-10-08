@@ -924,41 +924,42 @@ class BranchesController extends Controller
             return notFoundResponse(__('branch.branch_not_found'));
         }
 
-        // Get only pieces that are assigned to this branch
-        $branchServiceIds = $branch->services()->pluck('services.id');
+        $locale = app()->getLocale();
 
-        $pieces = $branch->pieces()
-            ->with(['services' => function ($q) use ($branchServiceIds) {
-                $q->whereIn('services.id', $branchServiceIds)
-                    ->where('services.is_active', true);
-            }])
+        // Get active pieces for this branch
+        $pieces = $branch->activePieces()
             ->get()
-            ->map(function ($piece) use ($branchId) {
-                $locale = app()->getLocale();
+            ->map(function ($piece) use ($branchId, $locale) {
+                // Get services for this piece at this branch
+                $services = $piece->services()
+                    ->where('service_piece.branch_id', $branchId)
+                    ->where('services.is_active', true)
+                    ->get();
+
+                $servicesFormatted = collect(\Modules\Piece\Support\PiecePricingFormatter::mapServicesWithPrices(
+                    $services,
+                    $piece,
+                    $branchId,
+                    $locale
+                ));
+
                 $additionalServices = \Modules\Piece\Support\PiecePricingFormatter::additionalServicesForPiece(
                     $piece,
                     $branchId,
                     $locale
                 );
 
-                $services = collect(\Modules\Piece\Support\PiecePricingFormatter::mapServicesWithPrices(
-                    $piece->services,
-                    $piece,
-                    $branchId,
-                    app()->getLocale()
-                ));
-
                 $pieceFields = \Modules\Piece\Support\PieceBranchOffering::branchApiFields(
                     $piece,
                     (int) $branchId,
-                    app()->getLocale()
+                    $locale
                 );
 
                 return array_merge($pieceFields, [
                     'piece_id' => $piece->id,
                     'icon' => $piece->iconRelation?->full_path,
                     'rating' => 0,
-                    'services' => $services,
+                    'services' => $servicesFormatted,
                     'additional_services' => $additionalServices,
                 ]);
             });
