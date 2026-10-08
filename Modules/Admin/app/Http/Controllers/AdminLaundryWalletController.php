@@ -67,7 +67,7 @@ class AdminLaundryWalletController extends Controller
         // table. Despite the key name (kept for frontend compatibility) this is not withdrawal
         // history: it's every payment transaction on an order handled by one of this vendor's
         // branches, which is what the table's columns (branch, order number, payment method) need.
-        $withdrawalOrdersLogPaginator = PaymentTransaction::with(['order.branch'])
+        $withdrawalOrdersLogPaginator = PaymentTransaction::with(['order.user', 'order.branch'])
             ->whereHas('order', fn ($q) => $q->whereIn('branch_id', $branchIds))
             ->orderBy('created_at', 'desc')
             ->paginate($request->input('per_page', 15));
@@ -77,8 +77,9 @@ class AdminLaundryWalletController extends Controller
             $processedAt = $transaction->paid_at ?? $transaction->created_at;
 
             return [
-                'process_number' => $transaction->transaction_id,
-                'client_name' => $order?->branch ? $order->branch->getTranslation('name', $lang) : null,
+                'process_number' => $transaction->transaction_id ?? ('TXN-' . $transaction->id),
+                'client_name' => $order?->user ? $order->user->name : ($order?->user?->phone ?? 'N/A'),
+                'branch_name' => $order?->branch ? $order->branch->getTranslation('name', $lang) : null,
                 'request_number' => $order?->order_number,
                 'process_date' => $processedAt ? $processedAt->format('Y-m-d') : null,
                 'total_price' => (float) $transaction->amount,
