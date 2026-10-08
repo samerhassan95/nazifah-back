@@ -47,16 +47,18 @@ class AdminLaundryCategoryController extends Controller
                 ->pluck('category_id')
                 ->unique();
 
-            // Get categories with their services for this vendor
-            $categories = Category::whereIn('id', $categoryIds)
+            // Get categories with their services for this vendor (only active categories)
+            $categories = Category::where('is_active', true)
+                ->whereIn('id', $categoryIds)
                 ->with(['services' => function ($query) use ($vendorServiceIds) {
                     $query->whereIn('services.id', $vendorServiceIds);
                 }, 'iconRelation'])
-                ->paginate($request->input('per_page', 15));
+                ->paginate($request->input('per_page', 100));
         } else {
-            // Get all categories
-            $categories = Category::with(['services', 'iconRelation'])
-                ->paginate($request->input('per_page', 15));
+            // Get all active categories
+            $categories = Category::where('is_active', true)
+                ->with(['services', 'iconRelation'])
+                ->paginate($request->input('per_page', 100));
         }
 
         $categoriesData = $categories->getCollection()->map(function ($category) {
