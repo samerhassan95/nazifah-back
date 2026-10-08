@@ -56,6 +56,7 @@ class ServicesController extends Controller
             return notFoundResponse(__('branch.branch_not_found_or_not_yours'));
         }
 
+        // Return system catalog services NOT yet in this vendor's catalog
         return successResponse(
             $this->mapSystemCatalogServices($vendorId),
             __('service.available_services_retrieved')
