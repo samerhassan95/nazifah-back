@@ -454,7 +454,22 @@ class AdminLaundryBranchController extends Controller
             'Phone' => $driver->phone,
         ]);
 
-        $services = $branch->services()->where('services.is_active', true)->get()->map(function ($service) use ($branch) {
+        // Same "actually orderable here" rule OrderCatalogAvailabilityService uses: the
+        // service must be active globally, active for this vendor (vendor_service), and
+        // active for this specific branch (branch_service) — checking only services.is_active
+        // let a service the laundry had turned off (vendor_service.is_active = false) still
+        // show up in every one of its branches.
+        $services = $branch->services()
+            ->where('services.is_active', true)
+            ->where('branch_service.is_active', true)
+            ->whereExists(function ($query) use ($branch) {
+                $query->select(DB::raw(1))
+                    ->from('vendor_service')
+                    ->whereColumn('vendor_service.service_id', 'services.id')
+                    ->where('vendor_service.vendor_id', $branch->vendor_id)
+                    ->where('vendor_service.is_active', true);
+            })
+            ->get()->map(function ($service) use ($branch) {
             $rating = Order::whereHas('items.service', function ($q) use ($service) {
                 $q->where('services.id', $service->id);
             })->where('branch_id', $branch->id)->whereNotNull('rating')->avg('rating') ?? 0;
