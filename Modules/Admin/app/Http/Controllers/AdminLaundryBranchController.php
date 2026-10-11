@@ -39,12 +39,12 @@ class AdminLaundryBranchController extends Controller
         $lang = app()->getLocale();
 
         if (! $vendorId) {
-            return errorResponse('Vendor ID is required', null, 400);
+            return errorResponse(__('admin.vendor_id_required'), null, 400);
         }
 
         $vendor = Vendor::find($vendorId);
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         $branches = Branch::where('vendor_id', $vendorId)
@@ -90,7 +90,7 @@ class AdminLaundryBranchController extends Controller
                 'current_page' => $branches->currentPage(),
                 'last_page' => $branches->lastPage(),
             ],
-        ], 'Branches retrieved successfully');
+        ], __('admin.branches_retrieved'));
     }
 
     /**
@@ -187,7 +187,7 @@ class AdminLaundryBranchController extends Controller
 
         $branch->save();
 
-        return successResponse($this->formatBranch($branch->load('vendor')), 'Branch created successfully', 201);
+        return successResponse($this->formatBranch($branch->load('vendor')), __('admin.branch_created'), 201);
     }
 
     /**
@@ -199,10 +199,10 @@ class AdminLaundryBranchController extends Controller
         $branch = Branch::with('vendor')->find($id);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
-        return successResponse($this->formatBranch($branch), 'Branch retrieved successfully');
+        return successResponse($this->formatBranch($branch), __('admin.branch_retrieved'));
     }
 
     /**
@@ -213,7 +213,7 @@ class AdminLaundryBranchController extends Controller
     {
         $branch = Branch::find($id);
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         // Normalize input fields before validation
@@ -273,7 +273,7 @@ class AdminLaundryBranchController extends Controller
             $branchAddress = $this->resolveBranchAddress($validated['address'] ?? []);
             if ($branchAddress === '') {
                 return validationErrorResponse([
-                    'address' => ['A branch address is required.'],
+                    'address' => [__('admin.branch_address_required')],
                 ]);
             }
             $branch->setTranslation('location', 'ar', $branchAddress);
@@ -333,7 +333,7 @@ class AdminLaundryBranchController extends Controller
 
         $branch->save();
 
-        return successResponse($this->formatBranch($branch->load('vendor')), 'Branch updated successfully');
+        return successResponse($this->formatBranch($branch->load('vendor')), __('admin.branch_updated'));
     }
 
     /**
@@ -344,7 +344,7 @@ class AdminLaundryBranchController extends Controller
     {
         $branch = Branch::find($id);
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $branch->is_active = ! $branch->is_active;
@@ -353,7 +353,7 @@ class AdminLaundryBranchController extends Controller
         return successResponse([
             'id' => $branch->id,
             'is_active' => $branch->is_active,
-        ], 'Branch status toggled successfully');
+        ], __('admin.branch_status_updated'));
     }
 
     /**
@@ -364,17 +364,17 @@ class AdminLaundryBranchController extends Controller
     {
         $branch = Branch::find($id);
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         // Optional: Check for existing orders before deleting
         if ($branch->orders()->exists()) {
-            return errorResponse('Cannot delete branch with existing orders. Deactivate it instead.', null, 400);
+            return errorResponse(__('admin.branch_cannot_delete_has_orders'), null, 400);
         }
 
         $branch->delete();
 
-        return successResponse(null, 'Branch deleted successfully');
+        return successResponse(null, __('admin.branch_deleted'));
     }
 
     /**
@@ -385,13 +385,13 @@ class AdminLaundryBranchController extends Controller
     {
         $branch = Branch::with('workingHourShifts')->find($id);
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         return successResponse([
             'branch_id' => $branch->id,
             'working_hours' => $branch->getApiWorkingHours(),
-        ], 'Working hours retrieved successfully');
+        ], __('admin.branch_working_hours_retrieved'));
     }
 
     /**
@@ -402,7 +402,7 @@ class AdminLaundryBranchController extends Controller
     {
         $branch = Branch::find($id);
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $validated = $request->validate([
@@ -420,7 +420,7 @@ class AdminLaundryBranchController extends Controller
         return successResponse([
             'branch_id' => $branch->id,
             'working_hours' => $branch->getApiWorkingHours(),
-        ], 'Working hours updated successfully');
+        ], __('admin.branch_working_hours_updated'));
     }
 
     /**
@@ -434,7 +434,7 @@ class AdminLaundryBranchController extends Controller
     {
         $branch = Branch::with('vendor')->find($id);
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $locale = app()->getLocale();
@@ -522,7 +522,7 @@ class AdminLaundryBranchController extends Controller
             'services' => $services,
             'pieces' => $pieces,
             'additional_services' => $additionalServices,
-        ], 'Branch detail retrieved successfully');
+        ], __('admin.branch_detail_retrieved'));
     }
 
     /**
@@ -635,7 +635,7 @@ class AdminLaundryBranchController extends Controller
     {
         $branch = Branch::find($id);
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $validated = $request->validate([
@@ -669,7 +669,7 @@ class AdminLaundryBranchController extends Controller
 
         return successResponse(
             null,
-            'Services assigned to branch successfully'
+            __('admin.branch_services_assigned')
         );
     }
 
@@ -681,7 +681,7 @@ class AdminLaundryBranchController extends Controller
     {
         $branch = Branch::find($id);
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $validated = $request->validate([
@@ -701,7 +701,7 @@ class AdminLaundryBranchController extends Controller
                 ->first();
 
             if (! $addition) {
-                return errorResponse("Additional service ID {$additionId} does not belong to vendor {$branch->vendor_id}", null, 422);
+                return errorResponse(__('admin.additional_service_vendor_mismatch', ['id' => $additionId, 'vendor_id' => $branch->vendor_id]), null, 422);
             }
 
             ServiceAdditionBranchOffering::upsert($branch->id, $addition, [
@@ -711,7 +711,7 @@ class AdminLaundryBranchController extends Controller
 
         return successResponse(
             null,
-            'Additional services assigned to branch successfully'
+            __('admin.branch_additional_services_assigned')
         );
     }
 
@@ -723,7 +723,7 @@ class AdminLaundryBranchController extends Controller
     {
         $branch = Branch::find($id);
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $validated = $request->validate([
@@ -746,7 +746,7 @@ class AdminLaundryBranchController extends Controller
                 ->first();
 
             if (! $piece) {
-                return errorResponse("Piece ID {$pieceId} does not belong to vendor {$branch->vendor_id}", null, 422);
+                return errorResponse(__('admin.piece_vendor_mismatch', ['id' => $pieceId, 'vendor_id' => $branch->vendor_id]), null, 422);
             }
 
             if (! empty($item['services'])) {
@@ -782,7 +782,7 @@ class AdminLaundryBranchController extends Controller
 
         return successResponse(
             null,
-            'Pieces pricing assigned to branch successfully'
+            __('admin.branch_pieces_assigned')
         );
     }
 }

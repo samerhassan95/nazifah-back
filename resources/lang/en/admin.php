@@ -89,6 +89,17 @@ return [
     'branch_not_found' => 'Branch not found',
     'branch_status_updated' => 'Branch status updated successfully',
     'branch_statistics_retrieved' => 'Branch statistics retrieved successfully',
+    'vendor_id_required' => 'Vendor ID is required',
+    'branch_address_required' => 'A branch address is required.',
+    'branch_cannot_delete_has_orders' => 'Cannot delete branch with existing orders. Deactivate it instead.',
+    'branch_working_hours_retrieved' => 'Working hours retrieved successfully',
+    'branch_working_hours_updated' => 'Working hours updated successfully',
+    'branch_detail_retrieved' => 'Branch detail retrieved successfully',
+    'branch_services_assigned' => 'Services assigned to branch successfully',
+    'branch_additional_services_assigned' => 'Additional services assigned to branch successfully',
+    'branch_pieces_assigned' => 'Pieces pricing assigned to branch successfully',
+    'additional_service_vendor_mismatch' => 'Additional service ID :id does not belong to vendor :vendor_id',
+    'piece_vendor_mismatch' => 'Piece ID :id does not belong to vendor :vendor_id',
 
     // Ad messages
     'ads_retrieved' => 'Ads retrieved successfully',

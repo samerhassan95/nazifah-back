@@ -89,6 +89,17 @@ return [
     'branch_not_found' => 'الفرع غير موجود',
     'branch_status_updated' => 'تم تحديث حالة الفرع بنجاح',
     'branch_statistics_retrieved' => 'تم استرجاع إحصائيات الفروع بنجاح',
+    'vendor_id_required' => 'معرّف المغسلة مطلوب',
+    'branch_address_required' => 'عنوان الفرع مطلوب.',
+    'branch_cannot_delete_has_orders' => 'لا يمكن حذف الفرع لوجود طلبات مرتبطة به. يمكنك إلغاء تفعيله بدلاً من ذلك.',
+    'branch_working_hours_retrieved' => 'تم استرجاع مواعيد العمل بنجاح',
+    'branch_working_hours_updated' => 'تم تحديث مواعيد العمل بنجاح',
+    'branch_detail_retrieved' => 'تم استرجاع تفاصيل الفرع بنجاح',
+    'branch_services_assigned' => 'تم إضافة الخدمات للفرع بنجاح',
+    'branch_additional_services_assigned' => 'تم إضافة الخدمات الإضافية للفرع بنجاح',
+    'branch_pieces_assigned' => 'تم إضافة أسعار القطع للفرع بنجاح',
+    'additional_service_vendor_mismatch' => 'الخدمة الإضافية رقم :id لا تتبع المغسلة رقم :vendor_id',
+    'piece_vendor_mismatch' => 'القطعة رقم :id لا تتبع المغسلة رقم :vendor_id',
 
     // Ad messages
     'ads_retrieved' => 'تم استرجاع الإعلانات بنجاح',
