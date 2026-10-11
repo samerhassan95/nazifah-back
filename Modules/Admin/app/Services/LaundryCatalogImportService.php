@@ -189,6 +189,12 @@ class LaundryCatalogImportService
                     }
                 }
 
+                // If still not found, fallback to the first existing category to prevent SQL not-null violation
+                if (! is_int($catId)) {
+                    $firstCat = $existingCategories->first();
+                    $catId = $firstCat ? $firstCat->id : 1;
+                }
+
                 if ($dryRun) {
                     if ($svcCode !== '') {
                         $serviceIdMap[$svcCode] = 'NEW:' . $svcCode;
@@ -199,7 +205,7 @@ class LaundryCatalogImportService
 
                 $svc = Service::create([
                     'service_name' => ['ar' => $name, 'en' => $name],
-                    'category_id' => is_int($catId) ? $catId : null,
+                    'category_id' => $catId,
                     'order' => (int) ($row['ترتيب الخدمة'] ?? 0),
                     'is_active' => true,
                 ]);
