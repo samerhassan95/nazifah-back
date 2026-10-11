@@ -656,7 +656,9 @@ class AdminOrderController extends Controller
             'lng' => $activeDriver->longitude !== null ? (float) $activeDriver->longitude : null,
         ] : null;
 
-        $clientAddressObj = $order->deliveryAddress ?? $order->pickupAddress;
+        $clientAddressObj = $order->deliveryAddress 
+            ?? $order->pickupAddress 
+            ?? $order->client?->addresses?->first();
         $clientName = $order->client ? (method_exists($order->client, 'getTranslation') ? ($order->client->getTranslation('full_name', $lang) ?? $order->client->full_name) : $order->client->full_name) : '';
 
         $clientData = $order->client ? [
