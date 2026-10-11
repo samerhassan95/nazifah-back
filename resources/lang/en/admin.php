@@ -1,6 +1,19 @@
 <?php
 
 return [
+    // Client messages
+    'clients_retrieved' => 'Clients retrieved successfully',
+    'client_retrieved' => 'Client retrieved successfully',
+    'client_created' => 'Client created successfully',
+    'client_updated' => 'Client updated successfully',
+    'client_deleted' => 'Client deleted successfully',
+    'client_not_found' => 'Client not found',
+    'client_status_toggled' => 'Client status toggled successfully',
+    'client_banned' => 'Client banned successfully',
+    'client_unbanned' => 'Client unbanned successfully',
+    'client_statistics_retrieved' => 'Client statistics retrieved successfully',
+    'clients_per_city_retrieved' => 'Clients per city retrieved successfully',
+
     // Owner messages
     'owners_retrieved' => 'Owners retrieved successfully',
     'owner_retrieved' => 'Owner retrieved successfully',

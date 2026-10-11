@@ -38,7 +38,7 @@ class AdminClientController extends Controller
 
         return successResponse(
             ClientResource::collection($clients),
-            __('admin::client.clients_retrieved')
+            __('admin.clients_retrieved')
         );
     }
 
@@ -62,7 +62,7 @@ class AdminClientController extends Controller
 
         $client = $this->clientService->create($data);
 
-        return successResponse(new ClientResource($client), __('admin::client.client_created'), 201);
+        return successResponse(new ClientResource($client), __('admin.client_created'), 201);
     }
 
     public function update(UpdateClientRequest $request, int $id): JsonResponse
@@ -70,7 +70,7 @@ class AdminClientController extends Controller
         $client = $this->clientService->find($id);
 
         if (! $client) {
-            return ErrorResponse::make(__('admin::client.client_not_found'), null, 404);
+            return ErrorResponse::make(__('admin.client_not_found'), null, 404);
         }
 
         $data = $request->validated();
@@ -95,7 +95,7 @@ class AdminClientController extends Controller
 
         return successResponse(
             new ClientResource($client),
-            __('admin::client.client_updated')
+            __('admin.client_updated')
         );
     }
 
@@ -104,10 +104,10 @@ class AdminClientController extends Controller
         $deleted = $this->clientService->delete($id);
 
         if (! $deleted) {
-            return ErrorResponse::make(__('admin::client.client_not_found'), null, 404);
+            return ErrorResponse::make(__('admin.client_not_found'), null, 404);
         }
 
-        return successResponse(null, __('admin::client.client_deleted'));
+        return successResponse(null, __('admin.client_deleted'));
     }
 
     public function toggleStatus(int $id): JsonResponse
@@ -115,12 +115,12 @@ class AdminClientController extends Controller
         $client = $this->clientService->toggleStatus($id);
 
         if (! $client) {
-            return ErrorResponse::make(__('admin::client.client_not_found'), null, 404);
+            return ErrorResponse::make(__('admin.client_not_found'), null, 404);
         }
 
         return successResponse(
             new ClientResource($client),
-            __('admin::client.client_status_toggled')
+            __('admin.client_status_toggled')
         );
     }
 
@@ -133,7 +133,7 @@ class AdminClientController extends Controller
         $client = Client::find($id);
 
         if (! $client) {
-            return ErrorResponse::make(__('admin::client.client_not_found'), null, 404);
+            return ErrorResponse::make(__('admin.client_not_found'), null, 404);
         }
 
         $request->validate([
@@ -148,7 +148,7 @@ class AdminClientController extends Controller
 
         return successResponse(
             new ClientResource($client->fresh()),
-            __('admin::client.client_banned')
+            __('admin.client_banned')
         );
     }
 
@@ -161,7 +161,7 @@ class AdminClientController extends Controller
         $client = Client::find($id);
 
         if (! $client) {
-            return ErrorResponse::make(__('admin::client.client_not_found'), null, 404);
+            return ErrorResponse::make(__('admin.client_not_found'), null, 404);
         }
 
         $client->update([
@@ -172,7 +172,7 @@ class AdminClientController extends Controller
 
         return successResponse(
             new ClientResource($client->fresh()),
-            __('admin::client.client_unbanned')
+            __('admin.client_unbanned')
         );
     }
 
@@ -219,7 +219,7 @@ class AdminClientController extends Controller
 
         return successResponse(
             $stats,
-            __('admin::client.client_statistics_retrieved')
+            __('admin.client_statistics_retrieved')
         );
     }
 
@@ -263,7 +263,7 @@ class AdminClientController extends Controller
 
         return successResponse([
             'customers_by_city' => $clientsPerCity,
-        ], 'Clients per city retrieved successfully');
+        ], __('admin.clients_per_city_retrieved'));
     }
 
     public function show(int $id): JsonResponse
@@ -271,7 +271,7 @@ class AdminClientController extends Controller
         $client = Client::with(['addresses'])->find($id);
 
         if (! $client) {
-            return ErrorResponse::make(__('admin::client.client_not_found'), null, 404);
+            return ErrorResponse::make(__('admin.client_not_found'), null, 404);
         }
 
         // Get client orders with branch.vendor relationship
@@ -413,7 +413,7 @@ class AdminClientController extends Controller
 
         return successResponse(
             $response,
-            __('admin::client.client_retrieved')
+            __('admin.client_retrieved')
         );
     }
 }

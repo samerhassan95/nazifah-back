@@ -1,6 +1,19 @@
 <?php
 
 return [
+    // Client messages
+    'clients_retrieved' => 'تم استرجاع العملاء بنجاح',
+    'client_retrieved' => 'تم استرجاع العميل بنجاح',
+    'client_created' => 'تم إنشاء العميل بنجاح',
+    'client_updated' => 'تم تحديث العميل بنجاح',
+    'client_deleted' => 'تم حذف العميل بنجاح',
+    'client_not_found' => 'العميل غير موجود',
+    'client_status_toggled' => 'تم تبديل حالة العميل بنجاح',
+    'client_banned' => 'تم حظر العميل بنجاح',
+    'client_unbanned' => 'تم إلغاء حظر العميل بنجاح',
+    'client_statistics_retrieved' => 'تم استرجاع إحصائيات العملاء بنجاح',
+    'clients_per_city_retrieved' => 'تم استرجاع العملاء حسب المدينة بنجاح',
+
     // Owner messages
     'owners_retrieved' => 'تم استرجاع الملاك بنجاح',
     'owner_retrieved' => 'تم استرجاع المالك بنجاح',
