@@ -287,6 +287,9 @@ class LaundryCatalogImportService
                     ->keyBy(fn ($p) => trim($p->getTranslation('name', 'ar')));
 
                 $touchedPieceIds = [];
+                // piece_id => [real service ids...], built while walking $piecesIn so the
+                // branch loop below can create properly branch-scoped service_piece rows.
+                $pieceRealServiceIds = [];
 
                 foreach ($piecesIn as $row) {
                     $name = trim((string) ($row['اسم القطعة'] ?? $row['name'] ?? ''));
@@ -304,7 +307,7 @@ class LaundryCatalogImportService
                     } else {
                         if ($dryRun) {
                             $stats['pieces_created']++;
-                            $stats['piece_service_attached'] += count($pieceToServicesMap[$pieceCode] ?? []);
+                            $stats['piece_service_attached'] += count($pieceToServicesMap[$pieceCode] ?? []) * max(count($branchIds), 1);
                             $stats['branch_piece_attached'] += count($branchIds);
                             continue;
                         }
@@ -319,43 +322,26 @@ class LaundryCatalogImportService
                         $stats['pieces_created']++;
                     }
 
-                    // Link services to piece
                     $linkedSvcCodes = $pieceToServicesMap[$pieceCode] ?? [];
-                    if (! empty($linkedSvcCodes)) {
-                        foreach ($linkedSvcCodes as $sc) {
-                            $realSvcId = $serviceIdMap[$sc] ?? null;
-                            if (! is_int($realSvcId)) {
-                                continue;
-                            }
-
-                            if ($dryRun) {
-                                $stats['piece_service_attached']++;
-                                continue;
-                            }
-
-                            // Check if service_piece already exists
-                            $alreadyAttached = \DB::table('service_piece')
-                                ->where('piece_id', $piece->id)
-                                ->where('service_id', $realSvcId)
-                                ->exists();
-
-                            if (! $alreadyAttached) {
-                                \DB::table('service_piece')->insert([
-                                    'piece_id' => $piece->id,
-                                    'service_id' => $realSvcId,
-                                    'price' => 0.0,
-                                    'created_at' => now(),
-                                    'updated_at' => now(),
-                                ]);
-                                $stats['piece_service_attached']++;
-                            }
+                    foreach ($linkedSvcCodes as $sc) {
+                        $realSvcId = $serviceIdMap[$sc] ?? null;
+                        if (is_int($realSvcId)) {
+                            $pieceRealServiceIds[$piece->id][] = $realSvcId;
                         }
                     }
                 }
 
-                // Attach touched pieces to selected branches
+                // Attach touched pieces to selected branches, and — critically — create
+                // service_piece rows scoped to each of those branches. Every app-facing
+                // endpoint (PiecesController, order pricing, etc.) reads a piece's services
+                // filtered by a specific service_piece.branch_id; a branch-less row is
+                // invisible to all of them even though the dashboard's unscoped
+                // Piece::services() relationship shows it fine. Mirrors what the manual
+                // "assign services to piece at branch" endpoint already does.
                 if (! $dryRun && ! empty($branchIds)) {
                     foreach ($touchedPieceIds as $pieceId) {
+                        $realSvcIds = array_unique($pieceRealServiceIds[$pieceId] ?? []);
+
                         foreach ($branchIds as $branchId) {
                             $exists = \DB::table('branch_piece')
                                 ->where('branch_id', $branchId)
@@ -364,15 +350,78 @@ class LaundryCatalogImportService
 
                             if ($exists) {
                                 $stats['branch_piece_skipped']++;
-                                continue;
+                            } else {
+                                $branch = Branch::find($branchId);
+                                if ($branch) {
+                                    $branch->pieces()->syncWithoutDetaching([
+                                        $pieceId => ['is_active' => true],
+                                    ]);
+                                    $stats['branch_piece_attached']++;
+                                }
                             }
 
-                            $branch = Branch::find($branchId);
-                            if ($branch) {
-                                $branch->pieces()->syncWithoutDetaching([
-                                    $pieceId => ['is_active' => true],
+                            foreach ($realSvcIds as $realSvcId) {
+                                $branchServiceExists = \DB::table('branch_service')
+                                    ->where('branch_id', $branchId)
+                                    ->where('service_id', $realSvcId)
+                                    ->exists();
+
+                                if ($branchServiceExists) {
+                                    \DB::table('branch_service')
+                                        ->where('branch_id', $branchId)
+                                        ->where('service_id', $realSvcId)
+                                        ->update(['is_active' => true, 'updated_at' => now()]);
+                                } else {
+                                    \DB::table('branch_service')->insert([
+                                        'branch_id' => $branchId,
+                                        'service_id' => $realSvcId,
+                                        'is_active' => true,
+                                        'created_at' => now(),
+                                        'updated_at' => now(),
+                                    ]);
+                                }
+
+                                $alreadyAttached = \DB::table('service_piece')
+                                    ->where('piece_id', $pieceId)
+                                    ->where('service_id', $realSvcId)
+                                    ->where('branch_id', $branchId)
+                                    ->exists();
+
+                                if (! $alreadyAttached) {
+                                    \DB::table('service_piece')->insert([
+                                        'piece_id' => $pieceId,
+                                        'service_id' => $realSvcId,
+                                        'branch_id' => $branchId,
+                                        'price' => 0.0,
+                                        'created_at' => now(),
+                                        'updated_at' => now(),
+                                    ]);
+                                    $stats['piece_service_attached']++;
+                                }
+                            }
+                        }
+                    }
+                } elseif (! $dryRun) {
+                    // No branch selected (vendor-level "pieces only" import): keep a
+                    // branch-less catalog record so the link survives until the admin
+                    // assigns the piece to a branch — the app can't use it yet either way.
+                    foreach ($touchedPieceIds as $pieceId) {
+                        foreach (array_unique($pieceRealServiceIds[$pieceId] ?? []) as $realSvcId) {
+                            $alreadyAttached = \DB::table('service_piece')
+                                ->where('piece_id', $pieceId)
+                                ->where('service_id', $realSvcId)
+                                ->whereNull('branch_id')
+                                ->exists();
+
+                            if (! $alreadyAttached) {
+                                \DB::table('service_piece')->insert([
+                                    'piece_id' => $pieceId,
+                                    'service_id' => $realSvcId,
+                                    'price' => 0.0,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
                                 ]);
-                                $stats['branch_piece_attached']++;
+                                $stats['piece_service_attached']++;
                             }
                         }
                     }
