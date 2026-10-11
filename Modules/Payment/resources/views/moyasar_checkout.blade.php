@@ -203,7 +203,50 @@
                 return true;
             }
 
+            // Moyasar's card fields are plain <input> elements in our own DOM (confirmed
+            // against the moyasar.js source — no iframe), with stable identifiers:
+            // #mysr-cc-name, #mysr-cc-number, and the expiry/CVC inputs found by their
+            // fixed placeholder text. So a toggle-triggered re-render doesn't have to
+            // lose what was typed — just carry the values across to the fresh form.
+            function findCardInputs(root) {
+                if (!root) return {};
+                return {
+                    name: root.querySelector('#mysr-cc-name, input[name="mysr-cc-name"]'),
+                    number: root.querySelector('#mysr-cc-number'),
+                    expiry: root.querySelector('input[placeholder="MM / YY"]'),
+                    cvc: root.querySelector('input[placeholder="CVC"]')
+                };
+            }
+
+            function captureCardValues() {
+                var inputs = findCardInputs(document.querySelector('.mysr-form'));
+                var values = {};
+                Object.keys(inputs).forEach(function (key) {
+                    if (inputs[key]) values[key] = inputs[key].value;
+                });
+                return values;
+            }
+
+            var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+
+            function restoreCardValues(values, root) {
+                if (!values) return;
+                var inputs = findCardInputs(root);
+                Object.keys(inputs).forEach(function (key) {
+                    var input = inputs[key];
+                    var value = values[key];
+                    if (!input || !value) return;
+                    // Set via the native setter (not input.value = ...) so any internal
+                    // listener relying on a tracked/overridden setter still sees the
+                    // change, then dispatch a real input event for formatting/validation.
+                    nativeInputValueSetter.call(input, value);
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            }
+
             function renderForm() {
+                var carriedValues = captureCardValues();
+
                 // Detach the checkbox first so removing the old form node doesn't delete it.
                 document.body.appendChild(saveWrap);
 
@@ -226,6 +269,7 @@
                     var attempts = 0;
                     var observer = new MutationObserver(function (_mutations, obs) {
                         var placed = placeCheckboxAboveSubmit();
+                        restoreCardValues(carriedValues, formEl);
 
                         // If checkbox is NOT checked, find and hide any Moyasar internal
                         // "card will be saved" notice. Moyasar renders it as a <p> or small
@@ -255,6 +299,7 @@
                     observer.observe(formEl, { childList: true, subtree: true });
                     setTimeout(function () {
                         placeCheckboxAboveSubmit();
+                        restoreCardValues(carriedValues, formEl);
                         // Final sweep after Moyasar finishes rendering
                         if (!saveToggle || !saveToggle.checked) {
                             var formEl3 = document.querySelector('.mysr-form');
@@ -281,42 +326,6 @@
             }
 
             renderForm();
-
-            // Toggling "save card" re-renders the whole Moyasar form (the only way to
-            // change credit_card.save_card), which wipes anything already typed —
-            // Moyasar's card number/expiry/CVC fields live in a cross-origin secure
-            // iframe we can't read values out of to restore them afterward. So: once
-            // the user has started interacting with the card form at all, lock the
-            // checkbox (disable it) so a later tap can never erase what they typed.
-            // They can still choose it freely beforehand — just not change their mind
-            // mid-entry without reloading the page.
-            if (canSaveCard && saveToggle) {
-                var formLocked = false;
-                var lockSaveToggle = function () {
-                    if (formLocked) return;
-                    formLocked = true;
-                    saveToggle.disabled = true;
-                    if (saveWrap) {
-                        saveWrap.style.opacity = '0.55';
-                        saveWrap.title = @js(app()->getLocale() === 'ar'
-                            ? 'لتغيير هذا الخيار بعد البدء في الكتابة، يرجى إعادة تحميل الصفحة.'
-                            : 'To change this after you start typing, please reload the page.');
-                    }
-                };
-                var formWrap = document.querySelector('.mysr-form-wrap');
-                if (formWrap) {
-                    formWrap.addEventListener('focusin', lockSaveToggle);
-                    formWrap.addEventListener('input', lockSaveToggle);
-                }
-                // Moyasar's card fields are very likely inside a cross-origin iframe —
-                // focus moving into one never fires our focusin, but it does blur the
-                // top window, which we can detect.
-                window.addEventListener('blur', function () {
-                    if (document.activeElement && document.activeElement.tagName === 'IFRAME') {
-                        lockSaveToggle();
-                    }
-                });
-            }
         });
     </script>
 </body>
