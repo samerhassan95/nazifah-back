@@ -100,6 +100,12 @@ return [
     'branch_pieces_assigned' => 'Pieces pricing assigned to branch successfully',
     'additional_service_vendor_mismatch' => 'Additional service ID :id does not belong to vendor :vendor_id',
     'piece_vendor_mismatch' => 'Piece ID :id does not belong to vendor :vendor_id',
+    'branch_pieces_retrieved' => 'Branch pieces retrieved successfully',
+    'pieces_added_to_branch' => 'Pieces added to branch successfully',
+    'pieces_removed_from_branch' => 'Pieces removed from branch successfully',
+    'branch_pieces_synced' => 'Branch pieces synced successfully',
+    'piece_not_found_in_branch' => 'Piece not found in this branch',
+    'piece_status_toggle_unsupported' => 'Piece status toggle is no longer supported',
 
     // Ad messages
     'ads_retrieved' => 'Ads retrieved successfully',

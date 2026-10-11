@@ -100,6 +100,12 @@ return [
     'branch_pieces_assigned' => 'تم إضافة أسعار القطع للفرع بنجاح',
     'additional_service_vendor_mismatch' => 'الخدمة الإضافية رقم :id لا تتبع المغسلة رقم :vendor_id',
     'piece_vendor_mismatch' => 'القطعة رقم :id لا تتبع المغسلة رقم :vendor_id',
+    'branch_pieces_retrieved' => 'تم استرجاع قطع الفرع بنجاح',
+    'pieces_added_to_branch' => 'تم إضافة القطع للفرع بنجاح',
+    'pieces_removed_from_branch' => 'تم إزالة القطع من الفرع بنجاح',
+    'branch_pieces_synced' => 'تم مزامنة قطع الفرع بنجاح',
+    'piece_not_found_in_branch' => 'القطعة غير موجودة في هذا الفرع',
+    'piece_status_toggle_unsupported' => 'تبديل حالة القطعة غير مدعوم حاليًا',
 
     // Ad messages
     'ads_retrieved' => 'تم استرجاع الإعلانات بنجاح',

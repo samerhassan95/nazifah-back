@@ -53,7 +53,7 @@ class AdminBranchController extends Controller
 
         return successResponse(
             BranchResource::collection($branches),
-            'Branches retrieved successfully'
+            __('admin.branches_retrieved')
         );
     }
 
@@ -116,7 +116,7 @@ class AdminBranchController extends Controller
 
         return successResponse(
             $branch->load(['vendor']),
-            'Branch created successfully',
+            __('admin.branch_created'),
             201
         );
     }
@@ -126,12 +126,12 @@ class AdminBranchController extends Controller
         $branch = Branch::with(['vendor'])->find($id);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         return successResponse(
             $branch,
-            'Branch retrieved successfully'
+            __('admin.branch_retrieved')
         );
     }
 
@@ -140,7 +140,7 @@ class AdminBranchController extends Controller
         $branch = Branch::find($id);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $validated = $request->validated();
@@ -167,7 +167,7 @@ class AdminBranchController extends Controller
 
         return successResponse(
             $branch->fresh()->load(['vendor']),
-            'Branch updated successfully'
+            __('admin.branch_updated')
         );
     }
 
@@ -176,14 +176,14 @@ class AdminBranchController extends Controller
         $branch = Branch::find($id);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $branch->delete();
 
         return successResponse(
             null,
-            'Branch deleted successfully'
+            __('admin.branch_deleted')
         );
     }
 
@@ -192,7 +192,7 @@ class AdminBranchController extends Controller
         $branch = Branch::find($id);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $branch->is_active = ! $branch->is_active;
@@ -200,7 +200,7 @@ class AdminBranchController extends Controller
 
         return successResponse(
             $branch,
-            'Branch status updated successfully'
+            __('admin.branch_status_updated')
         );
     }
 
@@ -214,7 +214,7 @@ class AdminBranchController extends Controller
 
         return successResponse(
             $stats,
-            'Branch statistics retrieved successfully'
+            __('admin.branch_statistics_retrieved')
         );
     }
 
@@ -228,13 +228,13 @@ class AdminBranchController extends Controller
         }])->find($id);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         return successResponse([
             'branch_id' => $branch->id,
             'pieces' => $branch->pieces,
-        ], 'Branch pieces retrieved successfully');
+        ], __('admin.branch_pieces_retrieved'));
     }
 
     /**
@@ -245,7 +245,7 @@ class AdminBranchController extends Controller
         $branch = Branch::find($id);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $validated = $request->validate([
@@ -261,7 +261,7 @@ class AdminBranchController extends Controller
         return successResponse([
             'branch_id' => $branch->id,
             'pieces' => $branch->pieces()->orderBy('pieces.id', 'asc')->get(),
-        ], 'Pieces added to branch successfully');
+        ], __('admin.pieces_added_to_branch'));
     }
 
     /**
@@ -272,7 +272,7 @@ class AdminBranchController extends Controller
         $branch = Branch::find($id);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $validated = $request->validate([
@@ -288,7 +288,7 @@ class AdminBranchController extends Controller
         return successResponse([
             'branch_id' => $branch->id,
             'pieces' => $branch->pieces()->orderBy('pieces.id', 'asc')->get(),
-        ], 'Pieces removed from branch successfully');
+        ], __('admin.pieces_removed_from_branch'));
     }
 
     public function syncPieces(Request $request, int $id): JsonResponse
@@ -296,7 +296,7 @@ class AdminBranchController extends Controller
         $branch = Branch::find($id);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $validated = $request->validate([
@@ -312,7 +312,7 @@ class AdminBranchController extends Controller
         return successResponse([
             'branch_id' => $branch->id,
             'pieces' => $branch->pieces()->orderBy('pieces.id', 'asc')->get(),
-        ], 'Branch pieces synced successfully');
+        ], __('admin.branch_pieces_synced'));
     }
 
     /**
@@ -323,19 +323,19 @@ class AdminBranchController extends Controller
         $branch = Branch::find($branchId);
 
         if (! $branch) {
-            return notFoundResponse('Branch not found');
+            return notFoundResponse(__('admin.branch_not_found'));
         }
 
         $piece = $branch->pieces()->where('piece_id', $pieceId)->first();
 
         if (! $piece) {
-            return notFoundResponse('Piece not found in this branch');
+            return notFoundResponse(__('admin.piece_not_found_in_branch'));
         }
 
         return successResponse([
             'branch_id' => $branch->id,
             'piece_id' => $pieceId,
             'message' => 'is_active column has been removed from pieces',
-        ], 'Piece status toggle is no longer supported');
+        ], __('admin.piece_status_toggle_unsupported'));
     }
 }
