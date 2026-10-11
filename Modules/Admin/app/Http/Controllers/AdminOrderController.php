@@ -841,9 +841,9 @@ class AdminOrderController extends Controller
                 'lng' => $driverData['lng'],
             ] : null,
             'client_location' => [
-                'lat' => $order->deliveryAddress?->latitude !== null ? (float) $order->deliveryAddress->latitude : null,
-                'lng' => $order->deliveryAddress?->longitude !== null ? (float) $order->deliveryAddress->longitude : null,
-                'address' => $deliveryLocation['address'] ?? null,
+                'lat' => $clientAddressObj?->latitude !== null ? (float) $clientAddressObj->latitude : null,
+                'lng' => $clientAddressObj?->longitude !== null ? (float) $clientAddressObj->longitude : null,
+                'address' => $clientAddressObj?->street_name ?? $clientAddressObj?->address_text ?? $deliveryLocation['address'] ?? null,
             ],
             'laundry_location' => [
                 'lat' => $order->branch?->latitude !== null ? (float) $order->branch->latitude : null,
