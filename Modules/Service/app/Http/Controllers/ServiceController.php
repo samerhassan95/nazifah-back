@@ -14,9 +14,12 @@ class ServiceController extends Controller
 {
     public function __construct(private ServiceService $serviceService) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $services = $this->serviceService->getAllServices();
+        $filters = $request->only(['search', 'is_active', 'category_id', 'sort_by', 'sort_order', 'per_page']);
+        $filters['page'] = (int) $request->input('page', 1);
+
+        $services = $this->serviceService->getAllServices($filters);
 
         return successResponse(
             ServiceResource::collection($services),

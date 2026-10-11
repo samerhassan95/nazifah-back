@@ -40,7 +40,7 @@ class ServiceRepository implements ServiceRepositoryInterface
                 $sortOrder = $filters['sort_order'] ?? 'desc';
                 $query->orderBy($sortBy, $sortOrder);
 
-                return $query->paginate($filters['per_page'] ?? 15);
+                return $query->paginate($filters['per_page'] ?? 15, ['*'], 'page', $filters['page'] ?? 1);
             },
             tags: ['services']
         );
