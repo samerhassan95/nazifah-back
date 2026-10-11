@@ -24,7 +24,7 @@ class AdminAdController extends Controller
 
         return successResponse(
             AdResource::collection($ads),
-            'Ads retrieved successfully'
+            __('admin.ads_retrieved')
         );
     }
 
@@ -46,7 +46,7 @@ class AdminAdController extends Controller
 
         $ad = $this->adService->createAd($validated);
 
-        return successResponse(new AdResource($ad), 'Ad created successfully', 201);
+        return successResponse(new AdResource($ad), __('admin.ad_created'), 201);
     }
 
     public function show(int $id): JsonResponse
@@ -54,7 +54,7 @@ class AdminAdController extends Controller
         $ad = $this->adService->getAdById($id);
 
         if (! $ad) {
-            return notFoundResponse('Ad not found');
+            return notFoundResponse(__('admin.ad_not_found'));
         }
 
         return successResponse(
@@ -71,7 +71,7 @@ class AdminAdController extends Controller
                 'is_active' => (bool) $ad->is_active,
                 'order' => $ad->order,
             ],
-            'Ad retrieved successfully'
+            __('admin.ad_retrieved')
         );
     }
 
@@ -86,10 +86,10 @@ class AdminAdController extends Controller
         $ad = $this->adService->updateAd($id, $validated);
 
         if (! $ad) {
-            return notFoundResponse('Ad not found');
+            return notFoundResponse(__('admin.ad_not_found'));
         }
 
-        return successResponse(new AdResource($ad), 'Ad updated successfully');
+        return successResponse(new AdResource($ad), __('admin.ad_updated'));
     }
 
     public function destroy(int $id): JsonResponse
@@ -97,10 +97,10 @@ class AdminAdController extends Controller
         $deleted = $this->adService->deleteAd($id);
 
         if (! $deleted) {
-            return notFoundResponse('Ad not found');
+            return notFoundResponse(__('admin.ad_not_found'));
         }
 
-        return successResponse(null, 'Ad deleted successfully');
+        return successResponse(null, __('admin.ad_deleted'));
     }
 
     public function toggleStatus(int $id): JsonResponse
@@ -108,18 +108,18 @@ class AdminAdController extends Controller
         $ad = $this->adService->getAdById($id);
 
         if (! $ad) {
-            return notFoundResponse('Ad not found');
+            return notFoundResponse(__('admin.ad_not_found'));
         }
 
         $ad = $this->adService->updateAd($id, ['is_active' => ! $ad->is_active]);
 
-        return successResponse($ad, 'Ad status updated successfully');
+        return successResponse($ad, __('admin.ad_status_updated'));
     }
 
     public function statistics(): JsonResponse
     {
         $stats = $this->adService->getStatistics();
 
-        return successResponse($stats, 'Ad statistics retrieved successfully');
+        return successResponse($stats, __('admin.ad_statistics_retrieved'));
     }
 }

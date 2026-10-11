@@ -202,6 +202,13 @@ return [
     'piece_statistics_retrieved' => 'Piece statistics retrieved successfully',
     'piece_form_options_retrieved' => 'Piece form options retrieved successfully',
 
+    // Icon messages
+    'icons_retrieved' => 'Icons retrieved successfully',
+    'icon_retrieved' => 'Icon retrieved successfully',
+    'icon_created' => 'Icon created successfully',
+    'icon_updated' => 'Icon updated successfully',
+    'icon_deleted' => 'Icon deleted successfully',
+
     // Dashboard messages
     'dashboard_overview_retrieved' => 'Dashboard overview retrieved successfully',
     'order_trends_retrieved' => 'Order trends retrieved successfully',
