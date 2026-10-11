@@ -21,6 +21,8 @@ return [
     'driver_status_updated' => 'Driver status updated successfully',
     'driver_availability_updated' => 'Driver availability updated successfully',
     'driver_statistics_retrieved' => 'Driver statistics retrieved successfully',
+    'driver_banned' => 'Driver banned successfully',
+    'driver_unbanned' => 'Driver unbanned successfully',
 
     // Vendor messages
     'vendors_retrieved' => 'Vendors retrieved successfully',

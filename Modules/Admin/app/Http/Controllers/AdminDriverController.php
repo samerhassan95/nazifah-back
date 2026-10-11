@@ -35,7 +35,7 @@ class AdminDriverController extends Controller
 
         return successResponse(
             DriverResource::collection($drivers),
-            'Drivers retrieved successfully'
+            __('admin.drivers_retrieved')
         );
     }
 
@@ -48,7 +48,7 @@ class AdminDriverController extends Controller
 
         $driver = $this->driverService->create($data);
 
-        return successResponse(new DriverResource($driver), 'Driver created successfully', 201);
+        return successResponse(new DriverResource($driver), __('admin.driver_created'), 201);
     }
 
     public function show(int $id): JsonResponse
@@ -56,10 +56,10 @@ class AdminDriverController extends Controller
         $driver = $this->driverService->find($id);
 
         if (! $driver) {
-            return ErrorResponse::make('Driver not found', null, 404);
+            return ErrorResponse::make(__('admin.driver_not_found'), null, 404);
         }
 
-        return successResponse(new DriverResource($driver), 'Driver retrieved successfully');
+        return successResponse(new DriverResource($driver), __('admin.driver_retrieved'));
     }
 
     public function update(UpdateDriverRequest $request, int $id): JsonResponse
@@ -67,7 +67,7 @@ class AdminDriverController extends Controller
         $driver = $this->driverService->find($id);
 
         if (! $driver) {
-            return ErrorResponse::make('Driver not found', null, 404);
+            return ErrorResponse::make(__('admin.driver_not_found'), null, 404);
         }
 
         $data = $request->validated();
@@ -86,7 +86,7 @@ class AdminDriverController extends Controller
 
         $driver = $this->driverService->update($id, $data);
 
-        return successResponse(new DriverResource($driver), 'Driver updated successfully');
+        return successResponse(new DriverResource($driver), __('admin.driver_updated'));
     }
 
     public function destroy(int $id): JsonResponse
@@ -94,12 +94,12 @@ class AdminDriverController extends Controller
         $deleted = $this->driverService->delete($id);
 
         if (! $deleted) {
-            return ErrorResponse::make('Driver not found', null, 404);
+            return ErrorResponse::make(__('admin.driver_not_found'), null, 404);
         }
 
         return successResponse(
             null,
-            'Driver deleted successfully'
+            __('admin.driver_deleted')
         );
     }
 
@@ -108,7 +108,7 @@ class AdminDriverController extends Controller
         $driver = $this->driverService->find($id);
 
         if (! $driver) {
-            return ErrorResponse::make('Driver not found', null, 404);
+            return ErrorResponse::make(__('admin.driver_not_found'), null, 404);
         }
 
         $driver->is_available = ! $driver->is_available;
@@ -116,7 +116,7 @@ class AdminDriverController extends Controller
 
         return successResponse(
             new DriverResource($driver),
-            'Driver availability updated successfully'
+            __('admin.driver_availability_updated')
         );
     }
 
@@ -126,7 +126,7 @@ class AdminDriverController extends Controller
 
         return successResponse(
             $stats,
-            'Driver statistics retrieved successfully'
+            __('admin.driver_statistics_retrieved')
         );
     }
 
@@ -135,7 +135,7 @@ class AdminDriverController extends Controller
         $driver = $this->driverService->find($id);
 
         if (! $driver) {
-            return ErrorResponse::make('Driver not found', null, 404);
+            return ErrorResponse::make(__('admin.driver_not_found'), null, 404);
         }
 
         $request->validate([
@@ -150,7 +150,7 @@ class AdminDriverController extends Controller
 
         return successResponse(
             new DriverResource($driver->fresh()),
-            'Driver banned successfully'
+            __('admin.driver_banned')
         );
     }
 
@@ -159,7 +159,7 @@ class AdminDriverController extends Controller
         $driver = $this->driverService->find($id);
 
         if (! $driver) {
-            return ErrorResponse::make('Driver not found', null, 404);
+            return ErrorResponse::make(__('admin.driver_not_found'), null, 404);
         }
 
         $driver->update([
@@ -170,7 +170,7 @@ class AdminDriverController extends Controller
 
         return successResponse(
             new DriverResource($driver->fresh()),
-            'Driver unbanned successfully'
+            __('admin.driver_unbanned')
         );
     }
 }

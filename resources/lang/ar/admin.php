@@ -21,6 +21,8 @@ return [
     'driver_status_updated' => 'تم تحديث حالة السائق بنجاح',
     'driver_availability_updated' => 'تم تحديث توفر السائق بنجاح',
     'driver_statistics_retrieved' => 'تم استرجاع إحصائيات السائقين بنجاح',
+    'driver_banned' => 'تم حظر السائق بنجاح',
+    'driver_unbanned' => 'تم إلغاء حظر السائق بنجاح',
 
     // Vendor messages
     'vendors_retrieved' => 'تم استرجاع المغاسل بنجاح',

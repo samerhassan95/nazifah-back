@@ -30,13 +30,13 @@ class AdminLaundryDriverController extends Controller
         $vendorId = $request->input('vendor_id');
 
         if (! $vendorId) {
-            return errorResponse('Vendor ID is required', null, 400);
+            return errorResponse(__('admin.vendor_id_required'), null, 400);
         }
 
         $vendor = Vendor::find($vendorId);
 
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         // Get drivers associated with this vendor (directly or via branches)
@@ -68,7 +68,7 @@ class AdminLaundryDriverController extends Controller
 
         $drivers->setCollection($driversData);
 
-        return successResponse($drivers, 'Drivers retrieved successfully');
+        return successResponse($drivers, __('admin.drivers_retrieved'));
     }
 
     /**
@@ -80,7 +80,7 @@ class AdminLaundryDriverController extends Controller
         $driver = Driver::with('branch')->find($id);
 
         if (! $driver) {
-            return ErrorResponse::make('Driver not found', null, 404);
+            return ErrorResponse::make(__('admin.driver_not_found'), null, 404);
         }
 
         $driverData = [
@@ -104,7 +104,7 @@ class AdminLaundryDriverController extends Controller
             ] : null,
         ];
 
-        return successResponse($driverData, 'Driver retrieved successfully');
+        return successResponse($driverData, __('admin.driver_retrieved'));
     }
 
     /**
@@ -159,7 +159,7 @@ class AdminLaundryDriverController extends Controller
 
         $driver = Driver::create($driverData);
 
-        return successResponse($this->formatDriver($driver), 'Driver created successfully', 201);
+        return successResponse($this->formatDriver($driver), __('admin.driver_created'), 201);
     }
 
     /**
@@ -171,7 +171,7 @@ class AdminLaundryDriverController extends Controller
         $driver = $this->driverService->find($id);
 
         if (! $driver) {
-            return ErrorResponse::make('Driver not found', null, 404);
+            return ErrorResponse::make(__('admin.driver_not_found'), null, 404);
         }
 
         $validated = $request->validate([
@@ -246,7 +246,7 @@ class AdminLaundryDriverController extends Controller
 
         $driver = $this->driverService->update($id, $driverData);
 
-        return successResponse($this->formatDriver($driver), 'Driver updated successfully');
+        return successResponse($this->formatDriver($driver), __('admin.driver_updated'));
     }
 
     /**
@@ -258,10 +258,10 @@ class AdminLaundryDriverController extends Controller
         $deleted = $this->driverService->delete($id);
 
         if (! $deleted) {
-            return ErrorResponse::make('Driver not found', null, 404);
+            return ErrorResponse::make(__('admin.driver_not_found'), null, 404);
         }
 
-        return successResponse(null, 'Driver deleted successfully');
+        return successResponse(null, __('admin.driver_deleted'));
     }
 
     /**
