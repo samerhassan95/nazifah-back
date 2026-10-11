@@ -23,15 +23,19 @@ return [
     'driver_statistics_retrieved' => 'تم استرجاع إحصائيات السائقين بنجاح',
 
     // Vendor messages
-    'vendors_retrieved' => 'تم استرجاع المتاجر بنجاح',
-    'vendor_retrieved' => 'تم استرجاع المتجر بنجاح',
-    'vendor_created' => 'تم إنشاء المتجر بنجاح',
-    'vendor_updated' => 'تم تحديث المتجر بنجاح',
-    'vendor_deleted' => 'تم حذف المتجر بنجاح',
-    'vendor_not_found' => 'المتجر غير موجود',
-    'vendor_status_updated' => 'تم تحديث حالة المتجر بنجاح',
-    'vendor_featured_updated' => 'تم تحديث حالة المتجر المميز بنجاح',
-    'vendor_statistics_retrieved' => 'تم استرجاع إحصائيات المتاجر بنجاح',
+    'vendors_retrieved' => 'تم استرجاع المغاسل بنجاح',
+    'vendor_retrieved' => 'تم استرجاع المغسلة بنجاح',
+    'vendor_created' => 'تم إنشاء المغسلة بنجاح',
+    'vendor_updated' => 'تم تحديث المغسلة بنجاح',
+    'vendor_deleted' => 'تم حذف المغسلة بنجاح',
+    'vendor_not_found' => 'المغسلة غير موجودة',
+    'vendor_status_updated' => 'تم تحديث حالة المغسلة بنجاح',
+    'vendor_featured_updated' => 'تم تحديث حالة المغسلة المميزة بنجاح',
+    'vendor_statistics_retrieved' => 'تم استرجاع إحصائيات المغاسل بنجاح',
+    'vendor_deleted_with_data' => 'تم حذف المغسلة وكل البيانات المرتبطة بها بنجاح',
+    'vendor_delete_failed' => 'فشل حذف المغسلة: :error',
+    'vendor_banned' => 'تم حظر المغسلة بنجاح',
+    'vendor_unbanned' => 'تم إلغاء حظر المغسلة بنجاح',
 
     // Order messages
     'orders_retrieved' => 'تم استرجاع الطلبات بنجاح',

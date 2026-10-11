@@ -32,6 +32,10 @@ return [
     'vendor_status_updated' => 'Vendor status updated successfully',
     'vendor_featured_updated' => 'Vendor featured status updated successfully',
     'vendor_statistics_retrieved' => 'Vendor statistics retrieved successfully',
+    'vendor_deleted_with_data' => 'Vendor and all related data deleted successfully',
+    'vendor_delete_failed' => 'Failed to delete vendor: :error',
+    'vendor_banned' => 'Vendor banned successfully',
+    'vendor_unbanned' => 'Vendor unbanned successfully',
 
     // Order messages
     'orders_retrieved' => 'Orders retrieved successfully',

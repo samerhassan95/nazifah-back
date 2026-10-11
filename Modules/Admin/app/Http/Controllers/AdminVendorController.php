@@ -44,7 +44,7 @@ class AdminVendorController extends Controller
 
         return successResponse(
             VendorResource::collection($vendors),
-            'Vendors retrieved successfully'
+            __('admin.vendors_retrieved')
         );
     }
 
@@ -70,7 +70,7 @@ class AdminVendorController extends Controller
 
         return successResponse(
             $this->formatVendorResponse($vendor),
-            'Vendor created successfully',
+            __('admin.vendor_created'),
             201
         );
     }
@@ -80,7 +80,7 @@ class AdminVendorController extends Controller
         $vendor = Vendor::with(['branches'])->find($id);
 
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         // Get branch IDs for this vendor
@@ -136,7 +136,7 @@ class AdminVendorController extends Controller
 
         return successResponse(
             $vendorData,
-            'Vendor retrieved successfully'
+            __('admin.vendor_retrieved')
         );
     }
 
@@ -145,7 +145,7 @@ class AdminVendorController extends Controller
         $vendor = Vendor::find($id);
 
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         $validated = $request->validated();
@@ -176,7 +176,7 @@ class AdminVendorController extends Controller
 
         return successResponse(
             $this->formatVendorResponse($vendor->fresh()),
-            'Vendor updated successfully'
+            __('admin.vendor_updated')
         );
     }
 
@@ -194,7 +194,7 @@ class AdminVendorController extends Controller
         $vendor = Vendor::find($id);
 
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         DB::beginTransaction();
@@ -237,12 +237,12 @@ class AdminVendorController extends Controller
 
             return successResponse(
                 null,
-                'Vendor and all related data deleted successfully'
+                __('admin.vendor_deleted_with_data')
             );
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return errorResponse('Failed to delete vendor: '.$e->getMessage(), 500);
+            return errorResponse(__('admin.vendor_delete_failed', ['error' => $e->getMessage()]), 500);
         }
     }
 
@@ -251,7 +251,7 @@ class AdminVendorController extends Controller
         $vendor = Vendor::find($id);
 
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         $vendor->is_active = ! $vendor->is_active;
@@ -259,7 +259,7 @@ class AdminVendorController extends Controller
 
         return successResponse(
             $vendor,
-            'Vendor status updated successfully'
+            __('admin.vendor_status_updated')
         );
     }
 
@@ -272,7 +272,7 @@ class AdminVendorController extends Controller
         $vendor = Vendor::find($id);
 
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         $request->validate([
@@ -287,7 +287,7 @@ class AdminVendorController extends Controller
 
         return successResponse(
             $vendor->fresh(),
-            'Vendor banned successfully'
+            __('admin.vendor_banned')
         );
     }
 
@@ -300,7 +300,7 @@ class AdminVendorController extends Controller
         $vendor = Vendor::find($id);
 
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         $vendor->update([
@@ -311,7 +311,7 @@ class AdminVendorController extends Controller
 
         return successResponse(
             $vendor->fresh(),
-            'Vendor unbanned successfully'
+            __('admin.vendor_unbanned')
         );
     }
 
@@ -507,6 +507,6 @@ class AdminVendorController extends Controller
             'is_recent' => strtotime($vendor->created_at) >= strtotime('-7 days'),
         ];
 
-        return successResponse($stats, 'Vendor statistics retrieved successfully');
+        return successResponse($stats, __('admin.vendor_statistics_retrieved'));
     }
 }
