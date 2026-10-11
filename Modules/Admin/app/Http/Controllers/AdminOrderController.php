@@ -772,33 +772,45 @@ class AdminOrderController extends Controller
             })->values()->toArray();
 
         $latestLog = end($statusLogs) ?: null;
-        $deliveryTitle = $latestLog['title'] ?? $statusLabel;
-        $deliverySubtitle = $latestLog['sub_title'] ?? $estimatedArrivalText;
 
-        if (in_array($actualStatus, ['on_way_to_pickup', 'on_way_to_delivery'], true)) {
-            $deliveryTitle = $lang === 'ar' ? 'السائق في طريقه إلى العميل' : 'Driver on the way to client';
-            $deliverySubtitle = $lang === 'ar'
-                ? 'السائق يقترب من موقع العميل لاستلام/تسليم الطلب وبانتظار تأكيد العميل جاهزيته لتسليم الطلب.'
-                : 'Driver is approaching client location for pickup/delivery and awaiting client confirmation.';
-        } elseif (in_array($actualStatus, ['driver_pickup_assigned', 'driver_delivery_assigned'], true)) {
-            $deliveryTitle = $lang === 'ar' ? 'تم تعيين السائق' : 'Driver Assigned';
-            $deliverySubtitle = $lang === 'ar' ? 'تم تعيين سائق للطلب وبانتظار قبول الطلب والانطلاق.' : 'Driver assigned, awaiting driver acceptance.';
-        } elseif (in_array($actualStatus, ['driver_pickup_accepted', 'driver_delivery_accepted'], true)) {
-            $deliveryTitle = $lang === 'ar' ? 'قبل السائق الطلب' : 'Driver Accepted';
-            $deliverySubtitle = $lang === 'ar' ? 'قبل السائق الطلب وهو بصدد الانطلاق للموقع.' : 'Driver accepted and preparing to head to location.';
-        } elseif ($actualStatus === 'picked_up') {
-            $deliveryTitle = $lang === 'ar' ? 'تم استلام الطلب من العميل' : 'Picked Up from Client';
-            $deliverySubtitle = $lang === 'ar' ? 'تم استلام الشحنة بنجاح وجاري نقلها إلى المغسلة.' : 'Order picked up successfully and heading to branch.';
-        } elseif (in_array($actualStatus, ['delivered_to_branch', 'preparing'], true)) {
-            $deliveryTitle = $lang === 'ar' ? 'الطلب في المغسلة' : 'Order at Branch';
-            $deliverySubtitle = $lang === 'ar' ? 'تم تسليم الطلب للمغسلة ويجري تجهيز الملابس والغسيل.' : 'Order arrived at branch and being prepared.';
-        } elseif ($actualStatus === 'ready') {
-            $deliveryTitle = $lang === 'ar' ? 'الطلب جاهز' : 'Order Ready';
-            $deliverySubtitle = $lang === 'ar' ? 'تم الانتهاء من الغسيل والطلب جاهز للتوصيل.' : 'Laundry finished and order ready for delivery.';
-        } elseif (in_array($actualStatus, ['delivered', 'completed'], true)) {
-            $deliveryTitle = $lang === 'ar' ? 'تم توصيل الطلب' : 'Order Delivered';
-            $deliverySubtitle = $lang === 'ar' ? 'تم تسليم الطلب للعميل واكتمال عملية التوصيل بنجاح.' : 'Order delivered successfully to client.';
-        }
+        // Dynamic Title and Subtitle matching Figma specifications for every order status
+        $deliveryTitle = match ($actualStatus) {
+            'pending' => ($lang === 'ar' ? 'طلب جديد قيد الانتظار' : 'New Order Pending'),
+            'confirmed', 'branch_review', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب' : 'Order Confirmed'),
+            'driver_pickup_assigned', 'driver_delivery_assigned' => ($lang === 'ar' ? 'تم تعيين السائق وبانتظار تأكيده' : 'Driver Assigned and Awaiting Confirmation'),
+            'driver_pickup_accepted', 'driver_delivery_accepted' => ($lang === 'ar' ? 'تم قبول الطلب من السائق' : 'Order Accepted by Driver'),
+            'on_way_to_pickup' => ($lang === 'ar' ? 'السائق في طريقه لاستلام الطلب' : 'Driver on the way for pickup'),
+            'on_way_to_delivery' => ($lang === 'ar' ? 'السائق في طريقه لتسليم الطلب' : 'Driver on the way for delivery'),
+            'picked_up' => ($lang === 'ar' ? 'تم استلام الطلب من العميل' : 'Order Picked Up from Client'),
+            'delivered_to_branch' => ($lang === 'ar' ? 'تم تسليم الطلب إلى المغسلة' : 'Delivered to Laundry Branch'),
+            'preparing' => ($lang === 'ar' ? 'الطلب قيد التجهيز والغسيل' : 'Order is Being Prepared and Washed'),
+            'ready' => ($lang === 'ar' ? 'الطلب جاهز للتوصيل' : 'Order Ready for Delivery'),
+            'waiting_client_receipt' => ($lang === 'ar' ? 'تم الوصول — بانتظار العميل' : 'Arrived — Waiting for Client'),
+            'delivered', 'completed' => ($lang === 'ar' ? 'تم تسليم الطلب بنجاح' : 'Order Delivered Successfully'),
+            'client_postponed_pickup' => ($lang === 'ar' ? 'أجل العميل موعد الاستلام' : 'Client Postponed Pickup'),
+            'client_postponed_delivery' => ($lang === 'ar' ? 'أجل العميل موعد التسليم' : 'Client Postponed Delivery'),
+            'cancelled' => ($lang === 'ar' ? 'تم إلغاء الطلب' : 'Order Cancelled'),
+            default => ($latestLog['title'] ?? $statusLabel),
+        };
+
+        $deliverySubtitle = match ($actualStatus) {
+            'pending' => ($lang === 'ar' ? 'تم استلام الطلب وجاري مراجعته وتأكيده.' : 'Order received and awaiting review and confirmation.'),
+            'confirmed', 'branch_review', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب من العميل وبانتظار تعيين السائق.' : 'Order confirmed by client and awaiting driver assignment.'),
+            'driver_pickup_assigned', 'driver_delivery_assigned' => ($lang === 'ar' ? 'تم تعيين سائق للطلب وبانتظار تأكيده لاستلام المهمة والبدء في التوصيل.' : 'Driver assigned and awaiting confirmation to start the mission.'),
+            'driver_pickup_accepted', 'driver_delivery_accepted' => ($lang === 'ar' ? 'قبل السائق الطلب وهو بصدد الانطلاق للموقع.' : 'Driver accepted and preparing to head to location.'),
+            'on_way_to_pickup' => ($lang === 'ar' ? 'السائق يقترب من موقع العميل لاستلام الطلب وبانتظار تأكيد العميل جاهزيته.' : 'Driver approaching client location for pickup and awaiting readiness confirmation.'),
+            'on_way_to_delivery' => ($lang === 'ar' ? 'السائق يقترب من موقع العميل لتسليم الطلب وبانتظار استلام العميل.' : 'Driver approaching client location for delivery.'),
+            'picked_up' => ($lang === 'ar' ? 'تم استلام الشحنة بنجاح وجاري نقلها إلى المغسلة.' : 'Order picked up successfully and heading to laundry.'),
+            'delivered_to_branch' => ($lang === 'ar' ? 'تم تسليم الملابس إلى المغسلة وبدء مرحلة الفرز والمعالجة.' : 'Clothes delivered to laundry and sorting stage started.'),
+            'preparing' => ($lang === 'ar' ? 'المغسلة تعمل حالياً على غسيل وكي وتجهيز الملابس.' : 'Laundry is currently washing, ironing and preparing clothes.'),
+            'ready' => ($lang === 'ar' ? 'تم الانتهاء من تجهيز الطلب بالكامل وهو جاهز للتسليم أو التوصيل.' : 'Order processing complete and ready for pickup/delivery.'),
+            'waiting_client_receipt' => ($lang === 'ar' ? 'السائق متواجد في الموقع وبانتظار خروج العميل للاستلام.' : 'Driver arrived at location and waiting for client to receive.'),
+            'delivered', 'completed' => ($lang === 'ar' ? 'تم تسليم الطلب للعميل واكتمال عملية التوصيل بنجاح.' : 'Order delivered successfully to client.'),
+            'client_postponed_pickup' => ($lang === 'ar' ? 'طلب العميل تأجيل موعد استلام الملابس وسيتم المتابعة لاحقاً.' : 'Client requested to postpone pickup time.'),
+            'client_postponed_delivery' => ($lang === 'ar' ? 'طلب العميل تأجيل موعد تسليم الملابس وسيتم إعادة الجدولة.' : 'Client requested to postpone delivery time.'),
+            'cancelled' => ($lang === 'ar' ? 'تم إلغاء هذا الطلب ولا توجد إجراءات إضافية مطلوبة.' : 'This order has been cancelled.'),
+            default => ($latestLog['sub_title'] ?? $estimatedArrivalText),
+        };
 
         $deliveryStatusPayload = [
             'status' => $actualStatus,
