@@ -37,11 +37,8 @@ return [
 
     'firebase' => [
         'server_key' => env('FIREBASE_SERVER_KEY'), // Legacy only — push uses service account (HTTP v1)
-        'project_id' => env('FIREBASE_PROJECT_ID', 'nathefah-146b3'),
-        'service_account_path' => env(
-            'FIREBASE_SERVICE_ACCOUNT_PATH',
-            storage_path('app/firebase/nathefah-146b3-firebase-adminsdk-fbsvc-26b2bd2f10.json')
-        ),
+        'project_id' => env('FIREBASE_PROJECT_ID'),
+        'service_account_path' => env('FIREBASE_SERVICE_ACCOUNT_PATH'),
     ],
 
 ];

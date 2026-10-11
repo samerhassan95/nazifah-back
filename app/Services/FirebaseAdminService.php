@@ -290,6 +290,7 @@ class FirebaseAdminService
         $candidates = array_filter([
             $configured !== '' ? $configured : null,
             $configured !== '' ? base_path($configured) : null,
+            storage_path('app/firebase/nathefah-e65cf-firebase-adminsdk-fbsvc-e20c3725ba.json'),
             storage_path('app/firebase/nathefah-146b3-firebase-adminsdk-fbsvc-26b2bd2f10.json'),
             storage_path('app/firebase/service-account.json'),
         ]);
@@ -301,13 +302,16 @@ class FirebaseAdminService
         }
 
         $discovered = glob(storage_path('app/firebase/*.json')) ?: [];
+        if (! empty($discovered) && is_readable($discovered[0])) {
+            return $discovered[0];
+        }
 
-        return $discovered[0] ?? $configured;
+        return $configured;
     }
 
     private function readProjectIdFromServiceAccount(): ?string
     {
-        if (! is_readable($this->serviceAccountPath)) {
+        if ($this->serviceAccountPath === '' || ! is_readable($this->serviceAccountPath)) {
             return null;
         }
 
