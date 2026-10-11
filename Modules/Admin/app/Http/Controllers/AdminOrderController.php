@@ -613,6 +613,13 @@ class AdminOrderController extends Controller
             'final_amount' => $finalTotal,
         ];
 
+        $clientAddressObj = $order->deliveryAddress 
+            ?? $order->pickupAddress 
+            ?? $order->client?->addresses?->first();
+
+        $clientResolvedAddress = $clientAddressObj?->street_name ?? $clientAddressObj?->address_text ?? null;
+        $laundryResolvedAddress = $order->branch?->address_text ?? $order->branch?->name ?? null;
+
         $orderInfo = [
             'branch_id' => $order->branch_id,
             'status' => $actualStatus,
@@ -625,9 +632,10 @@ class AdminOrderController extends Controller
             'total_price' => $subtotal,
             'total_price_after_tax' => $finalTotal,
             'final_amount' => $finalTotal,
-            'client_location' => $order->deliveryAddress?->street_name ?? $order->deliveryAddress?->address_text ?? '',
-            'client_address' => $order->deliveryAddress?->street_name ?? $order->deliveryAddress?->address_text ?? '',
+            'client_location' => $clientResolvedAddress ?? '',
+            'client_address' => $clientResolvedAddress ?? '',
             'laundry_name' => $order->branch?->vendor?->name ?? '',
+            'laundry_address' => $laundryResolvedAddress ?? '',
             'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
         ];
@@ -656,9 +664,6 @@ class AdminOrderController extends Controller
             'lng' => $activeDriver->longitude !== null ? (float) $activeDriver->longitude : null,
         ] : null;
 
-        $clientAddressObj = $order->deliveryAddress 
-            ?? $order->pickupAddress 
-            ?? $order->client?->addresses?->first();
         $clientName = $order->client ? (method_exists($order->client, 'getTranslation') ? ($order->client->getTranslation('full_name', $lang) ?? $order->client->full_name) : $order->client->full_name) : '';
 
         $clientData = $order->client ? [
@@ -861,6 +866,7 @@ class AdminOrderController extends Controller
 
         $response = [
             'laundry_name' => $order->branch?->vendor?->name ?? '',
+            'laundry_address' => $laundryResolvedAddress ?? '',
             'driver_name' => $driverData['name'] ?? $order->driver?->full_name ?? '',
             'client_name' => $clientName,
             'status' => $actualStatus,
