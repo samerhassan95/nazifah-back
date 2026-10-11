@@ -17,6 +17,9 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  * - 'categories' : Imports 01_الأقسام into global categories.
  * - 'services'   : Imports 02_الخدمات into global services (linked to categories).
  * - 'pieces'     : Imports 03_القطع & 04_ربط_الخدمة_بالقطعة into vendor pieces & branch links.
+ *                   Also creates any 02_الخدمات service referenced by the link sheet that
+ *                   does not already exist globally, so a piece's services never silently
+ *                   end up unlinked just because this scope was used on its own.
  * - 'addons'     : Imports 05_الإضافات into vendor additional services (ServiceAddition).
  * - 'full'       : Imports all available sheets in the workbook.
  */
@@ -155,7 +158,13 @@ class LaundryCatalogImportService
             // ==========================================
             $existingServices = Service::all()->keyBy(fn ($s) => trim($s->getTranslation('service_name', 'ar')));
             $serviceIdMap = [];
-            $canCreateServices = in_array($scope, ['services', 'full'], true);
+            // 'pieces' scope must also be allowed to create missing global services: the
+            // branch-level "import pieces" screen only exposes this scope (no separate
+            // "import services first" step), so a service referenced by the link sheet
+            // that doesn't already exist would otherwise never get a serviceIdMap entry —
+            // section D then silently drops that piece-service link with no indication to
+            // the admin, leaving the piece's edit screen with no usable services at all.
+            $canCreateServices = in_array($scope, ['services', 'pieces', 'full'], true);
 
             foreach ($servicesIn as $row) {
                 $name = trim((string) ($row['اسم الخدمة'] ?? $row['name'] ?? ''));
