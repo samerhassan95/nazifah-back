@@ -126,16 +126,15 @@ class PendingOrderService
         }
 
         $paymentService = app(\Modules\Order\Services\OrderPaymentService::class);
-        // User requested that fully paid orders stay as 'pending' instead of moving to 'payment_confirmed'.
-        // if ($paymentService->isFullyPaid($order)) {
-        //     $statusService = app(\App\Services\OrderStatusService::class);
-        //     if ($statusService->canTransition($order, \App\Enums\OrderStatus::PAYMENT_CONFIRMED)) {
-        //         $statusService->transitionTo($order, \App\Enums\OrderStatus::PAYMENT_CONFIRMED, [
-        //             'notes' => 'Auto: pending order materialized and fully paid',
-        //             'changed_by' => $order->client_id,
-        //         ]);
-        //     }
-        // }
+        if ($paymentService->isFullyPaid($order)) {
+            $statusService = app(\App\Services\OrderStatusService::class);
+            if ($statusService->canTransition($order, \App\Enums\OrderStatus::PAYMENT_CONFIRMED)) {
+                $statusService->transitionTo($order, \App\Enums\OrderStatus::PAYMENT_CONFIRMED, [
+                    'notes' => 'Auto: pending order materialized and fully paid',
+                    'changed_by' => $order->client_id,
+                ]);
+            }
+        }
 
         if ($pendingOrder->discount_id) {
             $discount = Discount::find($pendingOrder->discount_id);
@@ -146,7 +145,7 @@ class PendingOrderService
 
         OrderStatusLog::create([
             'order_id' => $order->id,
-            'status' => OrderStatus::PENDING->value,
+            'status' => $order->status,
             'notes' => 'Order created after payment',
             'changed_by' => $pendingOrder->client_id,
         ]);
