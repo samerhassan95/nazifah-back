@@ -35,7 +35,7 @@ class AdminAddressController extends Controller
 
         return successResponse(
             AddressResource::collection($addresses),
-            'Addresses retrieved successfully'
+            __('admin.addresses_retrieved')
         );
     }
 
@@ -57,7 +57,7 @@ class AdminAddressController extends Controller
 
         return successResponse(
             $address->load(['client']),
-            'Address created successfully',
+            __('admin.address_created'),
             201
         );
     }
@@ -67,12 +67,12 @@ class AdminAddressController extends Controller
         $address = Address::with(['client'])->find($id);
 
         if (! $address) {
-            return notFoundResponse('Address not found');
+            return notFoundResponse(__('admin.address_not_found'));
         }
 
         return successResponse(
             $address,
-            'Address retrieved successfully'
+            __('admin.address_retrieved')
         );
     }
 
@@ -81,7 +81,7 @@ class AdminAddressController extends Controller
         $address = Address::find($id);
 
         if (! $address) {
-            return notFoundResponse('Address not found');
+            return notFoundResponse(__('admin.address_not_found'));
         }
 
         $validated = $request->validate([
@@ -100,7 +100,7 @@ class AdminAddressController extends Controller
 
         return successResponse(
             $address->fresh()->load(['client']),
-            'Address updated successfully'
+            __('admin.address_updated')
         );
     }
 
@@ -109,14 +109,14 @@ class AdminAddressController extends Controller
         $address = Address::find($id);
 
         if (! $address) {
-            return notFoundResponse('Address not found');
+            return notFoundResponse(__('admin.address_not_found'));
         }
 
         $address->delete();
 
         return successResponse(
             null,
-            'Address deleted successfully'
+            __('admin.address_deleted')
         );
     }
 
@@ -132,7 +132,7 @@ class AdminAddressController extends Controller
 
         return successResponse(
             $stats,
-            'Address statistics retrieved successfully'
+            __('admin.address_statistics_retrieved')
         );
     }
 }

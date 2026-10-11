@@ -35,7 +35,7 @@ class AdminZoneController extends Controller
 
         return successResponse(
             ZoneResource::collection($zones),
-            'Zones retrieved successfully',
+            __('admin.zones_retrieved'),
             200,
             [
                 'statistics' => $statistics,
@@ -47,7 +47,7 @@ class AdminZoneController extends Controller
     {
         $zone = $this->zoneService->create($request->validated());
 
-        return successResponse(new ZoneResource($zone), 'Zone created successfully', 201);
+        return successResponse(new ZoneResource($zone), __('admin.zone_created'), 201);
     }
 
     public function show(int $id): JsonResponse
@@ -55,10 +55,10 @@ class AdminZoneController extends Controller
         $zone = $this->zoneService->find($id);
 
         if (! $zone) {
-            return ErrorResponse::make('Zone not found', null, 404);
+            return ErrorResponse::make(__('admin.zone_not_found'), null, 404);
         }
 
-        return successResponse(new ZoneResource($zone), 'Zone retrieved successfully');
+        return successResponse(new ZoneResource($zone), __('admin.zone_retrieved'));
     }
 
     public function update(UpdateZoneRequest $request, int $id): JsonResponse
@@ -66,14 +66,14 @@ class AdminZoneController extends Controller
         $zone = $this->zoneService->find($id);
 
         if (! $zone) {
-            return ErrorResponse::make('Zone not found', null, 404);
+            return ErrorResponse::make(__('admin.zone_not_found'), null, 404);
         }
 
         $zone = $this->zoneService->update($id, $request->validated());
 
         return successResponse(
             new ZoneResource($zone),
-            'Zone updated successfully'
+            __('admin.zone_updated')
         );
     }
 
@@ -82,12 +82,12 @@ class AdminZoneController extends Controller
         $deleted = $this->zoneService->delete($id);
 
         if (! $deleted) {
-            return ErrorResponse::make('Zone not found', null, 404);
+            return ErrorResponse::make(__('admin.zone_not_found'), null, 404);
         }
 
         return successResponse(
             null,
-            'Zone deleted successfully'
+            __('admin.zone_deleted')
         );
     }
 
@@ -96,12 +96,12 @@ class AdminZoneController extends Controller
         $zone = $this->zoneService->toggleStatus($id);
 
         if (! $zone) {
-            return ErrorResponse::make('Zone not found', null, 404);
+            return ErrorResponse::make(__('admin.zone_not_found'), null, 404);
         }
 
         return successResponse(
             new ZoneResource($zone),
-            'Zone status updated successfully'
+            __('admin.zone_status_updated')
         );
     }
 
@@ -111,7 +111,7 @@ class AdminZoneController extends Controller
 
         return successResponse(
             $stats,
-            'Zone statistics retrieved successfully'
+            __('admin.zone_statistics_retrieved')
         );
     }
 }

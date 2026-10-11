@@ -34,7 +34,7 @@ class AdminOwnerController extends Controller
 
         return successResponse(
             OwnerResource::collection($owners),
-            'Owners retrieved successfully'
+            __('admin.owners_retrieved')
         );
     }
 
@@ -42,7 +42,7 @@ class AdminOwnerController extends Controller
     {
         $owner = $this->ownerService->create($request->validated());
 
-        return successResponse(new OwnerResource($owner), 'Owner created successfully', 201);
+        return successResponse(new OwnerResource($owner), __('admin.owner_created'), 201);
     }
 
     public function show(int $id): JsonResponse
@@ -50,10 +50,10 @@ class AdminOwnerController extends Controller
         $owner = $this->ownerService->find($id);
 
         if (! $owner) {
-            return ErrorResponse::make('Owner not found', null, 404);
+            return ErrorResponse::make(__('admin.owner_not_found'), null, 404);
         }
 
-        return successResponse(new OwnerResource($owner), 'Owner retrieved successfully');
+        return successResponse(new OwnerResource($owner), __('admin.owner_retrieved'));
     }
 
     public function update(UpdateOwnerRequest $request, int $id): JsonResponse
@@ -61,14 +61,14 @@ class AdminOwnerController extends Controller
         $owner = $this->ownerService->find($id);
 
         if (! $owner) {
-            return ErrorResponse::make('Owner not found', null, 404);
+            return ErrorResponse::make(__('admin.owner_not_found'), null, 404);
         }
 
         $owner = $this->ownerService->update($id, $request->validated());
 
         return successResponse(
             new OwnerResource($owner),
-            'Owner updated successfully'
+            __('admin.owner_updated')
         );
     }
 
@@ -77,12 +77,12 @@ class AdminOwnerController extends Controller
         $deleted = $this->ownerService->delete($id);
 
         if (! $deleted) {
-            return ErrorResponse::make('Owner not found', null, 404);
+            return ErrorResponse::make(__('admin.owner_not_found'), null, 404);
         }
 
         return successResponse(
             null,
-            'Owner deleted successfully'
+            __('admin.owner_deleted')
         );
     }
 
@@ -91,12 +91,12 @@ class AdminOwnerController extends Controller
         $owner = $this->ownerService->toggleStatus($id);
 
         if (! $owner) {
-            return ErrorResponse::make('Owner not found', null, 404);
+            return ErrorResponse::make(__('admin.owner_not_found'), null, 404);
         }
 
         return successResponse(
             new OwnerResource($owner),
-            'Owner status updated successfully'
+            __('admin.owner_status_updated')
         );
     }
 
@@ -111,7 +111,7 @@ class AdminOwnerController extends Controller
 
         return successResponse(
             $stats,
-            'Owner statistics retrieved successfully'
+            __('admin.owner_statistics_retrieved')
         );
     }
 }
