@@ -78,6 +78,7 @@ return [
     'category_not_found' => 'Category not found',
     'category_status_updated' => 'Category status updated successfully',
     'category_statistics_retrieved' => 'Category statistics retrieved successfully',
+    'category_cannot_delete_has_services' => 'Cannot delete category with associated services',
 
     // Service messages
     'services_retrieved' => 'Services retrieved successfully',

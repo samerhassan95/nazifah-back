@@ -32,7 +32,7 @@ class AdminLaundryCategoryController extends Controller
             $vendor = Vendor::find($vendorId);
 
             if (! $vendor) {
-                return notFoundResponse('Vendor not found');
+                return notFoundResponse(__('admin.vendor_not_found'));
             }
 
             $vendorServiceIds = Service::where(function ($q) use ($vendorId) {
@@ -82,7 +82,7 @@ class AdminLaundryCategoryController extends Controller
 
         $categories->setCollection($categoriesData);
 
-        return successResponse($categories, 'Categories retrieved successfully');
+        return successResponse($categories, __('admin.categories_retrieved'));
     }
 
     /**
@@ -94,7 +94,7 @@ class AdminLaundryCategoryController extends Controller
         $category = Category::with(['services', 'iconRelation'])->find($id);
 
         if (! $category) {
-            return notFoundResponse('Category not found');
+            return notFoundResponse(__('admin.category_not_found'));
         }
 
         $vendorId = $request->input('vendor_id');
@@ -143,7 +143,7 @@ class AdminLaundryCategoryController extends Controller
             'Services' => $services,
         ];
 
-        return successResponse($categoryData, 'Category retrieved successfully');
+        return successResponse($categoryData, __('admin.category_retrieved'));
     }
 
     /**
@@ -181,7 +181,7 @@ class AdminLaundryCategoryController extends Controller
 
         $category = Category::create($categoryData);
 
-        return successResponse($this->formatCategory($category), 'Category created successfully', 201);
+        return successResponse($this->formatCategory($category), __('admin.category_created'), 201);
     }
 
     /**
@@ -193,7 +193,7 @@ class AdminLaundryCategoryController extends Controller
         $category = Category::find($id);
 
         if (! $category) {
-            return notFoundResponse('Category not found');
+            return notFoundResponse(__('admin.category_not_found'));
         }
 
         $validated = $request->validate([
@@ -233,7 +233,7 @@ class AdminLaundryCategoryController extends Controller
 
         $category->update($categoryData);
 
-        return successResponse($this->formatCategory($category->fresh()), 'Category updated successfully');
+        return successResponse($this->formatCategory($category->fresh()), __('admin.category_updated'));
     }
 
     /**
@@ -245,17 +245,17 @@ class AdminLaundryCategoryController extends Controller
         $category = Category::find($id);
 
         if (! $category) {
-            return notFoundResponse('Category not found');
+            return notFoundResponse(__('admin.category_not_found'));
         }
 
         // Check if category has services
         if ($category->services()->count() > 0) {
-            return errorResponse('Cannot delete category with associated services', 400);
+            return errorResponse(__('admin.category_cannot_delete_has_services'), 400);
         }
 
         $category->delete();
 
-        return successResponse(null, 'Category deleted successfully');
+        return successResponse(null, __('admin.category_deleted'));
     }
 
     /**

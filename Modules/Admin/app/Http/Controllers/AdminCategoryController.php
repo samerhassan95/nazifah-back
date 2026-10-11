@@ -31,7 +31,7 @@ class AdminCategoryController extends Controller
 
         return successResponse(
             CategoryResource::collection($categories),
-            'Categories retrieved successfully'
+            __('admin.categories_retrieved')
         );
     }
 
@@ -56,7 +56,7 @@ class AdminCategoryController extends Controller
 
         return successResponse(
             new CategoryResource($category),
-            'Category created successfully',
+            __('admin.category_created'),
             201
         );
     }
@@ -66,12 +66,12 @@ class AdminCategoryController extends Controller
         $category = Category::with('iconRelation')->find($id);
 
         if (! $category) {
-            return notFoundResponse('Category not found');
+            return notFoundResponse(__('admin.category_not_found'));
         }
 
         return successResponse(
             new CategoryResource($category),
-            'Category retrieved successfully'
+            __('admin.category_retrieved')
         );
     }
 
@@ -80,7 +80,7 @@ class AdminCategoryController extends Controller
         $category = Category::find($id);
 
         if (! $category) {
-            return notFoundResponse('Category not found');
+            return notFoundResponse(__('admin.category_not_found'));
         }
 
         $validated = $request->validate([
@@ -99,7 +99,7 @@ class AdminCategoryController extends Controller
 
         return successResponse(
             new CategoryResource($category->fresh()->load('iconRelation')),
-            'Category updated successfully'
+            __('admin.category_updated')
         );
     }
 
@@ -108,19 +108,19 @@ class AdminCategoryController extends Controller
         $category = Category::find($id);
 
         if (! $category) {
-            return notFoundResponse('Category not found');
+            return notFoundResponse(__('admin.category_not_found'));
         }
 
         // Check if category has services
         if ($category->services()->count() > 0) {
-            return errorResponse('Cannot delete category with associated services', 400);
+            return errorResponse(__('admin.category_cannot_delete_has_services'), 400);
         }
 
         $category->delete();
 
         return successResponse(
             null,
-            'Category deleted successfully'
+            __('admin.category_deleted')
         );
     }
 
@@ -129,7 +129,7 @@ class AdminCategoryController extends Controller
         $category = Category::find($id);
 
         if (! $category) {
-            return notFoundResponse('Category not found');
+            return notFoundResponse(__('admin.category_not_found'));
         }
 
         $category->is_active = ! $category->is_active;
@@ -137,7 +137,7 @@ class AdminCategoryController extends Controller
 
         return successResponse(
             new CategoryResource($category->fresh()->load('iconRelation')),
-            'Category status updated successfully'
+            __('admin.category_status_updated')
         );
     }
 
@@ -151,7 +151,7 @@ class AdminCategoryController extends Controller
 
         return successResponse(
             $stats,
-            'Category statistics retrieved successfully'
+            __('admin.category_statistics_retrieved')
         );
     }
 }

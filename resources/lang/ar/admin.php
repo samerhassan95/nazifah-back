@@ -78,6 +78,7 @@ return [
     'category_not_found' => 'الفئة غير موجودة',
     'category_status_updated' => 'تم تحديث حالة الفئة بنجاح',
     'category_statistics_retrieved' => 'تم استرجاع إحصائيات الفئات بنجاح',
+    'category_cannot_delete_has_services' => 'لا يمكن حذف الفئة لوجود خدمات مرتبطة بها',
 
     // Service messages
     'services_retrieved' => 'تم استرجاع الخدمات بنجاح',
