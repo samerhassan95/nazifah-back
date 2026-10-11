@@ -59,6 +59,16 @@ return [
     'order_no_driver_needed' => 'الطلب لا يحتاج إلى سائق (تم تولي المرحلتين من قبل المغسلة)',
     'order_driver_assignment_failed' => 'فشل تعيين السائق',
 
+    // Additional Service messages
+    'additional_services_retrieved' => 'تم استرجاع الخدمات الإضافية بنجاح',
+    'additional_service_retrieved' => 'تم استرجاع الخدمة الإضافية بنجاح',
+    'additional_service_created' => 'تم إنشاء الخدمة الإضافية بنجاح',
+    'additional_service_updated' => 'تم تحديث الخدمة الإضافية بنجاح',
+    'additional_service_deleted' => 'تم حذف الخدمة الإضافية بنجاح',
+    'additional_service_not_found' => 'الخدمة الإضافية غير موجودة',
+    'additional_service_status_updated' => 'تم تحديث حالة الخدمة الإضافية بنجاح',
+    'branch_vendor_mismatch' => 'الفرع لا يتبع هذه المغسلة',
+
     // Category messages
     'categories_retrieved' => 'تم استرجاع الفئات بنجاح',
     'category_retrieved' => 'تم استرجاع الفئة بنجاح',
@@ -174,6 +184,7 @@ return [
     'piece_not_found' => 'القطعة غير موجودة',
     'piece_status_updated' => 'تم تحديث حالة القطعة بنجاح',
     'piece_statistics_retrieved' => 'تم استرجاع إحصائيات القطع بنجاح',
+    'piece_form_options_retrieved' => 'تم استرجاع خيارات نموذج القطعة بنجاح',
 
     // Dashboard messages
     'dashboard_overview_retrieved' => 'تم استرجاع نظرة عامة على لوحة التحكم بنجاح',

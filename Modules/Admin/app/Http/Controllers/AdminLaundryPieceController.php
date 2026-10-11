@@ -30,13 +30,13 @@ class AdminLaundryPieceController extends Controller
         $vendorId = $request->input('vendor_id');
 
         if (! $vendorId) {
-            return errorResponse('Vendor ID is required', null, 400);
+            return errorResponse(__('admin.vendor_id_required'), null, 400);
         }
 
         $vendor = Vendor::find($vendorId);
 
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         $pieces = Piece::where('vendor_id', $vendorId)
@@ -90,7 +90,7 @@ class AdminLaundryPieceController extends Controller
 
         $pieces->setCollection($piecesData);
 
-        return successResponse($pieces, 'Pieces retrieved successfully');
+        return successResponse($pieces, __('admin.pieces_retrieved'));
     }
 
     /**
@@ -105,7 +105,7 @@ class AdminLaundryPieceController extends Controller
         $vendorId = $request->input('vendor_id');
 
         if (! $vendorId) {
-            return errorResponse('Vendor ID is required', null, 400);
+            return errorResponse(__('admin.vendor_id_required'), null, 400);
         }
 
         $locale = app()->getLocale();
@@ -140,7 +140,7 @@ class AdminLaundryPieceController extends Controller
             'services' => $services,
             'additional_services' => $additionalServices,
             'branches' => $branches,
-        ], 'Piece form options retrieved successfully');
+        ], __('admin.piece_form_options_retrieved'));
     }
 
     /**
@@ -152,7 +152,7 @@ class AdminLaundryPieceController extends Controller
         $piece = Piece::with(['services', 'additionalServices'])->find($id);
 
         if (! $piece) {
-            return notFoundResponse('Piece not found');
+            return notFoundResponse(__('admin.piece_not_found'));
         }
 
         $vendorId = $request->input('vendor_id');
@@ -212,7 +212,7 @@ class AdminLaundryPieceController extends Controller
             'Branches' => $branches,
         ];
 
-        return successResponse($pieceData, 'Piece retrieved successfully');
+        return successResponse($pieceData, __('admin.piece_retrieved'));
     }
 
     /**
@@ -285,7 +285,7 @@ class AdminLaundryPieceController extends Controller
         // cache invalidation: piece created with associations
         flushCacheTags(['pieces', 'branches', 'services']);
 
-        return successResponse($this->formatPiece($piece->fresh(), $validated['vendor_id'], $request->header('Accept-Language', 'ar')), 'Piece created successfully', 201);
+        return successResponse($this->formatPiece($piece->fresh(), $validated['vendor_id'], $request->header('Accept-Language', 'ar')), __('admin.piece_created'), 201);
     }
 
     /**
@@ -297,7 +297,7 @@ class AdminLaundryPieceController extends Controller
         $piece = Piece::find($id);
 
         if (! $piece) {
-            return notFoundResponse('Piece not found');
+            return notFoundResponse(__('admin.piece_not_found'));
         }
 
         $validated = $request->validate([
@@ -395,7 +395,7 @@ class AdminLaundryPieceController extends Controller
 
         $vendorId = $request->input('vendor_id', $piece->vendor_id);
 
-        return successResponse($this->formatPiece($piece->fresh(), $vendorId, $request->header('Accept-Language', 'ar')), 'Piece updated successfully');
+        return successResponse($this->formatPiece($piece->fresh(), $vendorId, $request->header('Accept-Language', 'ar')), __('admin.piece_updated'));
     }
 
     /**
@@ -407,12 +407,12 @@ class AdminLaundryPieceController extends Controller
         $piece = Piece::find($id);
 
         if (! $piece) {
-            return notFoundResponse('Piece not found');
+            return notFoundResponse(__('admin.piece_not_found'));
         }
 
         $piece->delete();
 
-        return successResponse(null, 'Piece deleted successfully');
+        return successResponse(null, __('admin.piece_deleted'));
     }
 
     /**

@@ -30,13 +30,13 @@ class AdminLaundryAdditionalServiceController extends Controller
         $vendorId = $request->input('vendor_id');
 
         if (! $vendorId) {
-            return errorResponse('Vendor ID is required', null, 400);
+            return errorResponse(__('admin.vendor_id_required'), null, 400);
         }
 
         $vendor = Vendor::find($vendorId);
 
         if (! $vendor) {
-            return notFoundResponse('Vendor not found');
+            return notFoundResponse(__('admin.vendor_not_found'));
         }
 
         // Get additional services for this vendor
@@ -74,7 +74,7 @@ class AdminLaundryAdditionalServiceController extends Controller
 
         $additionalServices->setCollection($servicesData);
 
-        return successResponse($additionalServices, 'Additional services retrieved successfully');
+        return successResponse($additionalServices, __('admin.additional_services_retrieved'));
     }
 
     /**
@@ -86,7 +86,7 @@ class AdminLaundryAdditionalServiceController extends Controller
         $service = ServiceAddition::with(['services', 'pieces'])->find($id);
 
         if (! $service) {
-            return notFoundResponse('Additional service not found');
+            return notFoundResponse(__('admin.additional_service_not_found'));
         }
 
         $branchPrice = null;
@@ -94,7 +94,7 @@ class AdminLaundryAdditionalServiceController extends Controller
             $branchId = (int) $request->input('branch_id');
             $branch = Branch::where('vendor_id', $service->vendor_id)->find($branchId);
             if (! $branch) {
-                return errorResponse('Branch does not belong to this laundry', null, 422);
+                return errorResponse(__('admin.branch_vendor_mismatch'), null, 422);
             }
 
             $branchPrice = ServiceAdditionBranchOffering::priceForBranch($branchId, $service);
@@ -140,7 +140,7 @@ class AdminLaundryAdditionalServiceController extends Controller
             'Pieces' => $pieces,
         ];
 
-        return successResponse($serviceData, 'Additional service retrieved successfully');
+        return successResponse($serviceData, __('admin.additional_service_retrieved'));
     }
 
     /**
@@ -179,7 +179,7 @@ class AdminLaundryAdditionalServiceController extends Controller
             $service->services()->attach($validated['service_ids']);
         }
 
-        return successResponse($this->formatAdditionalService($service->fresh(['services', 'pieces'])), 'Additional service created successfully', 201);
+        return successResponse($this->formatAdditionalService($service->fresh(['services', 'pieces'])), __('admin.additional_service_created'), 201);
     }
 
     /**
@@ -191,7 +191,7 @@ class AdminLaundryAdditionalServiceController extends Controller
         $service = ServiceAddition::find($id);
 
         if (! $service) {
-            return notFoundResponse('Additional service not found');
+            return notFoundResponse(__('admin.additional_service_not_found'));
         }
 
         $validated = $request->validate([
@@ -231,7 +231,7 @@ class AdminLaundryAdditionalServiceController extends Controller
             $service->services()->sync($validated['service_ids'] ?? []);
         }
 
-        return successResponse($this->formatAdditionalService($service->fresh(['services', 'pieces'])), 'Additional service updated successfully');
+        return successResponse($this->formatAdditionalService($service->fresh(['services', 'pieces'])), __('admin.additional_service_updated'));
     }
 
     /**
@@ -243,14 +243,14 @@ class AdminLaundryAdditionalServiceController extends Controller
         $service = ServiceAddition::find($id);
 
         if (! $service) {
-            return notFoundResponse('Additional service not found');
+            return notFoundResponse(__('admin.additional_service_not_found'));
         }
 
         $service->update(['is_active' => ! $service->is_active]);
 
         return successResponse(
             $this->formatAdditionalService($service->fresh(['services', 'pieces'])),
-            'Additional service status updated successfully'
+            __('admin.additional_service_status_updated')
         );
     }
 
@@ -263,12 +263,12 @@ class AdminLaundryAdditionalServiceController extends Controller
         $service = ServiceAddition::find($id);
 
         if (! $service) {
-            return notFoundResponse('Additional service not found');
+            return notFoundResponse(__('admin.additional_service_not_found'));
         }
 
         $service->delete();
 
-        return successResponse(null, 'Additional service deleted successfully');
+        return successResponse(null, __('admin.additional_service_deleted'));
     }
 
     /**

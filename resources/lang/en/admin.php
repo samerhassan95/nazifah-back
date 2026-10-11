@@ -59,6 +59,16 @@ return [
     'order_no_driver_needed' => 'Order does not need a driver (both legs handled at vendor)',
     'order_driver_assignment_failed' => 'Driver assignment failed',
 
+    // Additional Service messages
+    'additional_services_retrieved' => 'Additional services retrieved successfully',
+    'additional_service_retrieved' => 'Additional service retrieved successfully',
+    'additional_service_created' => 'Additional service created successfully',
+    'additional_service_updated' => 'Additional service updated successfully',
+    'additional_service_deleted' => 'Additional service deleted successfully',
+    'additional_service_not_found' => 'Additional service not found',
+    'additional_service_status_updated' => 'Additional service status updated successfully',
+    'branch_vendor_mismatch' => 'Branch does not belong to this laundry',
+
     // Category messages
     'categories_retrieved' => 'Categories retrieved successfully',
     'category_retrieved' => 'Category retrieved successfully',
@@ -174,6 +184,7 @@ return [
     'piece_not_found' => 'Piece not found',
     'piece_status_updated' => 'Piece status updated successfully',
     'piece_statistics_retrieved' => 'Piece statistics retrieved successfully',
+    'piece_form_options_retrieved' => 'Piece form options retrieved successfully',
 
     // Dashboard messages
     'dashboard_overview_retrieved' => 'Dashboard overview retrieved successfully',
