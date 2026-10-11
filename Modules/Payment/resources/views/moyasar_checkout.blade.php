@@ -281,6 +281,42 @@
             }
 
             renderForm();
+
+            // Toggling "save card" re-renders the whole Moyasar form (the only way to
+            // change credit_card.save_card), which wipes anything already typed —
+            // Moyasar's card number/expiry/CVC fields live in a cross-origin secure
+            // iframe we can't read values out of to restore them afterward. So: once
+            // the user has started interacting with the card form at all, lock the
+            // checkbox (disable it) so a later tap can never erase what they typed.
+            // They can still choose it freely beforehand — just not change their mind
+            // mid-entry without reloading the page.
+            if (canSaveCard && saveToggle) {
+                var formLocked = false;
+                var lockSaveToggle = function () {
+                    if (formLocked) return;
+                    formLocked = true;
+                    saveToggle.disabled = true;
+                    if (saveWrap) {
+                        saveWrap.style.opacity = '0.55';
+                        saveWrap.title = @js(app()->getLocale() === 'ar'
+                            ? 'لتغيير هذا الخيار بعد البدء في الكتابة، يرجى إعادة تحميل الصفحة.'
+                            : 'To change this after you start typing, please reload the page.');
+                    }
+                };
+                var formWrap = document.querySelector('.mysr-form-wrap');
+                if (formWrap) {
+                    formWrap.addEventListener('focusin', lockSaveToggle);
+                    formWrap.addEventListener('input', lockSaveToggle);
+                }
+                // Moyasar's card fields are very likely inside a cross-origin iframe —
+                // focus moving into one never fires our focusin, but it does blur the
+                // top window, which we can detect.
+                window.addEventListener('blur', function () {
+                    if (document.activeElement && document.activeElement.tagName === 'IFRAME') {
+                        lockSaveToggle();
+                    }
+                });
+            }
         });
     </script>
 </body>
