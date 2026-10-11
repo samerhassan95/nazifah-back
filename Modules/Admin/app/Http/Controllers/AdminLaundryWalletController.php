@@ -78,8 +78,12 @@ class AdminLaundryWalletController extends Controller
             $client = $order?->client;
             $clientName = $client ? ($client->full_name ?? $client->name ?? $client->phone ?? 'N/A') : 'N/A';
 
+            $gatewayTxnId = $transaction->fort_id 
+                ?? ($transaction->response_data['fort_id'] ?? null)
+                ?? ($transaction->response_data['id'] ?? null);
+
             return [
-                'process_number' => $transaction->transaction_id ?? ('TXN-' . $transaction->id),
+                'process_number' => $gatewayTxnId ?? $transaction->transaction_id ?? ('TXN-' . $transaction->id),
                 'client_name' => $clientName,
                 'branch_name' => $order?->branch ? $order->branch->getTranslation('name', $lang) : null,
                 'request_number' => $order?->order_number,
