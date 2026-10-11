@@ -46,7 +46,7 @@ class AdminServiceController extends Controller
 
         return successResponse(
             ServiceResource::collection($services),
-            'Services retrieved successfully'
+            __('admin.services_retrieved')
         );
     }
 
@@ -112,7 +112,7 @@ class AdminServiceController extends Controller
 
         return successResponse(
             new ServiceResource($service->load(['category'])),
-            'Service created successfully',
+            __('admin.service_created'),
             201
         );
     }
@@ -122,12 +122,12 @@ class AdminServiceController extends Controller
         $service = Service::with(['category', 'additions', 'pieces'])->find($id);
 
         if (! $service) {
-            return notFoundResponse('Service not found');
+            return notFoundResponse(__('admin.service_not_found'));
         }
 
         return successResponse(
             $service,
-            'Service retrieved successfully'
+            __('admin.service_retrieved')
         );
     }
 
@@ -136,7 +136,7 @@ class AdminServiceController extends Controller
         $service = Service::find($id);
 
         if (! $service) {
-            return notFoundResponse('Service not found');
+            return notFoundResponse(__('admin.service_not_found'));
         }
 
         $validated = $request->validate([
@@ -209,7 +209,7 @@ class AdminServiceController extends Controller
 
         return successResponse(
             new ServiceResource($service->fresh()->load(['category'])),
-            'Service updated successfully'
+            __('admin.service_updated')
         );
     }
 
@@ -218,14 +218,14 @@ class AdminServiceController extends Controller
         $service = Service::find($id);
 
         if (! $service) {
-            return notFoundResponse('Service not found');
+            return notFoundResponse(__('admin.service_not_found'));
         }
 
         $service->delete();
 
         return successResponse(
             null,
-            'Service deleted successfully'
+            __('admin.service_deleted')
         );
     }
 
@@ -234,7 +234,7 @@ class AdminServiceController extends Controller
         $service = Service::find($id);
 
         if (! $service) {
-            return notFoundResponse('Service not found');
+            return notFoundResponse(__('admin.service_not_found'));
         }
 
         $service->is_active = ! $service->is_active;
@@ -242,7 +242,7 @@ class AdminServiceController extends Controller
 
         return successResponse(
             $service,
-            'Service status updated successfully'
+            __('admin.service_status_updated')
         );
     }
 
@@ -256,7 +256,7 @@ class AdminServiceController extends Controller
 
         return successResponse(
             $stats,
-            'Service statistics retrieved successfully'
+            __('admin.service_statistics_retrieved')
         );
     }
 }

@@ -35,7 +35,7 @@ class AdminPieceController extends Controller
 
         return successResponse(
             PieceResource::collection($pieces),
-            'Pieces retrieved successfully'
+            __('admin.pieces_retrieved')
         );
     }
 
@@ -94,7 +94,7 @@ class AdminPieceController extends Controller
 
         return successResponse(
             new PieceResource($piece->load(['branches', 'services', 'iconRelation'])),
-            'Piece created successfully',
+            __('admin.piece_created'),
             201
         );
     }
@@ -104,12 +104,12 @@ class AdminPieceController extends Controller
         $piece = Piece::with(['vendor', 'branches', 'services'])->find($id);
 
         if (! $piece) {
-            return notFoundResponse('Piece not found');
+            return notFoundResponse(__('admin.piece_not_found'));
         }
 
         return successResponse(
             $piece,
-            'Piece retrieved successfully'
+            __('admin.piece_retrieved')
         );
     }
 
@@ -118,7 +118,7 @@ class AdminPieceController extends Controller
         $piece = Piece::find($id);
 
         if (! $piece) {
-            return notFoundResponse('Piece not found');
+            return notFoundResponse(__('admin.piece_not_found'));
         }
 
         $validated = $request->validate([
@@ -171,7 +171,7 @@ class AdminPieceController extends Controller
 
         return successResponse(
             new PieceResource($piece->fresh()->load(['branches', 'services', 'iconRelation'])),
-            'Piece updated successfully'
+            __('admin.piece_updated')
         );
     }
 
@@ -180,14 +180,14 @@ class AdminPieceController extends Controller
         $piece = Piece::find($id);
 
         if (! $piece) {
-            return notFoundResponse('Piece not found');
+            return notFoundResponse(__('admin.piece_not_found'));
         }
 
         $piece->delete();
 
         return successResponse(
             null,
-            'Piece deleted successfully'
+            __('admin.piece_deleted')
         );
     }
 
@@ -196,7 +196,7 @@ class AdminPieceController extends Controller
         $piece = Piece::find($id);
 
         if (! $piece) {
-            return notFoundResponse('Piece not found');
+            return notFoundResponse(__('admin.piece_not_found'));
         }
 
         $piece->is_active = ! $piece->is_active;
@@ -204,7 +204,7 @@ class AdminPieceController extends Controller
 
         return successResponse(
             $piece,
-            'Piece status updated successfully'
+            __('admin.piece_status_updated')
         );
     }
 
@@ -218,7 +218,7 @@ class AdminPieceController extends Controller
 
         return successResponse(
             $stats,
-            'Piece statistics retrieved successfully'
+            __('admin.piece_statistics_retrieved')
         );
     }
 }
