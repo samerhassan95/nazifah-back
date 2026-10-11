@@ -48,6 +48,16 @@ return [
     'order_driver_assigned' => 'تم تعيين السائق بنجاح',
     'order_cancelled' => 'تم إلغاء الطلب بنجاح',
     'order_statistics_retrieved' => 'تم استرجاع إحصائيات الطلبات بنجاح',
+    'order_id_required' => 'معرّف الطلب مطلوب',
+    'order_details_retrieved' => 'تم استرجاع تفاصيل الطلب بنجاح',
+    'orders_per_city_retrieved' => 'تم استرجاع الطلبات حسب المدينة بنجاح',
+    'orders_status_retrieved' => 'تم استرجاع حالة الطلبات بنجاح',
+    'order_invoice_retrieved' => 'تم استرجاع الفاتورة بنجاح',
+    'order_invoice_creation_failed' => 'فشل إنشاء الفاتورة: :error',
+    'order_cannot_assign_driver_cancelled' => 'لا يمكن تعيين سائق لطلب ملغى',
+    'order_driver_not_available' => 'السائق غير متاح',
+    'order_no_driver_needed' => 'الطلب لا يحتاج إلى سائق (تم تولي المرحلتين من قبل المغسلة)',
+    'order_driver_assignment_failed' => 'فشل تعيين السائق',
 
     // Category messages
     'categories_retrieved' => 'تم استرجاع الفئات بنجاح',
@@ -171,4 +181,17 @@ return [
     'top_vendors_retrieved' => 'تم استرجاع أفضل المتاجر بنجاح',
     'recent_activities_retrieved' => 'تم استرجاع الأنشطة الأخيرة بنجاح',
     'user_growth_retrieved' => 'تم استرجاع بيانات نمو المستخدمين بنجاح',
+
+    // Order payment (capture/void/refund) messages
+    'order_payments_retrieved' => 'تم استرجاع مدفوعات الطلب بنجاح',
+    'payment_already_captured' => 'تم تحصيل الدفعة مسبقًا',
+    'payment_no_authorized_transaction' => 'لا توجد عملية دفع مصرح بها لهذا الطلب',
+    'payment_capture_exceeds_authorized' => 'قيمة التحصيل تتجاوز القيمة المصرح بها',
+    'payment_capture_processed' => 'تم تنفيذ التحصيل',
+    'payment_no_authorized_transaction_void' => 'لا توجد عملية دفع مصرح بها لإلغائها',
+    'payment_void_processed' => 'تم إلغاء التفويض',
+    'payment_no_captured_transaction_refund' => 'لا توجد عملية دفع محصّلة لاستردادها',
+    'payment_already_fully_refunded' => 'تم استرداد قيمة العملية بالكامل مسبقًا',
+    'payment_refund_exceeds_refundable' => 'قيمة الاسترداد تتجاوز المبلغ القابل للاسترداد',
+    'payment_refund_processed' => 'تم تنفيذ الاسترداد',
 ];

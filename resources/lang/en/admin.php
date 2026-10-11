@@ -48,6 +48,16 @@ return [
     'order_driver_assigned' => 'Driver assigned successfully',
     'order_cancelled' => 'Order cancelled successfully',
     'order_statistics_retrieved' => 'Order statistics retrieved successfully',
+    'order_id_required' => 'Order ID is required',
+    'order_details_retrieved' => 'Order details retrieved successfully',
+    'orders_per_city_retrieved' => 'Orders per city retrieved successfully',
+    'orders_status_retrieved' => 'Orders status retrieved successfully',
+    'order_invoice_retrieved' => 'Invoice retrieved successfully',
+    'order_invoice_creation_failed' => 'Failed to create invoice: :error',
+    'order_cannot_assign_driver_cancelled' => 'Cannot assign a driver to a cancelled order',
+    'order_driver_not_available' => 'Driver is not available',
+    'order_no_driver_needed' => 'Order does not need a driver (both legs handled at vendor)',
+    'order_driver_assignment_failed' => 'Driver assignment failed',
 
     // Category messages
     'categories_retrieved' => 'Categories retrieved successfully',
@@ -171,4 +181,17 @@ return [
     'top_vendors_retrieved' => 'Top vendors retrieved successfully',
     'recent_activities_retrieved' => 'Recent activities retrieved successfully',
     'user_growth_retrieved' => 'User growth data retrieved successfully',
+
+    // Order payment (capture/void/refund) messages
+    'order_payments_retrieved' => 'Order payments retrieved successfully',
+    'payment_already_captured' => 'Payment already captured',
+    'payment_no_authorized_transaction' => 'No authorized transaction found for this order',
+    'payment_capture_exceeds_authorized' => 'Capture amount exceeds authorized amount',
+    'payment_capture_processed' => 'Capture processed',
+    'payment_no_authorized_transaction_void' => 'No authorized transaction found to void',
+    'payment_void_processed' => 'Void processed',
+    'payment_no_captured_transaction_refund' => 'No captured transaction found to refund',
+    'payment_already_fully_refunded' => 'Transaction is already fully refunded',
+    'payment_refund_exceeds_refundable' => 'Refund amount exceeds the remaining refundable amount',
+    'payment_refund_processed' => 'Refund processed',
 ];

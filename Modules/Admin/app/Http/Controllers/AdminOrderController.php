@@ -47,7 +47,7 @@ class AdminOrderController extends Controller
 
         return successResponse(
             OrderResource::collection($orders),
-            'Orders retrieved successfully'
+            __('admin.orders_retrieved')
         );
     }
 
@@ -56,10 +56,10 @@ class AdminOrderController extends Controller
         $order = $this->orderService->find($id);
 
         if (! $order) {
-            return ErrorResponse::make('Order not found', null, 404);
+            return ErrorResponse::make(__('admin.order_not_found'), null, 404);
         }
 
-        return successResponse(new OrderResource($order), 'Order retrieved successfully');
+        return successResponse(new OrderResource($order), __('admin.order_retrieved'));
     }
 
     public function invoice(int $id): JsonResponse
@@ -67,7 +67,7 @@ class AdminOrderController extends Controller
         $order = $this->orderService->find($id);
 
         if (! $order) {
-            return ErrorResponse::make('Order not found', null, 404);
+            return ErrorResponse::make(__('admin.order_not_found'), null, 404);
         }
 
         try {
@@ -83,7 +83,7 @@ class AdminOrderController extends Controller
                 'status'         => $invoice->status,
                 'zatca_status'   => $invoice->zatca_status,
                 'total_amount'   => (float) $invoice->total_amount,
-            ], 'Invoice retrieved successfully');
+            ], __('admin.order_invoice_retrieved'));
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Invoice creation failed', [
                 'order_id' => $id,
@@ -91,7 +91,7 @@ class AdminOrderController extends Controller
                 'trace'    => $e->getTraceAsString(),
             ]);
 
-            return ErrorResponse::make('Failed to create invoice: '.$e->getMessage(), null, 500);
+            return ErrorResponse::make(__('admin.order_invoice_creation_failed', ['error' => $e->getMessage()]), null, 500);
         }
     }
 
@@ -100,7 +100,7 @@ class AdminOrderController extends Controller
         $order = $this->orderService->find($id);
 
         if (! $order) {
-            return ErrorResponse::make('Order not found', null, 404);
+            return ErrorResponse::make(__('admin.order_not_found'), null, 404);
         }
 
         $validated = $request->validate([
@@ -119,7 +119,7 @@ class AdminOrderController extends Controller
 
         return successResponse(
             $order->fresh()->load(['statusLogs']),
-            'Order status updated successfully'
+            __('admin.order_status_updated')
         );
     }
 
@@ -128,11 +128,11 @@ class AdminOrderController extends Controller
         $order = $this->orderService->find($id);
 
         if (! $order) {
-            return ErrorResponse::make('Order not found', null, 404);
+            return ErrorResponse::make(__('admin.order_not_found'), null, 404);
         }
 
         if ($order->status === OrderStatus::CANCELLED->value) {
-            return ErrorResponse::make('Cannot assign a driver to a cancelled order', null, 400);
+            return ErrorResponse::make(__('admin.order_cannot_assign_driver_cancelled'), null, 400);
         }
 
         $validated = $request->validate([
@@ -142,7 +142,7 @@ class AdminOrderController extends Controller
         $driver = Driver::find($validated['driver_id']);
 
         if (! $driver || ! $driver->is_available) {
-            return ErrorResponse::make('Driver is not available', null, 400);
+            return ErrorResponse::make(__('admin.order_driver_not_available'), null, 400);
         }
 
         // Route through the state machine (same as the vendor-side assignment endpoint)
@@ -166,15 +166,15 @@ class AdminOrderController extends Controller
             } elseif ($order->needsDeliveryDriver()) {
                 $statusService->assignDeliveryDriver($order, $driver, $changedBy, 'admin');
             } else {
-                return ErrorResponse::make('Order does not need a driver (both legs handled at vendor)', null, 400);
+                return ErrorResponse::make(__('admin.order_no_driver_needed'), null, 400);
             }
         } catch (\Throwable $e) {
-            return ErrorResponse::make($e->getMessage() ?: 'Driver assignment failed', null, 400);
+            return ErrorResponse::make($e->getMessage() ?: __('admin.order_driver_assignment_failed'), null, 400);
         }
 
         return successResponse(
             $order->fresh()->load(['driver', 'pickupDriver', 'deliveryDriver']),
-            'Driver assigned successfully'
+            __('admin.order_driver_assigned')
         );
     }
 
@@ -183,7 +183,7 @@ class AdminOrderController extends Controller
         $order = $this->orderService->find($id);
 
         if (! $order) {
-            return ErrorResponse::make('Order not found', null, 404);
+            return ErrorResponse::make(__('admin.order_not_found'), null, 404);
         }
 
         // Check if payment_status is actually a payment method
@@ -245,7 +245,7 @@ class AdminOrderController extends Controller
 
         return successResponse(
             $order->fresh()->load('paymentTransactions'),
-            'Payment status updated successfully'
+            __('admin.order_payment_status_updated')
         );
     }
 
@@ -254,11 +254,11 @@ class AdminOrderController extends Controller
         $order = $this->orderService->find($id);
 
         if (! $order) {
-            return ErrorResponse::make('Order not found', null, 404);
+            return ErrorResponse::make(__('admin.order_not_found'), null, 404);
         }
 
         if ($order->status === OrderStatus::CANCELLED->value) {
-            return successResponse($order->fresh(), 'Order cancelled successfully');
+            return successResponse($order->fresh(), __('admin.order_cancelled'));
         }
 
         $context = [
@@ -297,7 +297,7 @@ class AdminOrderController extends Controller
 
         return successResponse(
             $order->fresh(),
-            'Order cancelled successfully'
+            __('admin.order_cancelled')
         );
     }
 
@@ -332,7 +332,7 @@ class AdminOrderController extends Controller
 
         return successResponse(
             $stats,
-            'Order statistics retrieved successfully'
+            __('admin.order_statistics_retrieved')
         );
     }
 
@@ -362,7 +362,7 @@ class AdminOrderController extends Controller
             'Completed_orders' => $completedOrders,
             'Pending_orders' => $pendingOrders,
             'cancelled_orders' => $cancelledOrders,
-        ], 'Order statistics retrieved successfully');
+        ], __('admin.order_statistics_retrieved'));
     }
 
     /**
@@ -401,7 +401,7 @@ class AdminOrderController extends Controller
             ];
         });
 
-        return successResponse($result, 'Orders per city retrieved successfully');
+        return successResponse($result, __('admin.orders_per_city_retrieved'));
     }
 
     /**
@@ -414,7 +414,7 @@ class AdminOrderController extends Controller
         $orderId = $id ?? $request->input('order_id');
 
         if (! $orderId) {
-            return ErrorResponse::make('Order ID is required', null, 400);
+            return ErrorResponse::make(__('admin.order_id_required'), null, 400);
         }
 
         $order = Order::with([
@@ -433,7 +433,7 @@ class AdminOrderController extends Controller
         ])->find($orderId);
 
         if (! $order) {
-            return ErrorResponse::make('Order not found', null, 404);
+            return ErrorResponse::make(__('admin.order_not_found'), null, 404);
         }
 
         // Separate accepted and rejected items (multi-service piece = one line)
@@ -877,7 +877,7 @@ class AdminOrderController extends Controller
             'payment_breakdown' => $paymentBreakdown,
         ];
 
-        return successResponse($response, 'Order details retrieved successfully');
+        return successResponse($response, __('admin.order_details_retrieved'));
     }
 
     /**
@@ -1069,6 +1069,6 @@ class AdminOrderController extends Controller
             'filter_type'    => $filterType,
             'data'           => $data,
             'monthly_status' => $data,
-        ], 'Orders status retrieved successfully');
+        ], __('admin.orders_status_retrieved'));
     }
 }

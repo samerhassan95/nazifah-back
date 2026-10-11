@@ -82,7 +82,7 @@ class AdminPaymentController extends Controller
                 'refunded' => $refunded,
             ],
             'transactions' => $transactions,
-        ], 'Order payments retrieved successfully');
+        ], __('admin.order_payments_retrieved'));
     }
 
     /**
@@ -115,7 +115,7 @@ class AdminPaymentController extends Controller
                 'transaction_id' => $completed->transaction_id,
                 'captured_amount' => (float) $completed->amount,
                 'status' => 'completed',
-            ], 'Payment already captured');
+            ], __('admin.payment_already_captured'));
         }
 
         $transaction = PaymentTransaction::where('order_id', $order->id)
@@ -126,14 +126,14 @@ class AdminPaymentController extends Controller
             ->first();
 
         if (! $transaction) {
-            return errorResponse('No authorized transaction found for this order', 404);
+            return errorResponse(__('admin.payment_no_authorized_transaction'), 404);
         }
 
         $authorized = (float) ($transaction->authorized_amount ?: $transaction->amount);
         $amount = isset($validated['amount']) ? (float) $validated['amount'] : $authorized;
 
         if ($amount > $authorized) {
-            return errorResponse('Capture amount exceeds authorized amount', 400);
+            return errorResponse(__('admin.payment_capture_exceeds_authorized'), 400);
         }
 
         try {
@@ -162,7 +162,7 @@ class AdminPaymentController extends Controller
                 'captured_amount' => $amount,
                 'authorized_amount' => $authorized,
                 'status' => $response->status,
-            ], $response->message ?? 'Capture processed', $response->isSuccessful() ? 200 : 400);
+            ], $response->message ?? __('admin.payment_capture_processed'), $response->isSuccessful() ? 200 : 400);
         } catch (\Exception $e) {
             return serverErrorResponse($e->getMessage());
         }
@@ -191,7 +191,7 @@ class AdminPaymentController extends Controller
             ->first();
 
         if (! $transaction) {
-            return errorResponse('No authorized transaction found to void', 404);
+            return errorResponse(__('admin.payment_no_authorized_transaction_void'), 404);
         }
 
         try {
@@ -215,7 +215,7 @@ class AdminPaymentController extends Controller
             return successResponse([
                 'transaction_id' => $transaction->transaction_id,
                 'status' => $response->isSuccessful() ? 'cancelled' : $transaction->status,
-            ], $response->message ?? 'Void processed', $response->isSuccessful() ? 200 : 400);
+            ], $response->message ?? __('admin.payment_void_processed'), $response->isSuccessful() ? 200 : 400);
         } catch (\Exception $e) {
             return serverErrorResponse($e->getMessage());
         }
@@ -246,20 +246,20 @@ class AdminPaymentController extends Controller
             ->first();
 
         if (! $transaction) {
-            return errorResponse('No captured transaction found to refund', 404);
+            return errorResponse(__('admin.payment_no_captured_transaction_refund'), 404);
         }
 
         $alreadyRefunded = (float) $transaction->refund_amount;
         $refundable = (float) $transaction->amount - $alreadyRefunded;
 
         if ($refundable <= 0) {
-            return errorResponse('Transaction is already fully refunded', 400);
+            return errorResponse(__('admin.payment_already_fully_refunded'), 400);
         }
 
         $amount = isset($validated['amount']) ? (float) $validated['amount'] : $refundable;
 
         if ($amount > $refundable) {
-            return errorResponse('Refund amount exceeds the remaining refundable amount', 400);
+            return errorResponse(__('admin.payment_refund_exceeds_refundable'), 400);
         }
 
         try {
@@ -301,7 +301,7 @@ class AdminPaymentController extends Controller
                 'refunded_amount' => $amount,
                 'total_refunded' => $alreadyRefunded + ($response->isSuccessful() ? $amount : 0),
                 'status' => $response->status,
-            ], $response->message ?? 'Refund processed', $response->isSuccessful() ? 200 : 400);
+            ], $response->message ?? __('admin.payment_refund_processed'), $response->isSuccessful() ? 200 : 400);
         } catch (\Exception $e) {
             return serverErrorResponse($e->getMessage());
         }
