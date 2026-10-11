@@ -21,8 +21,14 @@ class FirebaseAdminService
     public function __construct()
     {
         $this->serviceAccountPath = $this->resolveServiceAccountPath();
-        $this->projectId = (string) (config('services.firebase.project_id')
-            ?: $this->readProjectIdFromServiceAccount()
+        // The project id must always come from whichever service account file was
+        // actually resolved, never independently from .env — otherwise a stale
+        // FIREBASE_PROJECT_ID can silently pair the wrong project's credentials with
+        // the wrong project's FCM endpoint (valid auth, wrong project -> Google
+        // rejects every send). The file is the source of truth; .env is only a
+        // last-resort fallback if the file is unreadable or missing project_id.
+        $this->projectId = (string) ($this->readProjectIdFromServiceAccount()
+            ?: config('services.firebase.project_id')
             ?: '');
     }
 
@@ -287,12 +293,15 @@ class FirebaseAdminService
     {
         $configured = (string) config('services.firebase.service_account_path');
 
+        // Deliberately no project-specific hardcoded filenames here (there have been
+        // three different Firebase projects' credentials in this directory across
+        // this app's history) — a hardcoded fallback name silently surviving a
+        // project switch is exactly what caused the project_id/credentials mismatch
+        // this method used to have. The configured .env path is authoritative; the
+        // glob fallback only exists for local/dev setups that never set it.
         $candidates = array_filter([
             $configured !== '' ? $configured : null,
             $configured !== '' ? base_path($configured) : null,
-            storage_path('app/firebase/nathefah-e65cf-firebase-adminsdk-fbsvc-e20c3725ba.json'),
-            storage_path('app/firebase/nathefah-146b3-firebase-adminsdk-fbsvc-26b2bd2f10.json'),
-            storage_path('app/firebase/service-account.json'),
         ]);
 
         foreach (array_unique($candidates) as $path) {
