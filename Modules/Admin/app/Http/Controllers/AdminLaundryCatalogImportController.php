@@ -28,9 +28,9 @@ class AdminLaundryCatalogImportController extends Controller
     {
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls'],
-            'scope' => ['sometimes', 'in:categories,services,full'],
-            'vendor_id' => ['required_if:scope,full', 'nullable', 'exists:vendors,id'],
-            'branch_ids' => ['required_if:scope,full', 'nullable', 'array', 'min:1'],
+            'scope' => ['sometimes', 'in:categories,services,pieces,addons,full'],
+            'vendor_id' => ['required_if:scope,full,pieces,addons', 'nullable', 'exists:vendors,id'],
+            'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['exists:branches,id'],
             'dry_run' => ['sometimes', 'boolean'],
         ]);
