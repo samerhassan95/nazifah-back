@@ -416,7 +416,12 @@ class MoyasarGateway extends AbstractPaymentGateway
             $metadata = $this->buildMetadata($request, $merchantReference, $callbackUrl);
             unset($metadata['moyasar_token']);
 
-            $source = ['type' => 'token', 'token' => $token];
+            // Moyasar skips 3DS by default on a token charge ("the payment method was
+            // already verified when the token was created/saved"). Force it anyway on
+            // every saved-card charge — the existing $needsChallenge handling below
+            // already anticipates the 'initiated' + transaction_url response shape this
+            // produces, same as a normal (non-saved-card) 3DS challenge.
+            $source = ['type' => 'token', 'token' => $token, '3ds' => true];
             if ($this->isAuthorizationMode()) {
                 $source['manual'] = true;
             }
