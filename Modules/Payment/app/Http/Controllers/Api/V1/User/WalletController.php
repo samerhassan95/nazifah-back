@@ -18,6 +18,7 @@ use Modules\Payment\DTOs\PaymentRequest;
 use Modules\Payment\Models\PaymentMethod as PaymentMethodRecord;
 use Modules\Payment\Models\PaymentTransaction;
 use Modules\Payment\Services\ActiveGatewayResolver;
+use Modules\Payment\Services\ClientCardService;
 use Modules\Payment\Services\PaymentService;
 use Modules\Payment\Services\WalletDepositCreditor;
 
@@ -27,6 +28,7 @@ class WalletController extends Controller
         private PaymentService $paymentService,
         private WalletDepositCreditor $walletDepositCreditor,
         private DiscountService $discountService,
+        private ClientCardService $clientCardService,
     ) {}
 
     /**
@@ -606,6 +608,17 @@ class WalletController extends Controller
                 // from Moyasar's own `source`, same as the redirect-based path.
                 $paymentTransaction = app(\Modules\Payment\Services\MoyasarPaymentMethodApplier::class)
                     ->applyFromVerifiedSource($paymentTransaction, $verificationResponse->data['source'] ?? null, null);
+
+                // Wallet top-ups never went through PaymentController::callback(), so the
+                // save-card checkbox was silently a no-op here: the token lives in
+                // source.token on a successful verify, but nothing ever read it on this
+                // path. Same persistence PaymentController::callback() already does.
+                if (is_array($verificationResponse->data['source'] ?? null)) {
+                    $this->clientCardService->upsertFromMoyasarSource(
+                        $paymentTransaction,
+                        $verificationResponse->data['source']
+                    );
+                }
             }
 
             $settlement = $this->walletDepositCreditor->creditIfNotAlready(
@@ -789,6 +802,16 @@ class WalletController extends Controller
                             $verificationResponse->data['source'] ?? null,
                             null,
                         );
+
+                    // Same gap as confirmMoyasarDeposit(): this path never persisted a
+                    // token from a save_card checkout, so wallet top-ups could never
+                    // produce a saved card regardless of the checkbox.
+                    if (is_array($verificationResponse->data['source'] ?? null)) {
+                        $this->clientCardService->upsertFromMoyasarSource(
+                            $paymentTransaction,
+                            $verificationResponse->data['source']
+                        );
+                    }
 
                     $settlement = $this->walletDepositCreditor->creditIfNotAlready(
                         $paymentTransaction->fresh(),
