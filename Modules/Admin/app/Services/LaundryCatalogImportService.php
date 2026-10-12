@@ -10,28 +10,60 @@ use Modules\Service\Models\ServiceAddition;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * Service for importing catalog data from Master Catalog Excel v6 (or legacy format).
- * Supports both standalone sheets per screen and full imports.
+ * Service for importing catalog data from the Master Catalog Excel. Supports
+ * both the current "Developer Import v10" format (English sheet names,
+ * separate _AR/_EN name columns, a Service_Price column, and an explicit
+ * Section<->Service many-to-many sheet) and the older v6 format (Arabic sheet
+ * names, a single combined name column) for any file still in that shape —
+ * each sheet is looked up under its v10 name first, falling back to its v6
+ * name.
  *
  * Scopes supported:
- * - 'categories' : Imports 01_الأقسام into global categories.
- * - 'services'   : Imports 02_الخدمات into global services (linked to categories).
- * - 'pieces'     : Imports 03_القطع & 04_ربط_الخدمة_بالقطعة into vendor pieces & branch links.
- *                   Also creates any 02_الخدمات service referenced by the link sheet that
- *                   does not already exist globally, so a piece's services never silently
- *                   end up unlinked just because this scope was used on its own.
- * - 'addons'     : Imports 05_الإضافات into vendor additional services (ServiceAddition).
+ * - 'categories' : Imports 01_Sections into global categories.
+ * - 'services'   : Imports 02_Services into global services, and
+ *                   03_Section_Service into the category_service pivot (a
+ *                   service can legitimately belong to more than one
+ *                   category — confirmed real data, not an import quirk).
+ * - 'pieces'     : Imports 04_Pieces, 05_Service_Piece (with its per-pair
+ *                   Service_Price as the seed price) and 07_Piece_AddOn into
+ *                   vendor pieces, branch links, and branch-scoped
+ *                   service_piece / service_addition_piece rows. Also
+ *                   creates any referenced service/addon that doesn't
+ *                   already exist, so a piece's links never silently end up
+ *                   empty just because this scope was used on its own.
+ * - 'addons'     : Imports 06_AddOns into vendor additional services
+ *                   (ServiceAddition) — the sheet is a global name catalog,
+ *                   but service_additions.vendor_id is required, so a
+ *                   per-vendor copy is created/matched by name.
  * - 'full'       : Imports all available sheets in the workbook.
  */
 class LaundryCatalogImportService
 {
-    private const SECTIONS_SHEET = '01_الأقسام';
-    private const SERVICES_SHEET = '02_الخدمات';
-    private const PIECES_SHEET = '03_القطع';
-    private const SERVICE_PIECE_LINKS_SHEET = '04_ربط_الخدمة_بالقطعة';
+    private const SECTIONS_SHEET = '01_Sections';
+
+    private const SECTIONS_SHEET_LEGACY = '01_الأقسام';
+
+    private const SERVICES_SHEET = '02_Services';
+
+    private const SERVICES_SHEET_LEGACY = '02_الخدمات';
+
+    private const SECTION_SERVICE_SHEET = '03_Section_Service';
+
+    private const PIECES_SHEET = '04_Pieces';
+
+    private const PIECES_SHEET_LEGACY = '03_القطع';
+
+    private const SERVICE_PIECE_LINKS_SHEET = '05_Service_Piece';
+
+    private const SERVICE_PIECE_LINKS_SHEET_LEGACY = '04_ربط_الخدمة_بالقطعة';
+
+    private const ADDONS_SHEET = '06_AddOns';
+
     private const ADDONS_SHEET_V6 = '05_الإضافات';
+
     private const ADDONS_SHEET_LEGACY = '04_الإضافية';
-    private const ADDON_LINKS_SHEET_LEGACY = '05_ربط_الإضافية';
+
+    private const PIECE_ADDON_LINKS_SHEET = '07_Piece_AddOn';
 
     /**
      * @param int[] $branchIds
@@ -48,6 +80,7 @@ class LaundryCatalogImportService
         $stats = [
             'categories_created' => 0,
             'categories_skipped' => 0,
+            'category_links_attached' => 0,
             'services_created' => 0,
             'services_skipped' => 0,
             'pieces_created' => 0,
@@ -55,44 +88,54 @@ class LaundryCatalogImportService
             'addons_created' => 0,
             'addons_skipped' => 0,
             'piece_service_attached' => 0,
+            'piece_addon_attached' => 0,
             'branch_piece_attached' => 0,
             'branch_piece_skipped' => 0,
         ];
 
-        // 1. Read Sections/Categories if requested
+        // 1. Sections/Categories
         $sections = in_array($scope, ['categories', 'services', 'pieces', 'full'], true)
-            ? $this->sheetRowsOrEmpty($spreadsheet, self::SECTIONS_SHEET, ['Section_ID', 'section_id'])
+            ? $this->readSheet($spreadsheet, [self::SECTIONS_SHEET, self::SECTIONS_SHEET_LEGACY], ['Section_ID', 'section_id'])
             : [];
 
-        // 2. Read Services if requested
+        // 2. Services
         $servicesIn = in_array($scope, ['services', 'pieces', 'full'], true)
-            ? $this->sheetRowsOrEmpty($spreadsheet, self::SERVICES_SHEET, ['Service_ID', 'service_id'])
+            ? $this->readSheet($spreadsheet, [self::SERVICES_SHEET, self::SERVICES_SHEET_LEGACY], ['Service_ID', 'service_id'])
             : [];
 
-        // 3. Read Pieces & Links if requested
+        // 3. Section<->Service many-to-many (v10 only; no v6 equivalent)
+        $sectionServiceLinks = in_array($scope, ['services', 'pieces', 'full'], true)
+            ? $this->readSheet($spreadsheet, [self::SECTION_SERVICE_SHEET], ['Section_ID', 'section_id'])
+            : [];
+
+        // 4. Pieces
         $piecesIn = in_array($scope, ['pieces', 'full'], true)
-            ? $this->sheetRowsOrEmpty($spreadsheet, self::PIECES_SHEET, ['Piece_ID', 'piece_id'])
+            ? $this->readSheet($spreadsheet, [self::PIECES_SHEET, self::PIECES_SHEET_LEGACY], ['Piece_ID', 'piece_id'])
             : [];
 
+        // 5. Service<->Piece links (with per-pair price in v10)
         $servicePieceLinks = in_array($scope, ['pieces', 'full'], true)
-            ? $this->sheetRowsOrEmpty($spreadsheet, self::SERVICE_PIECE_LINKS_SHEET, ['Service_ID', 'service_id'])
+            ? $this->readSheet($spreadsheet, [self::SERVICE_PIECE_LINKS_SHEET, self::SERVICE_PIECE_LINKS_SHEET_LEGACY], ['Service_ID', 'service_id'])
             : [];
 
-        // 4. Read Addons if requested
-        $addonsIn = [];
-        if (in_array($scope, ['addons', 'full'], true)) {
-            $addonsIn = $this->sheetRowsOrEmpty($spreadsheet, self::ADDONS_SHEET_V6, ['AddOn_ID', 'addon_id']);
-            if (empty($addonsIn)) {
-                $addonsIn = $this->sheetRowsOrEmpty($spreadsheet, self::ADDONS_SHEET_LEGACY, ['AddOn_ID', 'addon_id']);
-            }
-        }
+        // 6. Addons (name catalog)
+        $addonsIn = in_array($scope, ['addons', 'pieces', 'full'], true)
+            ? $this->readSheet($spreadsheet, [self::ADDONS_SHEET, self::ADDONS_SHEET_V6, self::ADDONS_SHEET_LEGACY], ['AddOn_ID', 'addon_id'])
+            : [];
+
+        // 7. Piece<->AddOn suggested links (v10 only; no v6 equivalent)
+        $pieceAddonLinks = in_array($scope, ['pieces', 'full'], true)
+            ? $this->readSheet($spreadsheet, [self::PIECE_ADDON_LINKS_SHEET], ['Piece_ID', 'piece_id'])
+            : [];
 
         $run = function () use (
             $sections,
             $servicesIn,
+            $sectionServiceLinks,
             $piecesIn,
             $servicePieceLinks,
             $addonsIn,
+            $pieceAddonLinks,
             $vendorId,
             $branchIds,
             &$stats,
@@ -107,16 +150,16 @@ class LaundryCatalogImportService
             $canCreateCategories = in_array($scope, ['categories', 'full'], true);
 
             foreach ($sections as $row) {
-                $name = trim((string) ($row['اسم القسم'] ?? $row['name'] ?? ''));
+                $name = $this->bilingualName($row, 'section_name_AR', 'section_name_EN', ['اسم القسم', 'name']);
                 $sectionCode = (string) ($row['Section_ID'] ?? $row['section_id'] ?? '');
 
-                if ($name === '') {
+                if ($name['ar'] === '') {
                     continue;
                 }
 
-                if (isset($existingCategories[$name])) {
+                if (isset($existingCategories[$name['ar']])) {
                     if ($sectionCode !== '') {
-                        $categoryIdMap[$sectionCode] = $existingCategories[$name]->id;
+                        $categoryIdMap[$sectionCode] = $existingCategories[$name['ar']]->id;
                     }
                     if ($canCreateCategories) {
                         $stats['categories_skipped']++;
@@ -137,7 +180,7 @@ class LaundryCatalogImportService
                 }
 
                 $cat = Category::create([
-                    'name' => ['ar' => $name, 'en' => $name],
+                    'name' => ['ar' => $name['ar'], 'en' => $name['en']],
                     'order' => (int) ($row['ترتيب العرض'] ?? 0),
                     'is_active' => true,
                 ]);
@@ -145,7 +188,7 @@ class LaundryCatalogImportService
                 if ($sectionCode !== '') {
                     $categoryIdMap[$sectionCode] = $cat->id;
                 }
-                $existingCategories[$name] = $cat;
+                $existingCategories[$name['ar']] = $cat;
                 $stats['categories_created']++;
             }
 
@@ -154,8 +197,22 @@ class LaundryCatalogImportService
             }
 
             // ==========================================
-            // B. Services (Global)
+            // B. Services (Global) + category_service links
             // ==========================================
+
+            // A service's categories now live in 03_Section_Service rather than inline
+            // on the services sheet — build code -> [section codes...] first so the
+            // first one can seed the still-required services.category_id below, and the
+            // rest get recorded in category_service once every id is known.
+            $sectionCodesByServiceCode = [];
+            foreach ($sectionServiceLinks as $link) {
+                $secCode = (string) ($link['Section_ID'] ?? $link['section_id'] ?? '');
+                $svcCode = (string) ($link['Service_ID'] ?? $link['service_id'] ?? '');
+                if ($secCode !== '' && $svcCode !== '') {
+                    $sectionCodesByServiceCode[$svcCode][] = $secCode;
+                }
+            }
+
             $existingServices = Service::all()->keyBy(fn ($s) => trim($s->getTranslation('service_name', 'ar')));
             $serviceIdMap = [];
             // 'pieces' scope must also be allowed to create missing global services: the
@@ -167,17 +224,16 @@ class LaundryCatalogImportService
             $canCreateServices = in_array($scope, ['services', 'pieces', 'full'], true);
 
             foreach ($servicesIn as $row) {
-                $name = trim((string) ($row['اسم الخدمة'] ?? $row['name'] ?? ''));
+                $name = $this->bilingualName($row, 'service_name_AR', 'service_name_EN', ['اسم الخدمة', 'name']);
                 $svcCode = (string) ($row['Service_ID'] ?? $row['service_id'] ?? '');
-                $sectionCode = (string) ($row['Section_ID'] ?? $row['section_id'] ?? '');
 
-                if ($name === '') {
+                if ($name['ar'] === '') {
                     continue;
                 }
 
-                if (isset($existingServices[$name])) {
+                if (isset($existingServices[$name['ar']])) {
                     if ($svcCode !== '') {
-                        $serviceIdMap[$svcCode] = $existingServices[$name]->id;
+                        $serviceIdMap[$svcCode] = $existingServices[$name['ar']]->id;
                     }
                     if ($canCreateServices) {
                         $stats['services_skipped']++;
@@ -189,9 +245,14 @@ class LaundryCatalogImportService
                     continue;
                 }
 
-                $catId = $categoryIdMap[$sectionCode] ?? null;
+                $firstSectionCode = $sectionCodesByServiceCode[$svcCode][0] ?? null;
+                $catId = $firstSectionCode !== null ? ($categoryIdMap[$firstSectionCode] ?? null) : null;
                 if (! is_int($catId)) {
-                    // Try to match category by section name if provided in row
+                    // Legacy fallback: an inline Section_ID/القسم column directly on this row.
+                    $legacySectionCode = (string) ($row['Section_ID'] ?? $row['section_id'] ?? '');
+                    $catId = $categoryIdMap[$legacySectionCode] ?? null;
+                }
+                if (! is_int($catId)) {
                     $sectionName = trim((string) ($row['القسم'] ?? ''));
                     if ($sectionName !== '' && isset($existingCategories[$sectionName])) {
                         $catId = $existingCategories[$sectionName]->id;
@@ -213,7 +274,7 @@ class LaundryCatalogImportService
                 }
 
                 $svc = Service::create([
-                    'service_name' => ['ar' => $name, 'en' => $name],
+                    'service_name' => ['ar' => $name['ar'], 'en' => $name['en']],
                     'category_id' => $catId,
                     'order' => (int) ($row['ترتيب الخدمة'] ?? 0),
                     'is_active' => true,
@@ -222,8 +283,40 @@ class LaundryCatalogImportService
                 if ($svcCode !== '') {
                     $serviceIdMap[$svcCode] = $svc->id;
                 }
-                $existingServices[$name] = $svc;
+                $existingServices[$name['ar']] = $svc;
                 $stats['services_created']++;
+            }
+
+            // Now that every category and service id is resolved, record every
+            // section a service is linked to (not just the first) in category_service.
+            if (! $dryRun) {
+                foreach ($sectionCodesByServiceCode as $svcCode => $secCodes) {
+                    $svcId = $serviceIdMap[$svcCode] ?? null;
+                    if (! is_int($svcId)) {
+                        continue;
+                    }
+                    foreach (array_unique($secCodes) as $secCode) {
+                        $catId = $categoryIdMap[$secCode] ?? null;
+                        if (! is_int($catId)) {
+                            continue;
+                        }
+                        $exists = \DB::table('category_service')
+                            ->where('category_id', $catId)
+                            ->where('service_id', $svcId)
+                            ->exists();
+                        if (! $exists) {
+                            \DB::table('category_service')->insert([
+                                'category_id' => $catId,
+                                'service_id' => $svcId,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                            $stats['category_links_attached']++;
+                        }
+                    }
+                }
+            } else {
+                $stats['category_links_attached'] += array_sum(array_map('count', $sectionCodesByServiceCode));
             }
 
             if ($scope === 'services') {
@@ -233,34 +326,57 @@ class LaundryCatalogImportService
             // ==========================================
             // C. Addons / Additional Services (Vendor-Scoped)
             // ==========================================
-            if (in_array($scope, ['addons', 'full'], true) && $vendorId) {
+            // service_additions.vendor_id is required (no global addon catalog), so
+            // 06_AddOns' catalog names are matched/created per vendor by name — same
+            // as a plain vendor addon import, just with the AddOn_ID code also kept so
+            // 07_Piece_AddOn below can resolve its links to the per-vendor row.
+            $addonIdMap = [];
+            if (in_array($scope, ['addons', 'pieces', 'full'], true) && $vendorId) {
                 $existingAddons = ServiceAddition::where('vendor_id', $vendorId)->get()
                     ->keyBy(fn ($a) => trim($a->getTranslation('name', 'ar')));
+                $canCreateAddons = in_array($scope, ['addons', 'full'], true);
 
                 foreach ($addonsIn as $row) {
-                    $name = trim((string) ($row['اسم الإضافة'] ?? $row['اسم الخدمة الإضافية'] ?? $row['name'] ?? ''));
-                    if ($name === '') {
+                    $name = $this->bilingualName($row, 'add_on_name_AR', 'add_on_name_EN', ['اسم الإضافة', 'اسم الخدمة الإضافية', 'name']);
+                    $addonCode = (string) ($row['AddOn_ID'] ?? $row['addon_id'] ?? '');
+
+                    if ($name['ar'] === '') {
                         continue;
                     }
 
-                    if (isset($existingAddons[$name])) {
-                        $stats['addons_skipped']++;
+                    if (isset($existingAddons[$name['ar']])) {
+                        if ($addonCode !== '') {
+                            $addonIdMap[$addonCode] = $existingAddons[$name['ar']]->id;
+                        }
+                        if ($canCreateAddons) {
+                            $stats['addons_skipped']++;
+                        }
+                        continue;
+                    }
+
+                    if (! $canCreateAddons) {
                         continue;
                     }
 
                     if ($dryRun) {
+                        if ($addonCode !== '') {
+                            $addonIdMap[$addonCode] = 'NEW:' . $addonCode;
+                        }
                         $stats['addons_created']++;
                         continue;
                     }
 
                     $addon = ServiceAddition::create([
                         'vendor_id' => $vendorId,
-                        'name' => ['ar' => $name, 'en' => $name],
+                        'name' => ['ar' => $name['ar'], 'en' => $name['en']],
                         'description' => ! empty($row['ملاحظات']) ? ['ar' => (string) $row['ملاحظات'], 'en' => (string) $row['ملاحظات']] : null,
                         'price' => (float) ($row['السعر'] ?? 0),
                         'is_active' => true,
                     ]);
-                    $existingAddons[$name] = $addon;
+                    $existingAddons[$name['ar']] = $addon;
+                    if ($addonCode !== '') {
+                        $addonIdMap[$addonCode] = $addon->id;
+                    }
                     $stats['addons_created']++;
                 }
             }
@@ -270,16 +386,29 @@ class LaundryCatalogImportService
             }
 
             // ==========================================
-            // D. Pieces & Service Links (Vendor + Branches)
+            // D. Pieces & Service/AddOn Links (Vendor + Branches)
             // ==========================================
             if (in_array($scope, ['pieces', 'full'], true) && $vendorId) {
-                // Map piece code -> list of service codes
+                // Map piece code -> list of [service id/placeholder, price]
                 $pieceToServicesMap = [];
                 foreach ($servicePieceLinks as $link) {
                     $svcCode = (string) ($link['Service_ID'] ?? $link['service_id'] ?? '');
                     $pieceCode = (string) ($link['Piece_ID'] ?? $link['piece_id'] ?? '');
-                    if ($svcCode !== '' && $pieceCode !== '') {
-                        $pieceToServicesMap[$pieceCode][] = $svcCode;
+                    if ($svcCode === '' || $pieceCode === '') {
+                        continue;
+                    }
+                    $price = (float) ($link['Service_Price'] ?? $link['service_price'] ?? 0);
+                    $pieceToServicesMap[$pieceCode][] = ['code' => $svcCode, 'price' => $price];
+                }
+
+                // Map piece code -> list of addon codes (no price on this sheet — the
+                // addon's own catalog price, set in section C, is used as the seed).
+                $pieceToAddonsMap = [];
+                foreach ($pieceAddonLinks as $link) {
+                    $pieceCode = (string) ($link['Piece_ID'] ?? $link['piece_id'] ?? '');
+                    $addonCode = (string) ($link['AddOn_ID'] ?? $link['addon_id'] ?? '');
+                    if ($pieceCode !== '' && $addonCode !== '') {
+                        $pieceToAddonsMap[$pieceCode][] = $addonCode;
                     }
                 }
 
@@ -287,60 +416,69 @@ class LaundryCatalogImportService
                     ->keyBy(fn ($p) => trim($p->getTranslation('name', 'ar')));
 
                 $touchedPieceIds = [];
-                // piece_id => [real service ids...], built while walking $piecesIn so the
-                // branch loop below can create properly branch-scoped service_piece rows.
-                $pieceRealServiceIds = [];
+                // piece_id => [['service_id' => int, 'price' => float], ...]
+                $pieceRealServices = [];
+                // piece_id => [['addon_id' => int, 'price' => float], ...]
+                $pieceRealAddons = [];
 
                 foreach ($piecesIn as $row) {
-                    $name = trim((string) ($row['اسم القطعة'] ?? $row['name'] ?? ''));
+                    $name = $this->bilingualName($row, 'piece_name_AR', 'piece_name_EN', ['اسم القطعة', 'name']);
                     $pieceCode = (string) ($row['Piece_ID'] ?? $row['piece_id'] ?? '');
 
-                    if ($name === '') {
+                    if ($name['ar'] === '') {
                         continue;
                     }
 
                     $piece = null;
-                    if (isset($existingPieces[$name])) {
-                        $piece = $existingPieces[$name];
+                    if (isset($existingPieces[$name['ar']])) {
+                        $piece = $existingPieces[$name['ar']];
                         $touchedPieceIds[] = $piece->id;
                         $stats['pieces_skipped']++;
                     } else {
                         if ($dryRun) {
                             $stats['pieces_created']++;
                             $stats['piece_service_attached'] += count($pieceToServicesMap[$pieceCode] ?? []) * max(count($branchIds), 1);
+                            $stats['piece_addon_attached'] += count($pieceToAddonsMap[$pieceCode] ?? []) * max(count($branchIds), 1);
                             $stats['branch_piece_attached'] += count($branchIds);
                             continue;
                         }
 
                         $piece = Piece::create([
                             'vendor_id' => $vendorId,
-                            'name' => ['ar' => $name, 'en' => $name],
+                            'name' => ['ar' => $name['ar'], 'en' => $name['en']],
                             'is_active' => true,
                         ]);
-                        $existingPieces[$name] = $piece;
+                        $existingPieces[$name['ar']] = $piece;
                         $touchedPieceIds[] = $piece->id;
                         $stats['pieces_created']++;
                     }
 
-                    $linkedSvcCodes = $pieceToServicesMap[$pieceCode] ?? [];
-                    foreach ($linkedSvcCodes as $sc) {
-                        $realSvcId = $serviceIdMap[$sc] ?? null;
+                    foreach ($pieceToServicesMap[$pieceCode] ?? [] as $link) {
+                        $realSvcId = $serviceIdMap[$link['code']] ?? null;
                         if (is_int($realSvcId)) {
-                            $pieceRealServiceIds[$piece->id][] = $realSvcId;
+                            $pieceRealServices[$piece->id][] = ['service_id' => $realSvcId, 'price' => $link['price']];
+                        }
+                    }
+
+                    foreach ($pieceToAddonsMap[$pieceCode] ?? [] as $addonCode) {
+                        $realAddonId = $addonIdMap[$addonCode] ?? null;
+                        if (is_int($realAddonId)) {
+                            $pieceRealAddons[$piece->id][] = $realAddonId;
                         }
                     }
                 }
 
                 // Attach touched pieces to selected branches, and — critically — create
-                // service_piece rows scoped to each of those branches. Every app-facing
-                // endpoint (PiecesController, order pricing, etc.) reads a piece's services
-                // filtered by a specific service_piece.branch_id; a branch-less row is
-                // invisible to all of them even though the dashboard's unscoped
-                // Piece::services() relationship shows it fine. Mirrors what the manual
-                // "assign services to piece at branch" endpoint already does.
+                // service_piece / service_addition_piece rows scoped to each of those
+                // branches. Every app-facing endpoint (PiecesController, order pricing,
+                // etc.) reads a piece's services/addons filtered by a specific branch_id;
+                // a branch-less row is invisible to all of them even though the
+                // dashboard's unscoped relationships show it fine. Mirrors what the
+                // manual "assign services to piece at branch" endpoint already does.
                 if (! $dryRun && ! empty($branchIds)) {
                     foreach ($touchedPieceIds as $pieceId) {
-                        $realSvcIds = array_unique($pieceRealServiceIds[$pieceId] ?? []);
+                        $realServices = $pieceRealServices[$pieceId] ?? [];
+                        $realAddonIds = array_unique($pieceRealAddons[$pieceId] ?? []);
 
                         foreach ($branchIds as $branchId) {
                             $exists = \DB::table('branch_piece')
@@ -360,7 +498,9 @@ class LaundryCatalogImportService
                                 }
                             }
 
-                            foreach ($realSvcIds as $realSvcId) {
+                            foreach ($realServices as $svcLink) {
+                                $realSvcId = $svcLink['service_id'];
+
                                 $branchServiceExists = \DB::table('branch_service')
                                     ->where('branch_id', $branchId)
                                     ->where('service_id', $realSvcId)
@@ -392,21 +532,43 @@ class LaundryCatalogImportService
                                         'piece_id' => $pieceId,
                                         'service_id' => $realSvcId,
                                         'branch_id' => $branchId,
-                                        'price' => 0.0,
+                                        'price' => $svcLink['price'],
                                         'created_at' => now(),
                                         'updated_at' => now(),
                                     ]);
                                     $stats['piece_service_attached']++;
                                 }
                             }
+
+                            foreach ($realAddonIds as $realAddonId) {
+                                $alreadyAttached = \DB::table('service_addition_piece')
+                                    ->where('piece_id', $pieceId)
+                                    ->where('service_addition_id', $realAddonId)
+                                    ->where('branch_id', $branchId)
+                                    ->exists();
+
+                                if (! $alreadyAttached) {
+                                    $addonPrice = (float) (ServiceAddition::find($realAddonId)?->price ?? 0);
+                                    \DB::table('service_addition_piece')->insert([
+                                        'piece_id' => $pieceId,
+                                        'service_addition_id' => $realAddonId,
+                                        'branch_id' => $branchId,
+                                        'price' => $addonPrice,
+                                        'created_at' => now(),
+                                        'updated_at' => now(),
+                                    ]);
+                                    $stats['piece_addon_attached']++;
+                                }
+                            }
                         }
                     }
                 } elseif (! $dryRun) {
-                    // No branch selected (vendor-level "pieces only" import): keep a
-                    // branch-less catalog record so the link survives until the admin
-                    // assigns the piece to a branch — the app can't use it yet either way.
+                    // No branch selected (vendor-level "pieces only" import): keep
+                    // branch-less catalog records so the links survive until the admin
+                    // assigns the piece to a branch — the app can't use them yet either way.
                     foreach ($touchedPieceIds as $pieceId) {
-                        foreach (array_unique($pieceRealServiceIds[$pieceId] ?? []) as $realSvcId) {
+                        foreach ($pieceRealServices[$pieceId] ?? [] as $svcLink) {
+                            $realSvcId = $svcLink['service_id'];
                             $alreadyAttached = \DB::table('service_piece')
                                 ->where('piece_id', $pieceId)
                                 ->where('service_id', $realSvcId)
@@ -417,11 +579,31 @@ class LaundryCatalogImportService
                                 \DB::table('service_piece')->insert([
                                     'piece_id' => $pieceId,
                                     'service_id' => $realSvcId,
-                                    'price' => 0.0,
+                                    'price' => $svcLink['price'],
                                     'created_at' => now(),
                                     'updated_at' => now(),
                                 ]);
                                 $stats['piece_service_attached']++;
+                            }
+                        }
+
+                        foreach (array_unique($pieceRealAddons[$pieceId] ?? []) as $realAddonId) {
+                            $alreadyAttached = \DB::table('service_addition_piece')
+                                ->where('piece_id', $pieceId)
+                                ->where('service_addition_id', $realAddonId)
+                                ->whereNull('branch_id')
+                                ->exists();
+
+                            if (! $alreadyAttached) {
+                                $addonPrice = (float) (ServiceAddition::find($realAddonId)?->price ?? 0);
+                                \DB::table('service_addition_piece')->insert([
+                                    'piece_id' => $pieceId,
+                                    'service_addition_id' => $realAddonId,
+                                    'price' => $addonPrice,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+                                $stats['piece_addon_attached']++;
                             }
                         }
                     }
@@ -436,6 +618,54 @@ class LaundryCatalogImportService
         }
 
         return $stats;
+    }
+
+    /**
+     * Resolve a bilingual name from a row: prefers the v10 separate _AR/_EN
+     * columns, falling back to a single combined column (v6, or either
+     * language missing) duplicated into both locales.
+     *
+     * @return array{ar: string, en: string}
+     */
+    private function bilingualName(array $row, string $arKey, string $enKey, array $fallbackKeys = []): array
+    {
+        $ar = trim((string) ($row[$arKey] ?? ''));
+        $en = trim((string) ($row[$enKey] ?? ''));
+
+        if ($ar === '' && $en === '') {
+            foreach ($fallbackKeys as $key) {
+                $value = trim((string) ($row[$key] ?? ''));
+                if ($value !== '') {
+                    $ar = $en = $value;
+                    break;
+                }
+            }
+        }
+
+        if ($ar === '') {
+            $ar = $en;
+        }
+        if ($en === '') {
+            $en = $ar;
+        }
+
+        return ['ar' => $ar, 'en' => $en];
+    }
+
+    /**
+     * Reads the first sheet found among $sheetNames (tried in order), or
+     * returns empty if none of them exist in the workbook.
+     */
+    private function readSheet($spreadsheet, array $sheetNames, array $possibleIdHeaders): array
+    {
+        foreach ($sheetNames as $sheetName) {
+            $rows = $this->sheetRowsOrEmpty($spreadsheet, $sheetName, $possibleIdHeaders);
+            if (! empty($rows)) {
+                return $rows;
+            }
+        }
+
+        return [];
     }
 
     /**

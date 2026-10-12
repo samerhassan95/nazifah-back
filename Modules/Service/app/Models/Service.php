@@ -117,6 +117,18 @@ class Service extends Model
     }
 
     /**
+     * Every category this service is associated with. category_id above stays
+     * the single required "primary" category used across existing screens;
+     * this additionally records cases like "Regular Washing" legitimately
+     * applying to both Clothing and Bedding & Blankets.
+     */
+    public function categories(): BelongsToMany
+    {
+        return $this->belongsToMany(Category::class, 'category_service')
+            ->withTimestamps();
+    }
+
+    /**
      * Get the icon associated with this service
      */
     public function iconRelation(): BelongsTo

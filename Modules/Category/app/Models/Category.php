@@ -5,6 +5,7 @@ namespace Modules\Category\Models;
 use App\Traits\Cacheable;
 use App\Traits\HasSoftDeletes;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Service\Models\Service;
 use Spatie\Translatable\HasTranslations;
@@ -46,6 +47,18 @@ class Category extends Model
     public function services(): HasMany
     {
         return $this->hasMany(Service::class);
+    }
+
+    /**
+     * Every service associated with this category via category_service, in
+     * addition to the services whose single required category_id points here
+     * (see services() above). A service like "Regular Washing" can show up
+     * under more than one category through this relation.
+     */
+    public function linkedServices(): BelongsToMany
+    {
+        return $this->belongsToMany(Service::class, 'category_service')
+            ->withTimestamps();
     }
 
     /**
