@@ -202,6 +202,10 @@ Route::middleware(['auth:client', 'banned'])->group(function () {
         Route::delete('/cards/{card_id}', [WalletController::class, 'deleteCard'])
             ->name('user.wallet.delete-card');
 
+        // Set a saved card as default (shown first in the cards list)
+        Route::post('/cards/{card_id}/default', [WalletController::class, 'setDefaultCard'])
+            ->name('user.wallet.set-default-card');
+
         // Add deposit to wallet
         Route::post('/deposit', [WalletController::class, 'addDeposit'])
             ->name('user.wallet.deposit');

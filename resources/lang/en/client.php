@@ -13,6 +13,7 @@ return [
     'not_found' => 'Client not found',
     'card_not_found' => 'Card not found',
     'card_deleted' => 'Card deleted successfully',
+    'card_set_default' => 'Card set as default successfully',
     'cards_saved_via_checkout' => 'Cards are saved automatically when you pay with Visa, Mastercard, or Mada.',
     'wallet_details_retrieved' => 'Wallet details retrieved',
     'deposit_added' => 'Amount added to your wallet successfully',

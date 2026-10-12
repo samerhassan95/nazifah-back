@@ -127,6 +127,37 @@ class WalletController extends Controller
     }
 
     /**
+     * Mark a saved card as the default — it then shows first in the cards
+     * list (index() already orders by is_default desc) and is selected by
+     * default wherever the app pre-fills a saved card for checkout.
+     */
+    public function setDefaultCard(Request $request, int $card_id): JsonResponse
+    {
+        $user = $request->user();
+
+        $card = ClientCard::query()
+            ->where('id', $card_id)
+            ->where('client_id', $user->id)
+            ->first();
+
+        if (! $card) {
+            return notFoundResponse(__('client.card_not_found'));
+        }
+
+        if (! $card->is_default) {
+            ClientCard::where('client_id', $user->id)
+                ->where('id', '!=', $card->id)
+                ->update(['is_default' => false]);
+            $card->update(['is_default' => true]);
+        }
+
+        return successResponse([
+            'card_id' => $card->id,
+            'is_default' => true,
+        ], __('client.card_set_default'));
+    }
+
+    /**
      * Add deposit to wallet
      */
     public function addDeposit(Request $request): JsonResponse
@@ -397,6 +428,21 @@ class WalletController extends Controller
                         'status' => 'completed',
                         'paid_at' => now(),
                     ]);
+
+                    // Every other settlement path (confirmMoyasarDeposit, verifyDeposit,
+                    // PaymentController::callback) resolves the concrete card brand from
+                    // Moyasar's own source here before crediting — this synchronous
+                    // saved-token path skipped it, so payment_method stayed the generic
+                    // "credit_card" string forever on this transaction (and the
+                    // wallet_transactions ledger row copied from it), even though a real
+                    // card_id/brand was used. That's what showed a saved-card deposit with
+                    // a generic/cash-looking icon instead of the actual card brand.
+                    $paymentTransaction = app(\Modules\Payment\Services\MoyasarPaymentMethodApplier::class)
+                        ->applyFromVerifiedSource(
+                            $paymentTransaction->fresh() ?? $paymentTransaction,
+                            $paymentResponse->data['source'] ?? null,
+                            null,
+                        );
 
                     $settlement = $this->walletDepositCreditor->creditIfNotAlready(
                         $paymentTransaction->fresh(),
