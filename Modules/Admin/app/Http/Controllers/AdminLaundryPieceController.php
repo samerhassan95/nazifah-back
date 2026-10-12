@@ -68,7 +68,9 @@ class AdminLaundryPieceController extends Controller
                 })
                 ->toArray();
 
-            $services = $piece->services->map(function ($service) use ($locale) {
+            // unique: the pivot has one row per branch (plus a branch-less catalog
+            // row from a vendor-level import), but this list only needs it once.
+            $services = $piece->services->unique('id')->map(function ($service) use ($locale) {
                 return [
                     'service_id' => $service->id,
                     'service_name' => $service->getTranslation('service_name', $locale),
@@ -187,7 +189,10 @@ class AdminLaundryPieceController extends Controller
                 ->toArray();
         }
 
-        $services = $piece->services->map(function ($service) {
+        // unique: same as additionalServices above — the pivot has one row per
+        // branch (plus a branch-less catalog row from a vendor-level import), but
+        // this screen only needs the service listed once.
+        $services = $piece->services->unique('id')->map(function ($service) {
             return [
                 'service_id' => $service->id,
                 'service_name' => [
@@ -450,7 +455,9 @@ class AdminLaundryPieceController extends Controller
                 ->toArray();
         }
 
-        $services = $piece->services->map(function ($service) {
+        // unique: the pivot has one row per branch (plus a branch-less catalog
+        // row from a vendor-level import), but this response only needs it once.
+        $services = $piece->services->unique('id')->map(function ($service) {
             return [
                 'service_id' => $service->id,
                 'service_name' => [

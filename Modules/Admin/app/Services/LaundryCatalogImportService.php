@@ -88,7 +88,9 @@ class LaundryCatalogImportService
             'addons_created' => 0,
             'addons_skipped' => 0,
             'piece_service_attached' => 0,
+            'piece_service_price_updated' => 0,
             'piece_addon_attached' => 0,
+            'piece_addon_price_updated' => 0,
             'branch_piece_attached' => 0,
             'branch_piece_skipped' => 0,
         ];
@@ -521,13 +523,13 @@ class LaundryCatalogImportService
                                     ]);
                                 }
 
-                                $alreadyAttached = \DB::table('service_piece')
+                                $existingLink = \DB::table('service_piece')
                                     ->where('piece_id', $pieceId)
                                     ->where('service_id', $realSvcId)
                                     ->where('branch_id', $branchId)
-                                    ->exists();
+                                    ->first();
 
-                                if (! $alreadyAttached) {
+                                if (! $existingLink) {
                                     \DB::table('service_piece')->insert([
                                         'piece_id' => $pieceId,
                                         'service_id' => $realSvcId,
@@ -537,18 +539,26 @@ class LaundryCatalogImportService
                                         'updated_at' => now(),
                                     ]);
                                     $stats['piece_service_attached']++;
+                                } elseif ((float) $existingLink->price !== $svcLink['price']) {
+                                    // The sheet is authoritative on re-import: an earlier run
+                                    // (e.g. before Service_Price support existed) may have left
+                                    // this row at a stale/placeholder price like 0.
+                                    \DB::table('service_piece')
+                                        ->where('id', $existingLink->id)
+                                        ->update(['price' => $svcLink['price'], 'updated_at' => now()]);
+                                    $stats['piece_service_price_updated']++;
                                 }
                             }
 
                             foreach ($realAddonIds as $realAddonId) {
-                                $alreadyAttached = \DB::table('service_addition_piece')
+                                $existingLink = \DB::table('service_addition_piece')
                                     ->where('piece_id', $pieceId)
                                     ->where('service_addition_id', $realAddonId)
                                     ->where('branch_id', $branchId)
-                                    ->exists();
+                                    ->first();
+                                $addonPrice = (float) (ServiceAddition::find($realAddonId)?->price ?? 0);
 
-                                if (! $alreadyAttached) {
-                                    $addonPrice = (float) (ServiceAddition::find($realAddonId)?->price ?? 0);
+                                if (! $existingLink) {
                                     \DB::table('service_addition_piece')->insert([
                                         'piece_id' => $pieceId,
                                         'service_addition_id' => $realAddonId,
@@ -558,6 +568,11 @@ class LaundryCatalogImportService
                                         'updated_at' => now(),
                                     ]);
                                     $stats['piece_addon_attached']++;
+                                } elseif ((float) $existingLink->price !== $addonPrice) {
+                                    \DB::table('service_addition_piece')
+                                        ->where('id', $existingLink->id)
+                                        ->update(['price' => $addonPrice, 'updated_at' => now()]);
+                                    $stats['piece_addon_price_updated']++;
                                 }
                             }
                         }
@@ -569,13 +584,13 @@ class LaundryCatalogImportService
                     foreach ($touchedPieceIds as $pieceId) {
                         foreach ($pieceRealServices[$pieceId] ?? [] as $svcLink) {
                             $realSvcId = $svcLink['service_id'];
-                            $alreadyAttached = \DB::table('service_piece')
+                            $existingLink = \DB::table('service_piece')
                                 ->where('piece_id', $pieceId)
                                 ->where('service_id', $realSvcId)
                                 ->whereNull('branch_id')
-                                ->exists();
+                                ->first();
 
-                            if (! $alreadyAttached) {
+                            if (! $existingLink) {
                                 \DB::table('service_piece')->insert([
                                     'piece_id' => $pieceId,
                                     'service_id' => $realSvcId,
@@ -584,18 +599,23 @@ class LaundryCatalogImportService
                                     'updated_at' => now(),
                                 ]);
                                 $stats['piece_service_attached']++;
+                            } elseif ((float) $existingLink->price !== $svcLink['price']) {
+                                \DB::table('service_piece')
+                                    ->where('id', $existingLink->id)
+                                    ->update(['price' => $svcLink['price'], 'updated_at' => now()]);
+                                $stats['piece_service_price_updated']++;
                             }
                         }
 
                         foreach (array_unique($pieceRealAddons[$pieceId] ?? []) as $realAddonId) {
-                            $alreadyAttached = \DB::table('service_addition_piece')
+                            $existingLink = \DB::table('service_addition_piece')
                                 ->where('piece_id', $pieceId)
                                 ->where('service_addition_id', $realAddonId)
                                 ->whereNull('branch_id')
-                                ->exists();
+                                ->first();
+                            $addonPrice = (float) (ServiceAddition::find($realAddonId)?->price ?? 0);
 
-                            if (! $alreadyAttached) {
-                                $addonPrice = (float) (ServiceAddition::find($realAddonId)?->price ?? 0);
+                            if (! $existingLink) {
                                 \DB::table('service_addition_piece')->insert([
                                     'piece_id' => $pieceId,
                                     'service_addition_id' => $realAddonId,
@@ -604,6 +624,11 @@ class LaundryCatalogImportService
                                     'updated_at' => now(),
                                 ]);
                                 $stats['piece_addon_attached']++;
+                            } elseif ((float) $existingLink->price !== $addonPrice) {
+                                \DB::table('service_addition_piece')
+                                    ->where('id', $existingLink->id)
+                                    ->update(['price' => $addonPrice, 'updated_at' => now()]);
+                                $stats['piece_addon_price_updated']++;
                             }
                         }
                     }
