@@ -85,7 +85,13 @@ class ClientCardService
             return null;
         }
 
+        // Confirmed against live transactions: Moyasar's source.company sends
+        // "master", not "mastercard", for Mastercard-branded cards — the strict
+        // whitelist below was silently dropping every real Mastercard save
+        // (token present, card never persisted, no error anywhere) while Visa
+        // worked fine. Normalize known aliases before validating.
         $brand = strtolower((string) ($source['company'] ?? ''));
+        $brand = $brand === 'master' ? 'mastercard' : $brand;
         if (! in_array($brand, ['visa', 'mastercard', 'mada'], true)) {
             return null;
         }
