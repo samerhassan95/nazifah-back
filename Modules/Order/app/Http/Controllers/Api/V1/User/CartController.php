@@ -3,6 +3,7 @@
 namespace Modules\Order\Http\Controllers\Api\V1\User;
 
 use App\Http\Controllers\Controller;
+use App\Services\UploadFilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -14,7 +15,8 @@ use Modules\Order\Services\CartService;
 class CartController extends Controller
 {
     public function __construct(
-        private CartService $cartService
+        private CartService $cartService,
+        private UploadFilesService $uploadFilesService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -39,17 +41,27 @@ class CartController extends Controller
             'items.*.additional_service_ids' => ['nullable', 'array'],
             'items.*.additional_service_ids.*' => ['integer', 'exists:service_additions,id'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
-            'items.*.image' => ['nullable', 'string'],
+            // A real file upload, not a path string: the client's local cache path (e.g.
+            // Android's /data/user/0/.../cache/scaled_20.png) is meaningless on our server
+            // and previously got stored as-is, producing a broken image URL on GET.
+            'items.*.image' => ['nullable', 'file', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'],
         ]);
 
         if ($validator->fails()) {
             return validationErrorResponse($validator->errors());
         }
 
+        $items = $request->input('items');
+        foreach ($items as $index => &$item) {
+            $file = $request->file("items.{$index}.image");
+            $item['image'] = $file ? $this->uploadFilesService->uploadImage($file, 'cart/items') : null;
+        }
+        unset($item);
+
         $result = $this->cartService->addItems(
             $request->user(),
             (int) $request->branch_id,
-            $request->input('items'),
+            $items,
             app()->getLocale()
         );
 
@@ -69,17 +81,22 @@ class CartController extends Controller
             'additional_service_ids' => ['sometimes', 'nullable', 'array'],
             'additional_service_ids.*' => ['integer', 'exists:service_additions,id'],
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
-            'image' => ['sometimes', 'nullable', 'string'],
+            'image' => ['sometimes', 'nullable', 'file', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'],
         ]);
 
         if ($validator->fails()) {
             return validationErrorResponse($validator->errors());
         }
 
+        $changes = $request->only(['quantity', 'service_ids', 'additional_service_ids', 'note']);
+        if ($request->hasFile('image')) {
+            $changes['image'] = $this->uploadFilesService->uploadImage($request->file('image'), 'cart/items');
+        }
+
         $result = $this->cartService->updateItem(
             $request->user(),
             $cartItemId,
-            $request->only(['quantity', 'service_ids', 'additional_service_ids', 'note', 'image']),
+            $changes,
             app()->getLocale()
         );
 
