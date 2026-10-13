@@ -271,23 +271,20 @@
                         var placed = placeCheckboxAboveSubmit();
                         restoreCardValues(carriedValues, formEl);
 
-                        // If checkbox is NOT checked, find and hide any Moyasar internal
-                        // "card will be saved" notice. Moyasar renders it as a <p> or small
-                        // element containing keywords like "save" / "حفظ" / "saved" at the
-                        // bottom of the form — hide it via inline style.
-                        // IMPORTANT: skip elements that belong to our own save-card-opt label.
+                        // If checkbox is NOT checked, hide Moyasar's internal "card will be
+                        // saved" notice. Confirmed against the actual moyasar.js source: it
+                        // renders as <span class="mysr-form-warn-icon warn-icon"><svg/>TEXT</span>
+                        // — an SVG icon child plus a bare text node, not wrapped in its own
+                        // leaf element. An earlier version of this hide logic matched on
+                        // leaf elements containing save/حفظ/بيانات keywords, which this
+                        // element could never satisfy (it has the <svg> as a child), so it
+                        // was never actually hidden. Target the stable class name directly.
                         if (!saveToggle || !saveToggle.checked) {
                             var formEl2 = document.querySelector('.mysr-form');
                             if (formEl2) {
-                                formEl2.querySelectorAll('p, small, span, div').forEach(function (el) {
+                                formEl2.querySelectorAll('.mysr-form-warn-icon, .warn-icon').forEach(function (el) {
                                     if (saveWrap && saveWrap.contains(el)) return; // skip our own label
-                                    var txt = (el.innerText || '').toLowerCase();
-                                    if (
-                                        (txt.indexOf('save') !== -1 || txt.indexOf('حفظ') !== -1 || txt.indexOf('saved') !== -1 || txt.indexOf('بيانات') !== -1) &&
-                                        el.children.length === 0
-                                    ) {
-                                        el.style.display = 'none';
-                                    }
+                                    el.style.display = 'none';
                                 });
                             }
                         }
@@ -304,15 +301,9 @@
                         if (!saveToggle || !saveToggle.checked) {
                             var formEl3 = document.querySelector('.mysr-form');
                             if (formEl3) {
-                                formEl3.querySelectorAll('p, small, span, div').forEach(function (el) {
+                                formEl3.querySelectorAll('.mysr-form-warn-icon, .warn-icon').forEach(function (el) {
                                     if (saveWrap && saveWrap.contains(el)) return; // skip our own label
-                                    var txt = (el.innerText || '').toLowerCase();
-                                    if (
-                                        (txt.indexOf('save') !== -1 || txt.indexOf('حفظ') !== -1 || txt.indexOf('saved') !== -1 || txt.indexOf('بيانات') !== -1) &&
-                                        el.children.length === 0
-                                    ) {
-                                        el.style.display = 'none';
-                                    }
+                                    el.style.display = 'none';
                                 });
                             }
                         }
