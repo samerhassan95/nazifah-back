@@ -74,11 +74,13 @@ class AdminOrderController extends Controller
             $invoiceService = app(\Modules\Invoice\Services\InvoiceService::class);
             $invoice = $invoiceService->createOrFetchForOrder($order);
             $shareUrl = $invoiceService->shareUrl($invoice);
+            $pdfUrl = $invoiceService->pdfUrl($invoice);
 
             return successResponse([
                 'invoice_id'     => $invoice->id,
                 'invoice_number' => $invoice->invoice_number,
                 'share_url'      => $shareUrl,
+                'pdf_url'        => $pdfUrl,
                 'issued_at'      => optional($invoice->issued_at)->toIso8601String(),
                 'status'         => $invoice->status,
                 'zatca_status'   => $invoice->zatca_status,

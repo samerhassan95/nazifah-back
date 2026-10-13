@@ -35,6 +35,7 @@ class InvoiceController extends Controller
                 'total_amount' => (float) $invoice->total_amount,
                 'issued_at' => optional($invoice->issued_at)->toIso8601String(),
                 'share_url' => $service->shareUrl($invoice),
+                'pdf_url' => $service->pdfUrl($invoice),
                 'payload' => $invoice->invoice_payload,
             ],
         ]);
@@ -57,5 +58,15 @@ class InvoiceController extends Controller
         ])->render();
 
         return response($html);
+    }
+
+    public function sharePdf(Request $request, Invoice $invoice)
+    {
+        $pdf = app(\Modules\Invoice\Services\InvoiceService::class)->generatePdfBytes($invoice);
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$invoice->invoice_number.'.pdf"',
+        ]);
     }
 }

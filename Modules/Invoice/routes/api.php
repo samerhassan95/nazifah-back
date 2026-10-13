@@ -12,4 +12,8 @@ Route::prefix('v1/invoices')->group(function () {
     Route::get('/{invoice}/share', [InvoiceController::class, 'share'])
         ->middleware('signed')
         ->name('invoice.share');
+
+    Route::get('/{invoice}/pdf', [InvoiceController::class, 'sharePdf'])
+        ->middleware('signed')
+        ->name('invoice.pdf');
 });

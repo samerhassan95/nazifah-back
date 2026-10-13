@@ -216,6 +216,11 @@ class InvoiceService
                 'invoice_number' => $invoice->invoice_number,
                 'amount' => round((float) $invoice->total_amount, 2),
                 'invoice_url' => $shareUrl,
+                // Only usable once the Content Template's Media field is itself set up in
+                // the Twilio Console with a {{N}} placeholder pointing at this variable —
+                // Twilio does not support attaching a document via a per-message field
+                // outside the template's own configured media URL pattern.
+                'invoice_pdf_url' => $this->pdfUrl($invoice),
             ],
         ];
 
@@ -249,6 +254,51 @@ class InvoiceService
             now()->addDays((int) $this->invoiceSettings->get('invoice_public_link_ttl_days', 30)),
             ['invoice' => $invoice->id]
         );
+    }
+
+    /**
+     * Signed URL that renders the PDF on request (api.invoice.pdf) — same
+     * lazy-render pattern as shareUrl(), not a pre-generated static file, so
+     * it's always built from the invoice's current data and never goes stale.
+     */
+    public function pdfUrl(Invoice $invoice): string
+    {
+        return URL::temporarySignedRoute(
+            'api.invoice.pdf',
+            now()->addDays((int) $this->invoiceSettings->get('invoice_public_link_ttl_days', 30)),
+            ['invoice' => $invoice->id]
+        );
+    }
+
+    /**
+     * Renders the exact same invoice HTML the share link shows, through a
+     * real Chromium instance (Spatie\Browsershot — needs Node.js + Chromium
+     * on the server; see SERVER_SETUP note in README/deploy docs), so Arabic
+     * text shapes correctly. dompdf was evaluated and rejected: it has no
+     * Arabic contextual letter-shaping support and would render broken text
+     * on a legal tax document.
+     */
+    public function generatePdfBytes(Invoice $invoice): string
+    {
+        $invoice->loadMissing('order.client', 'order.items.piece', 'order.items.service', 'branch.vendor');
+
+        $payload = $invoice->invoice_payload;
+        if (empty($payload)) {
+            $payload = $this->payloadBuilder->buildForOrder($invoice->order, $invoice);
+            $invoice->forceFill(['invoice_payload' => $payload])->save();
+        }
+
+        $html = view('invoice::show', [
+            'invoice' => $invoice,
+            'payload' => $payload,
+        ])->render();
+
+        return \Spatie\Browsershot\Browsershot::html($html)
+            ->format('A4')
+            ->showBackground()
+            ->margins(0, 0, 0, 0)
+            ->noSandbox()
+            ->pdf();
     }
 
     /**
