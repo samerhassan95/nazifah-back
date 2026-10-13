@@ -27,6 +27,7 @@ use Modules\Order\Models\OrderItem;
 use Modules\Order\Models\OrderItemAdditionalService;
 use Modules\Order\Models\OrderStatusLog;
 use Modules\Order\Models\PendingOrder;
+use Modules\Order\Services\CartService;
 use Modules\Order\Services\OrderPaymentService;
 use Modules\Order\Support\OrderItemGrouper;
 use Modules\Order\Support\OrderItemsNormalizer;
@@ -50,13 +51,16 @@ class OrderController extends Controller
 
     protected OrderPaymentService $orderPaymentService;
 
+    protected CartService $cartService;
+
     public function __construct(
         UploadFilesService $uploadFilesService,
         DiscountService $discountService,
         PaymentService $paymentService,
         FirebaseService $firebaseService,
         OrderCatalogAvailabilityService $catalogAvailabilityService,
-        OrderPaymentService $orderPaymentService
+        OrderPaymentService $orderPaymentService,
+        CartService $cartService
     ) {
         $this->uploadFilesService = $uploadFilesService;
         $this->discountService = $discountService;
@@ -64,6 +68,34 @@ class OrderController extends Controller
         $this->firebaseService = $firebaseService;
         $this->catalogAvailabilityService = $catalogAvailabilityService;
         $this->orderPaymentService = $orderPaymentService;
+        $this->cartService = $cartService;
+    }
+
+    /**
+     * calculate()/store() read from the server-side cart when the client
+     * doesn't send its own `items` array (CART_BACKEND_API.md §6). Returns a
+     * JsonResponse to short-circuit with (empty/unavailable cart), or null
+     * to proceed — in which case $request already has 'items' and
+     * 'branch_id' (if it was missing) merged in from the cart.
+     */
+    private function fillFromCartIfItemsMissing(Request $request): ?JsonResponse
+    {
+        if (! empty($request->input('items'))) {
+            return null;
+        }
+
+        $result = $this->cartService->itemsForOrderCreation($request->user(), app()->getLocale());
+        if (isset($result['error'])) {
+            return errorResponse($result['error'], null, 400);
+        }
+
+        $merge = ['items' => $result['items']];
+        if (! $request->filled('branch_id')) {
+            $merge['branch_id'] = $result['branch_id'];
+        }
+        $request->merge($merge);
+
+        return null;
     }
 
     /**
@@ -374,6 +406,11 @@ class OrderController extends Controller
      */
     public function calculate(Request $request): JsonResponse
     {
+        $cartError = $this->fillFromCartIfItemsMissing($request);
+        if ($cartError !== null) {
+            return $cartError;
+        }
+
         $request->merge([
             'items' => OrderItemsNormalizer::normalize($request->input('items', [])),
         ]);
@@ -858,6 +895,11 @@ class OrderController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $cartError = $this->fillFromCartIfItemsMissing($request);
+        if ($cartError !== null) {
+            return $cartError;
+        }
+
         $request->merge([
             'items' => OrderItemsNormalizer::normalize($request->input('items', [])),
         ]);

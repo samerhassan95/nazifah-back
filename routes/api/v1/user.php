@@ -9,6 +9,7 @@ use Modules\Category\Http\Controllers\Api\V1\User\DepartmentController;
 use Modules\Chat\Http\Controllers\Api\V1\User\ChatController;
 use Modules\Client\Http\Controllers\Api\V1\AuthController;
 use Modules\Notification\Http\Controllers\Api\V1\User\NotificationController;
+use Modules\Order\Http\Controllers\Api\V1\User\CartController;
 use Modules\Order\Http\Controllers\Api\V1\User\OrderController;
 use Modules\Order\Http\Controllers\Api\V1\User\OrderTrackingController;
 use Modules\Payment\Http\Controllers\Api\V1\User\PaymentMethodController;
@@ -265,6 +266,26 @@ Route::middleware(['auth:client', 'banned'])->group(function () {
         // Set default location
         Route::post('/{address_id}/set-default', [LocationController::class, 'setDefault'])
             ->name('user.locations.set-default');
+    });
+
+    // ========================================================================
+    // CART API — see CART_BACKEND_API.md
+    // ========================================================================
+    Route::prefix('cart')->group(function () {
+        Route::get('/', [CartController::class, 'index'])
+            ->name('user.cart.index');
+
+        Route::post('/items', [CartController::class, 'store'])
+            ->name('user.cart.items.store');
+
+        Route::match(['put', 'patch'], '/items/{cart_item_id}', [CartController::class, 'update'])
+            ->name('user.cart.items.update');
+
+        Route::delete('/items/{cart_item_id}', [CartController::class, 'destroyItem'])
+            ->name('user.cart.items.destroy');
+
+        Route::delete('/', [CartController::class, 'clear'])
+            ->name('user.cart.clear');
     });
 
     // ========================================================================
