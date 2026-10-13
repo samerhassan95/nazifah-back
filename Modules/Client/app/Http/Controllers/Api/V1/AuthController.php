@@ -5,6 +5,7 @@ namespace Modules\Client\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ErrorResponse;
 use App\Services\DeewanSmsService;
+use App\Services\TwilioWhatsappOtpService;
 use App\Services\UploadFilesService;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -19,10 +20,13 @@ class AuthController extends Controller
 
     protected $deewanSms;
 
-    public function __construct(UploadFilesService $uploadFilesService, DeewanSmsService $deewanSms)
+    protected $twilioOtp;
+
+    public function __construct(UploadFilesService $uploadFilesService, DeewanSmsService $deewanSms, TwilioWhatsappOtpService $twilioOtp)
     {
         $this->uploadFilesService = $uploadFilesService;
         $this->deewanSms = $deewanSms;
+        $this->twilioOtp = $twilioOtp;
     }
 
     /**
@@ -94,7 +98,9 @@ class AuthController extends Controller
 
             // Send OTP and capture the result
             $otpSent = false;
-            if (config('deewan.otp_channel') === 'sms') {
+            if (config('deewan.otp_channel') === 'whatsapp') {
+                $otpSent = $this->twilioOtp->sendOtp($request->phone, $otp, 'login', app()->getLocale());
+            } elseif (config('deewan.otp_channel') === 'sms') {
                 $otpSent = $this->deewanSms->sendOtp($request->phone, $otp, 'login', app()->getLocale());
             } else {
                 // If SMS is disabled, consider it as sent for development
@@ -339,7 +345,9 @@ class AuthController extends Controller
             // Generate new OTP
             $otp = $session->generateOtp();
 
-            if (config('deewan.otp_channel') === 'sms') {
+            if (config('deewan.otp_channel') === 'whatsapp') {
+                $this->twilioOtp->sendOtp($session->phone, $otp, 'verify_account', app()->getLocale());
+            } elseif (config('deewan.otp_channel') === 'sms') {
                 $this->deewanSms->sendOtp($session->phone, $otp, 'verify_account', app()->getLocale());
             }
 
@@ -549,7 +557,9 @@ class AuthController extends Controller
             $otp = $session->generateOtp();
 
             $otpSent = true;
-            if (config('deewan.otp_channel') === 'sms') {
+            if (config('deewan.otp_channel') === 'whatsapp') {
+                $otpSent = $this->twilioOtp->sendOtp($newPhone, $otp, 'change_phone', app()->getLocale());
+            } elseif (config('deewan.otp_channel') === 'sms') {
                 $otpSent = $this->deewanSms->sendOtp($newPhone, $otp, 'change_phone', app()->getLocale());
             }
 
