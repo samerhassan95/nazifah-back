@@ -20,14 +20,18 @@ class AdminServiceController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Service::with(['category']);
+        $query = Service::with(['category', 'categories']);
 
         if ($request->has('is_active')) {
             $query->where('is_active', $request->is_active);
         }
 
         if ($request->has('category_id')) {
-            $query->where('category_id', $request->category_id);
+            $catId = $request->category_id;
+            $query->where(function ($q) use ($catId) {
+                $q->where('category_id', $catId)
+                    ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $catId));
+            });
         }
 
         if ($request->has('search')) {
@@ -54,6 +58,8 @@ class AdminServiceController extends Controller
     {
         $validated = $request->validate([
             'category_id' => 'nullable|integer',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
             'name' => 'required|array',
             'name.ar' => 'required|string|max:255',
             'name.en' => 'required|string|max:255',
@@ -71,12 +77,20 @@ class AdminServiceController extends Controller
             'icon_id' => 'required|exists:icons,id',
         ]);
 
-        $categoryId = isset($validated['category_id']) && DB::table('categories')->where('id', $validated['category_id'])->exists() 
-            ? $validated['category_id'] 
-            : null;
+        $categoryIds = [];
+        if (! empty($validated['category_ids'])) {
+            $categoryIds = array_map('intval', $validated['category_ids']);
+        } elseif (! empty($validated['category_id'])) {
+            $categoryIds = [(int) $validated['category_id']];
+        }
+
+        $primaryCategoryId = ! empty($categoryIds) ? $categoryIds[0] : null;
+        if (! $primaryCategoryId && isset($validated['category_id']) && \Illuminate\Support\Facades\DB::table('categories')->where('id', $validated['category_id'])->exists()) {
+            $primaryCategoryId = (int) $validated['category_id'];
+        }
 
         $serviceData = [
-            'category_id' => $categoryId,
+            'category_id' => $primaryCategoryId,
             'service_name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'discount_price' => $validated['discount_price'] ?? null,
@@ -95,6 +109,11 @@ class AdminServiceController extends Controller
 
         $service = Service::create($serviceData);
 
+        // Sync many-to-many categories
+        if (! empty($categoryIds)) {
+            $service->categories()->sync($categoryIds);
+        }
+
         // attach pieces with optional pivot prices
         if ($request->has('pieces') && is_array($request->pieces)) {
             $syncData = [];
@@ -111,7 +130,7 @@ class AdminServiceController extends Controller
         }
 
         return successResponse(
-            new ServiceResource($service->load(['category'])),
+            new ServiceResource($service->load(['category', 'categories'])),
             __('admin.service_created'),
             201
         );
@@ -119,7 +138,7 @@ class AdminServiceController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $service = Service::with(['category', 'additions', 'pieces'])->find($id);
+        $service = Service::with(['category', 'categories', 'additions', 'pieces'])->find($id);
 
         if (! $service) {
             return notFoundResponse(__('admin.service_not_found'));
@@ -140,7 +159,9 @@ class AdminServiceController extends Controller
         }
 
         $validated = $request->validate([
-            'category_id' => 'sometimes|exists:categories,id',
+            'category_id' => 'sometimes|nullable|exists:categories,id',
+            'category_ids' => 'sometimes|nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
             'name' => 'sometimes|array',
             'name.ar' => 'sometimes|string|max:255',
             'name.en' => 'sometimes|string|max:255',
@@ -160,8 +181,17 @@ class AdminServiceController extends Controller
 
         $data = [];
 
-        if (array_key_exists('category_id', $validated)) {
+        if (array_key_exists('category_ids', $validated) && is_array($validated['category_ids'])) {
+            $catIds = array_map('intval', $validated['category_ids']);
+            $service->categories()->sync($catIds);
+            if (! empty($catIds)) {
+                $data['category_id'] = $catIds[0];
+            }
+        } elseif (array_key_exists('category_id', $validated)) {
             $data['category_id'] = $validated['category_id'];
+            if ($validated['category_id']) {
+                $service->categories()->syncWithoutDetaching([(int) $validated['category_id']]);
+            }
         }
 
         if (isset($validated['name'])) {
@@ -208,7 +238,7 @@ class AdminServiceController extends Controller
         }
 
         return successResponse(
-            new ServiceResource($service->fresh()->load(['category'])),
+            new ServiceResource($service->fresh()->load(['category', 'categories'])),
             __('admin.service_updated')
         );
     }

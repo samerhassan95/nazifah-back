@@ -22,6 +22,8 @@ class StoreServiceRequest extends FormRequest
     {
         return [
             'category_id' => 'nullable|integer|exists:categories,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
             'service_name' => ['required', 'array'],
             'service_name.ar' => ['required', 'string', 'max:255'],
             'service_name.en' => ['required', 'string', 'max:255'],

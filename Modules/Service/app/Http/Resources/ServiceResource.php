@@ -15,9 +15,14 @@ class ServiceResource extends JsonResource
         $isDetailView = $request->route() && $request->route()->getName() && str_contains($request->route()->getName(), 'show');
         $locale = app()->getLocale();
 
+        $categoryIds = $this->relationLoaded('categories')
+            ? $this->categories->pluck('id')->values()->all()
+            : ($this->category_id ? [(int) $this->category_id] : []);
+
         return [
             'id' => $this->id,
             'category_id' => $this->category_id,
+            'category_ids' => $categoryIds,
             'service_name' => $isDetailView ? ['ar' => $this->getTranslation('service_name', 'ar'), 'en' => $this->getTranslation('service_name', 'en')] : $this->getTranslation('service_name', $locale),
             'description' => $isDetailView ? ['ar' => $this->getTranslation('description', 'ar'), 'en' => $this->getTranslation('description', 'en')] : ($this->getTranslation('description', $locale) ?: null),
             'icon_id' => $this->icon_id,
@@ -25,6 +30,7 @@ class ServiceResource extends JsonResource
             'is_active' => (bool) $this->is_active,
             'vendor_id' => $this->vendor_id,
             'category' => $this->whenLoaded('category', fn () => new CategoryResource($this->category)),
+            'categories' => CategoryResource::collection($this->whenLoaded('categories')),
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ];

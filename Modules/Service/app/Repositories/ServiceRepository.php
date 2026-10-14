@@ -18,13 +18,13 @@ class ServiceRepository implements ServiceRepositoryInterface
             key: $key,
             ttl: CacheManager::TTL_LONG,
             callback: function () use ($filters) {
-                $query = Service::with(['category']);
+                $query = Service::with(['category', 'categories']);
 
                 if (isset($filters['search'])) {
                     $search = $filters['search'];
                     $query->where(function ($q) use ($search) {
-                        $q->whereRaw("JSON_EXTRACT(service_name, '$$.ar') LIKE ?", ["%{$search}%"])
-                            ->orWhereRaw("JSON_EXTRACT(service_name, '$$.en') LIKE ?", ["%{$search}%"]);
+                        $q->whereRaw("JSON_EXTRACT(service_name, '$.ar') LIKE ?", ["%{$search}%"])
+                            ->orWhereRaw("JSON_EXTRACT(service_name, '$.en') LIKE ?", ["%{$search}%"]);
                     });
                 }
 
@@ -33,7 +33,11 @@ class ServiceRepository implements ServiceRepositoryInterface
                 }
 
                 if (isset($filters['category_id'])) {
-                    $query->where('category_id', $filters['category_id']);
+                    $catId = $filters['category_id'];
+                    $query->where(function ($q) use ($catId) {
+                        $q->where('category_id', $catId)
+                            ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $catId));
+                    });
                 }
 
                 $sortBy = $filters['sort_by'] ?? 'created_at';
@@ -51,14 +55,31 @@ class ServiceRepository implements ServiceRepositoryInterface
         return CacheManager::remember(
             key: ServiceCacheKey::withRelations($id),
             ttl: CacheManager::TTL_LONG,
-            callback: fn () => Service::with(['category'])->find($id),
+            callback: fn () => Service::with(['category', 'categories'])->find($id),
             tags: ['services', "service:{$id}"]
         );
     }
 
     public function create(array $data): Service
     {
+        $categoryIds = [];
+        if (! empty($data['category_ids'])) {
+            $categoryIds = array_map('intval', (array) $data['category_ids']);
+            if (empty($data['category_id']) && ! empty($categoryIds)) {
+                $data['category_id'] = $categoryIds[0];
+            }
+        } elseif (! empty($data['category_id'])) {
+            $categoryIds = [(int) $data['category_id']];
+        }
+
+        unset($data['category_ids']);
+
         $service = Service::create($data);
+
+        if (! empty($categoryIds)) {
+            $service->categories()->sync($categoryIds);
+        }
+
         $this->clearCollectionCache();
 
         return $service;
@@ -66,6 +87,18 @@ class ServiceRepository implements ServiceRepositoryInterface
 
     public function update(Service $service, array $data): bool
     {
+        if (array_key_exists('category_ids', $data) && is_array($data['category_ids'])) {
+            $categoryIds = array_map('intval', $data['category_ids']);
+            $service->categories()->sync($categoryIds);
+            if (! empty($categoryIds)) {
+                $data['category_id'] = $categoryIds[0];
+            }
+        } elseif (array_key_exists('category_id', $data) && $data['category_id']) {
+            $service->categories()->syncWithoutDetaching([(int) $data['category_id']]);
+        }
+
+        unset($data['category_ids']);
+
         $result = $service->update($data);
         $this->clearCache($service->id);
 

@@ -23,7 +23,9 @@ class UpdateServiceRequest extends FormRequest
         $id = $this->route('id') ?? $this->route(strtolower('Service'));
 
         return [
-            'category_id' => 'sometimes|integer|exists:categories,id',
+            'category_id' => 'sometimes|nullable|integer|exists:categories,id',
+            'category_ids' => 'sometimes|nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
             'service_name' => ['sometimes', 'array'],
             'service_name.ar' => ['sometimes', 'string', 'max:255'],
             'service_name.en' => ['sometimes', 'string', 'max:255'],

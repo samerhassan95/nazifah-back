@@ -107,7 +107,10 @@ class AdminLaundryCategoryController extends Controller
                     ->orWhereHas('pieces', fn ($p) => $p->where('pieces.vendor_id', $vendorId));
             })->pluck('id');
 
-            $services = Service::where('category_id', $category->id)
+            $services = Service::where(function ($q) use ($category) {
+                    $q->where('category_id', $category->id)
+                        ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $category->id));
+                })
                 ->whereIn('id', $vendorServiceIds)
                 ->get()
                 ->map(function ($service) {
@@ -118,7 +121,7 @@ class AdminLaundryCategoryController extends Controller
                 })
                 ->toArray();
         } else {
-            $services = $category->services->map(function ($service) {
+            $services = $category->allServices()->get()->map(function ($service) {
                 return [
                     'ar' => $service->getTranslation('service_name', 'ar'),
                     'en' => $service->getTranslation('service_name', 'en'),
@@ -265,7 +268,10 @@ class AdminLaundryCategoryController extends Controller
     {
         $services = [];
         if ($vendorId) {
-            $services = Service::where('category_id', $category->id)
+            $services = Service::where(function ($q) use ($category) {
+                    $q->where('category_id', $category->id)
+                        ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $category->id));
+                })
                 ->where('vendor_id', $vendorId)
                 ->get()
                 ->map(function ($service) {
@@ -276,7 +282,7 @@ class AdminLaundryCategoryController extends Controller
                 })
                 ->toArray();
         } else {
-            $services = $category->services->map(function ($service) {
+            $services = $category->allServices()->get()->map(function ($service) {
                 return [
                     'ar' => $service->getTranslation('service_name', 'ar'),
                     'en' => $service->getTranslation('service_name', 'en'),

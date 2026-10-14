@@ -70,12 +70,26 @@ class Category extends Model
     }
 
     /**
-     * Get all active services for this category
+     * Get all active services for this category (direct category_id + many-to-many pivot)
      *
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getActiveServices()
     {
-        return $this->services()->get();
+        return Service::where(function ($q) {
+            $q->where('category_id', $this->id)
+                ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $this->id));
+        })->where('is_active', true)->get();
+    }
+
+    /**
+     * Get all services query for this category (direct category_id + pivot)
+     */
+    public function allServices()
+    {
+        return Service::where(function ($q) {
+            $q->where('category_id', $this->id)
+                ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $this->id));
+        });
     }
 }

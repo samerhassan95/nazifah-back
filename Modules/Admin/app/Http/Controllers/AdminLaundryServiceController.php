@@ -38,7 +38,7 @@ class AdminLaundryServiceController extends Controller
         $branchId = $request->input('branch_id');
         $scope    = $request->input('scope');
 
-        $query = Service::with(['category']);
+        $query = Service::with(['category', 'categories']);
 
         if ($scope === 'available' && $vendorId) {
             $query->where('services.is_active', true)
@@ -75,13 +75,24 @@ class AdminLaundryServiceController extends Controller
                 return $this->formatVendorService($service, (int) $vendorId, $locale, $vendorBranchIds, $scope === 'available', $ratingsMap);
             }
 
+            $categoryIds = $service->relationLoaded('categories')
+                ? $service->categories->pluck('id')->values()->all()
+                : ($service->category_id ? [(int) $service->category_id] : []);
+
             return [
                 'id'                  => $service->id,
                 'category_id'         => $service->category_id,
+                'category_ids'        => $categoryIds,
                 'icon'                => $this->uploadFilesService->getFullUrl($service->iconRelation?->full_path ?? $service->iconRelation?->path),
                 'Service_name'        => $service->getTranslation('service_name', $locale),
                 'Service_description' => $service->getTranslation('description', $locale),
                 'Category'            => $service->category ? $service->category->getTranslation('name', $locale) : null,
+                'Categories'          => $service->relationLoaded('categories')
+                    ? $service->categories->map(fn ($c) => [
+                        'id' => $c->id,
+                        'name' => $c->getTranslation('name', $locale),
+                    ])->values()->all()
+                    : ($service->category ? [['id' => $service->category->id, 'name' => $service->category->getTranslation('name', $locale)]] : []),
                 'is_active'           => (bool) $service->is_active,
             ];
         });
@@ -98,7 +109,7 @@ class AdminLaundryServiceController extends Controller
      */
     public function show(Request $request, int $id): JsonResponse
     {
-        $service = Service::with(['category', 'pieces'])->find($id);
+        $service = Service::with(['category', 'categories', 'pieces'])->find($id);
 
         if (! $service) {
             return notFoundResponse(__('service.not_found'));
@@ -106,9 +117,14 @@ class AdminLaundryServiceController extends Controller
 
         $locale = app()->getLocale();
 
+        $categoryIds = $service->relationLoaded('categories')
+            ? $service->categories->pluck('id')->values()->all()
+            : ($service->category_id ? [(int) $service->category_id] : []);
+
         $serviceData = [
             'id' => $service->id,
             'category_id' => $service->category_id,
+            'category_ids' => $categoryIds,
             'icon' => $this->uploadFilesService->getFullUrl($service->iconRelation?->full_path ?? $service->iconRelation?->path),
             'Service_name' => [
                 'ar' => $service->getTranslation('service_name', 'ar'),
@@ -122,6 +138,21 @@ class AdminLaundryServiceController extends Controller
                 'ar' => $service->category->getTranslation('name', 'ar'),
                 'en' => $service->category->getTranslation('name', 'en'),
             ] : null,
+            'Categories' => $service->relationLoaded('categories')
+                ? $service->categories->map(fn ($c) => [
+                    'id' => $c->id,
+                    'name' => [
+                        'ar' => $c->getTranslation('name', 'ar'),
+                        'en' => $c->getTranslation('name', 'en'),
+                    ],
+                ])->values()->all()
+                : ($service->category ? [[
+                    'id' => $service->category->id,
+                    'name' => [
+                        'ar' => $service->category->getTranslation('name', 'ar'),
+                        'en' => $service->category->getTranslation('name', 'en'),
+                    ],
+                ]] : []),
             'is_active' => (bool) $service->is_active,
         ];
 
@@ -146,18 +177,33 @@ class AdminLaundryServiceController extends Controller
             'service_description' => 'nullable|array',
             'service_description.ar' => 'nullable|string',
             'service_description.en' => 'nullable|string',
-            'category_id' => 'required|exists:categories,id',
+            'category_id' => 'nullable|exists:categories,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
         ]);
+
+        $categoryIds = [];
+        if (! empty($validated['category_ids'])) {
+            $categoryIds = array_map('intval', $validated['category_ids']);
+        } elseif (! empty($validated['category_id'])) {
+            $categoryIds = [(int) $validated['category_id']];
+        }
+
+        $primaryCategoryId = ! empty($categoryIds) ? $categoryIds[0] : ($validated['category_id'] ?? null);
 
         $serviceData = [
             'service_name' => $validated['service_name'],
             'description' => $validated['service_description'] ?? null,
-            'category_id' => $validated['category_id'],
+            'category_id' => $primaryCategoryId,
             'icon_id' => $validated['icon_id'] ?? null,
             'is_active' => true,
         ];
 
         $service = Service::create($serviceData);
+
+        if (! empty($categoryIds)) {
+            $service->categories()->sync($categoryIds);
+        }
 
         if (! empty($validated['vendor_id'])) {
             ServiceVendorOffering::upsert((int) $validated['vendor_id'], $service, ['is_active' => true]);
@@ -166,7 +212,7 @@ class AdminLaundryServiceController extends Controller
         $locale = app()->getLocale();
 
         return successResponse(
-            $this->formatService($service, $locale),
+            $this->formatService($service->load(['category', 'categories']), $locale),
             __('service.created_successfully'),
             201
         );
@@ -250,10 +296,25 @@ class AdminLaundryServiceController extends Controller
             'service_description' => 'nullable|array',
             'service_description.ar' => 'nullable|string',
             'service_description.en' => 'nullable|string',
-            'category_id' => 'sometimes|exists:categories,id',
+            'category_id' => 'sometimes|nullable|exists:categories,id',
+            'category_ids' => 'sometimes|nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
         ]);
 
         $serviceData = [];
+
+        if (array_key_exists('category_ids', $validated) && is_array($validated['category_ids'])) {
+            $catIds = array_map('intval', $validated['category_ids']);
+            $service->categories()->sync($catIds);
+            if (! empty($catIds)) {
+                $serviceData['category_id'] = $catIds[0];
+            }
+        } elseif (array_key_exists('category_id', $validated)) {
+            $serviceData['category_id'] = $validated['category_id'];
+            if ($validated['category_id']) {
+                $service->categories()->syncWithoutDetaching([(int) $validated['category_id']]);
+            }
+        }
 
         if (isset($validated['service_name'])) {
             $serviceData['service_name'] = $validated['service_name'];
@@ -261,10 +322,6 @@ class AdminLaundryServiceController extends Controller
 
         if (isset($validated['service_description'])) {
             $serviceData['description'] = $validated['service_description'];
-        }
-
-        if (isset($validated['category_id'])) {
-            $serviceData['category_id'] = $validated['category_id'];
         }
 
         if ($request->has('icon_id')) {
@@ -276,7 +333,7 @@ class AdminLaundryServiceController extends Controller
         $locale = app()->getLocale();
 
         return successResponse(
-            $this->formatService($service->fresh(), $locale),
+            $this->formatService($service->fresh()->load(['category', 'categories']), $locale),
             __('service.updated_successfully')
         );
     }
@@ -318,13 +375,24 @@ class AdminLaundryServiceController extends Controller
                 ->avg('rating') ?? 0);
         }
 
+        $categoryIds = $service->relationLoaded('categories')
+            ? $service->categories->pluck('id')->values()->all()
+            : ($service->category_id ? [(int) $service->category_id] : []);
+
         return array_merge([
             'id'                  => $service->id,
             'category_id'         => $service->category_id,
+            'category_ids'        => $categoryIds,
             'icon'                => $this->uploadFilesService->getFullUrl($iconPath),
             'Service_name'        => ServiceVendorOffering::displayNameForVendor($service, $vendorId, $locale),
             'Service_description' => ServiceVendorOffering::descriptionForVendor($service, $vendorId, $locale),
             'Category'            => $service->category ? $service->category->getTranslation('name', $locale) : null,
+            'Categories'          => $service->relationLoaded('categories')
+                ? $service->categories->map(fn ($c) => [
+                    'id' => $c->id,
+                    'name' => $c->getTranslation('name', $locale),
+                ])->values()->all()
+                : ($service->category ? [['id' => $service->category->id, 'name' => $service->category->getTranslation('name', $locale)]] : []),
             'rating'              => round((float) $rating, 2),
             'vendor_id'           => $vendorId,
             'in_vendor_catalog'   => ServiceVendorOffering::find($vendorId, $service->id) !== null,
@@ -337,9 +405,14 @@ class AdminLaundryServiceController extends Controller
      */
     private function formatService($service, $locale = 'ar'): array
     {
+        $categoryIds = $service->relationLoaded('categories')
+            ? $service->categories->pluck('id')->values()->all()
+            : ($service->category_id ? [(int) $service->category_id] : []);
+
         return [
             'id' => $service->id,
             'category_id' => $service->category_id,
+            'category_ids' => $categoryIds,
             'icon' => $this->uploadFilesService->getFullUrl($service->iconRelation?->full_path ?? $service->iconRelation?->path),
             'Service_name' => [
                 'ar' => $service->getTranslation('service_name', 'ar'),
@@ -353,6 +426,21 @@ class AdminLaundryServiceController extends Controller
                 'ar' => $service->category->getTranslation('name', 'ar'),
                 'en' => $service->category->getTranslation('name', 'en'),
             ] : null,
+            'Categories' => $service->relationLoaded('categories')
+                ? $service->categories->map(fn ($c) => [
+                    'id' => $c->id,
+                    'name' => [
+                        'ar' => $c->getTranslation('name', 'ar'),
+                        'en' => $c->getTranslation('name', 'en'),
+                    ],
+                ])->values()->all()
+                : ($service->category ? [[
+                    'id' => $service->category->id,
+                    'name' => [
+                        'ar' => $service->category->getTranslation('name', 'ar'),
+                        'en' => $service->category->getTranslation('name', 'en'),
+                    ],
+                ]] : []),
             'is_active' => (bool) $service->is_active,
         ];
     }

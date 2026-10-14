@@ -15,11 +15,14 @@ class ServiceResource extends JsonResource
     {
         $uploadFilesService = app(UploadFilesService::class);
         $isDetailView = $this->isDetailView($request);
-        $locale = app()->getLocale();
+        $categoryIds = $this->relationLoaded('categories')
+            ? $this->categories->pluck('id')->values()->all()
+            : ($this->category_id ? [(int) $this->category_id] : []);
 
         return [
             'id' => $this->id,
             'category_id' => $this->category_id,
+            'category_ids' => $categoryIds,
             'name' => $isDetailView ? ['ar' => $this->getTranslation('service_name', 'ar'), 'en' => $this->getTranslation('service_name', 'en')] : $this->getTranslation('service_name', $locale),
             'description' => $isDetailView ? ['ar' => $this->getTranslation('description', 'ar'), 'en' => $this->getTranslation('description', 'en')] : $this->getTranslation('description', $locale),
             'image' => $uploadFilesService->getFullUrl($this->image),
@@ -28,6 +31,7 @@ class ServiceResource extends JsonResource
             'preparation_time' => $this->preparation_time,
             'is_active' => $this->is_active,
             'category' => new CategoryResource($this->whenLoaded('category')),
+            'categories' => CategoryResource::collection($this->whenLoaded('categories')),
             'created_at' => $this->created_at?->toDateTimeString(),
             'updated_at' => $this->updated_at?->toDateTimeString(),
         ];

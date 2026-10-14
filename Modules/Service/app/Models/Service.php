@@ -31,6 +31,14 @@ class Service extends Model
         if ($service->category_id) {
             flushCacheTags("category_{$service->category_id}");
         }
+        try {
+            if ($service->relationLoaded('categories')) {
+                foreach ($service->categories as $cat) {
+                    flushCacheTags("category_{$cat->id}");
+                }
+            }
+        } catch (\Throwable) {
+        }
     }
 
     /**
