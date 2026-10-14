@@ -21,6 +21,7 @@ class CategoryResource extends JsonResource
             'id' => $this->id,
             'name' => $isDetailView ? ['ar' => $this->getTranslation('name', 'ar'), 'en' => $this->getTranslation('name', 'en')] : $this->getTranslation('name', $locale),
             'description' => $isDetailView ? ['ar' => $this->getTranslation('description', 'ar'), 'en' => $this->getTranslation('description', 'en')] : $this->getTranslation('description', $locale),
+            'icon_id' => $this->icon_id,
             'icon' => $this->whenLoaded('iconRelation', fn () => $this->iconRelation?->full_path),
             'image' => $uploadFilesService->getFullUrl($this->image),
             'is_active' => $this->is_active,
