@@ -76,8 +76,11 @@ class DepartmentController extends Controller
                 ->where('is_active', true)
                 ->orderBy('order', 'asc');
 
-            // Filter by department (category) using category_id
-            $query->where('category_id', $department->id);
+            // Filter by department (category) using category_id or pivot relation (category_service)
+            $query->where(function ($q) use ($department) {
+                $q->where('category_id', $department->id)
+                    ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $department->id));
+            });
 
             $results = $query->paginate($perPage);
 

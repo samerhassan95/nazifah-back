@@ -329,8 +329,10 @@ class Client extends Authenticatable
         if ($categoryId) {
             // Filter vendors by category through their branches' services
             $query->whereHas('branches.services', function ($q) use ($categoryId) {
-                $q->where('category_id', $categoryId)
-                    ->where('services.is_active', true);
+                $q->where(function ($subQ) use ($categoryId) {
+                    $subQ->where('services.category_id', $categoryId)
+                        ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $categoryId));
+                })->where('services.is_active', true);
             });
         }
 
@@ -378,7 +380,10 @@ class Client extends Authenticatable
         if ($categoryId) {
             // Filter branches by category through their services
             $query->whereHas('services', function ($q) use ($categoryId) {
-                $q->where('category_id', $categoryId);
+                $q->where(function ($subQ) use ($categoryId) {
+                    $subQ->where('services.category_id', $categoryId)
+                        ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $categoryId));
+                });
             });
         }
 

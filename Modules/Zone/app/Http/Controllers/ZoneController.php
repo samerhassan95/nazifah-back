@@ -204,7 +204,10 @@ class ZoneController extends Controller
         $vendors = $zone->vendors()
             ->where('is_active', true)
             ->whereHas('branches.services', function ($query) use ($categoryId) {
-                $query->where('category_id', $categoryId);
+                $query->where(function ($subQ) use ($categoryId) {
+                    $subQ->where('services.category_id', $categoryId)
+                        ->orWhereHas('categories', fn ($cq) => $cq->where('categories.id', $categoryId));
+                });
             })
             ->get();
 
