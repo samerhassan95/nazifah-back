@@ -81,6 +81,7 @@
         }
         .mysr-form-wrap {
             padding: 0 1.5rem;
+            min-height: 480px;
         }
         .secure-badge {
             text-align: center;
@@ -245,6 +246,7 @@
             }
 
             function renderForm() {
+                var scrollY = window.scrollY || document.documentElement.scrollTop;
                 var carriedValues = captureCardValues();
 
                 // Detach the checkbox first so removing the old form node doesn't delete it.
@@ -258,6 +260,8 @@
                 var formEl = document.createElement('div');
                 formEl.className = 'mysr-form';
                 oldFormEl.parentNode.replaceChild(formEl, oldFormEl);
+
+                window.scrollTo({ top: scrollY, behavior: 'instant' });
 
                 var cfg = Object.assign({}, init);
                 if (canSaveCard && saveToggle && saveToggle.checked) {
