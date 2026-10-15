@@ -126,7 +126,7 @@ class DepartmentController extends Controller
         $firstBranch = $vendor->branches->where('is_active', true)->first();
         $firstBranchId = $firstBranch?->id;
 
-        $itemTypes = $itemTypesQuery->orderBy('pieces.order', 'asc')
+        $itemTypes = $itemTypesQuery->orderBy('pieces.id', 'asc')
             ->get()
             ->map(function ($piece) use ($service, $firstBranchId) {
                 $options = $this->getServiceOptions($service->id);
