@@ -160,8 +160,19 @@ class LaundryCatalogImportService
                 }
 
                 if (isset($existingCategories[$name['ar']])) {
+                    $existingCat = $existingCategories[$name['ar']];
                     if ($sectionCode !== '') {
-                        $categoryIdMap[$sectionCode] = $existingCategories[$name['ar']]->id;
+                        $categoryIdMap[$sectionCode] = $existingCat->id;
+                    }
+                    // Fix: if EN was stored as AR (old v6 import bug), update it
+                    if (
+                        ! $dryRun
+                        && $name['en'] !== ''
+                        && $name['en'] !== $name['ar']
+                        && $existingCat->getTranslation('name', 'en') === $name['ar']
+                    ) {
+                        $existingCat->setTranslation('name', 'en', $name['en'])->save();
+                        $stats['categories_updated'] = ($stats['categories_updated'] ?? 0) + 1;
                     }
                     if ($canCreateCategories) {
                         $stats['categories_skipped']++;
@@ -234,8 +245,19 @@ class LaundryCatalogImportService
                 }
 
                 if (isset($existingServices[$name['ar']])) {
+                    $existingSvc = $existingServices[$name['ar']];
                     if ($svcCode !== '') {
-                        $serviceIdMap[$svcCode] = $existingServices[$name['ar']]->id;
+                        $serviceIdMap[$svcCode] = $existingSvc->id;
+                    }
+                    // Fix: if EN was stored as AR (old v6 import bug), update it
+                    if (
+                        ! $dryRun
+                        && $name['en'] !== ''
+                        && $name['en'] !== $name['ar']
+                        && $existingSvc->getTranslation('service_name', 'en') === $name['ar']
+                    ) {
+                        $existingSvc->setTranslation('service_name', 'en', $name['en'])->save();
+                        $stats['services_updated'] = ($stats['services_updated'] ?? 0) + 1;
                     }
                     if ($canCreateServices) {
                         $stats['services_skipped']++;
@@ -347,8 +369,19 @@ class LaundryCatalogImportService
                     }
 
                     if (isset($existingAddons[$name['ar']])) {
+                        $existingAddon = $existingAddons[$name['ar']];
                         if ($addonCode !== '') {
-                            $addonIdMap[$addonCode] = $existingAddons[$name['ar']]->id;
+                            $addonIdMap[$addonCode] = $existingAddon->id;
+                        }
+                        // Fix: if EN was stored as AR (old v6 import bug), update it
+                        if (
+                            ! $dryRun
+                            && $name['en'] !== ''
+                            && $name['en'] !== $name['ar']
+                            && $existingAddon->getTranslation('name', 'en') === $name['ar']
+                        ) {
+                            $existingAddon->setTranslation('name', 'en', $name['en'])->save();
+                            $stats['addons_updated'] = ($stats['addons_updated'] ?? 0) + 1;
                         }
                         if ($canCreateAddons) {
                             $stats['addons_skipped']++;
@@ -434,6 +467,16 @@ class LaundryCatalogImportService
                     $piece = null;
                     if (isset($existingPieces[$name['ar']])) {
                         $piece = $existingPieces[$name['ar']];
+                        // Fix: if EN was stored as AR (old v6 import bug), update it
+                        if (
+                            ! $dryRun
+                            && $name['en'] !== ''
+                            && $name['en'] !== $name['ar']
+                            && $piece->getTranslation('name', 'en') === $name['ar']
+                        ) {
+                            $piece->setTranslation('name', 'en', $name['en'])->save();
+                            $stats['pieces_updated'] = ($stats['pieces_updated'] ?? 0) + 1;
+                        }
                         $touchedPieceIds[] = $piece->id;
                         $stats['pieces_skipped']++;
                     } else {
