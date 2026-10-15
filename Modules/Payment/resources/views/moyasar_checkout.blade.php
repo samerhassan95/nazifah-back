@@ -205,13 +205,14 @@
                 return true;
             }
 
-            // Always hide Moyasar's internal ugly warning text since we have our clean checkbox
-            function hideMoyasarInternalNotice() {
+            // Toggle Moyasar's "card will be saved" notice based on checkbox state instantly (no re-render needed!)
+            function updateNoticeVisibility() {
                 var formEl = document.querySelector('.mysr-form');
                 if (formEl) {
+                    var show = saveToggle && saveToggle.checked;
                     formEl.querySelectorAll('.mysr-form-warn-icon, .warn-icon').forEach(function (el) {
                         if (saveWrap && saveWrap.contains(el)) return;
-                        el.style.display = 'none';
+                        el.style.display = show ? '' : 'none';
                     });
                 }
             }
@@ -220,7 +221,7 @@
                 var attempts = 0;
                 var observer = new MutationObserver(function (_mutations, obs) {
                     var placed = placeCheckboxAboveSubmit();
-                    hideMoyasarInternalNotice();
+                    updateNoticeVisibility();
                     if (placed && ++attempts > 20) {
                         obs.disconnect();
                     }
@@ -231,9 +232,13 @@
                 }
                 setTimeout(function () {
                     placeCheckboxAboveSubmit();
-                    hideMoyasarInternalNotice();
+                    updateNoticeVisibility();
                     observer.disconnect();
                 }, 2000);
+
+                if (saveToggle) {
+                    saveToggle.addEventListener('change', updateNoticeVisibility);
+                }
             }
 
             // Intercept form submission or click on the pay button to append save_card flag to callback_url
