@@ -23,7 +23,11 @@ class AdminServiceController extends Controller
         $query = Service::with(['category', 'categories']);
 
         if ($request->has('is_active')) {
-            $query->where('is_active', $request->is_active);
+            $query->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
+        } elseif ((int) $request->input('per_page') >= 50) {
+            // Bulk selection / picker modals (e.g. Add Service modal to laundry, discount selectors)
+            // only show active services that are not stopped by admin.
+            $query->where('is_active', true);
         }
 
         if ($request->has('category_id')) {

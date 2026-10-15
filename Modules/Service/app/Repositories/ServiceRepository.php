@@ -29,7 +29,11 @@ class ServiceRepository implements ServiceRepositoryInterface
                 }
 
                 if (isset($filters['is_active'])) {
-                    $query->where('is_active', $filters['is_active']);
+                    $query->where('is_active', filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN));
+                } elseif (isset($filters['per_page']) && (int) $filters['per_page'] >= 50) {
+                    // Pickers / selection modals (e.g. Add service to laundry, discount selectors)
+                    // fetching bulk lists should only see active services.
+                    $query->where('is_active', true);
                 }
 
                 if (isset($filters['category_id'])) {

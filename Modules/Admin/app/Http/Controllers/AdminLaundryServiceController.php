@@ -7,6 +7,7 @@ use App\Services\UploadFilesService;
 use App\Support\CatalogActivePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Modules\Admin\Models\Icon;
 use Modules\Branch\Models\Branch;
 use Modules\Order\Models\Order;
@@ -40,9 +41,15 @@ class AdminLaundryServiceController extends Controller
 
         $query = Service::with(['category', 'categories']);
 
+        if ($request->has('is_active')) {
+            $query->where('services.is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
+        } else {
+            // Services stopped by admin must never show up in laundries, branches, or available popup
+            $query->where('services.is_active', true);
+        }
+
         if ($scope === 'available' && $vendorId) {
-            $query->where('services.is_active', true)
-                ->whereDoesntHave('vendors', fn ($v) => $v->where('vendors.id', $vendorId))
+            $query->whereDoesntHave('vendors', fn ($v) => $v->where('vendors.id', $vendorId))
                 ->orderBy('services.id');
         } elseif ($branchId) {
             $query->whereHas('branches', fn ($q) => $q->where('branches.id', $branchId));
@@ -339,10 +346,14 @@ class AdminLaundryServiceController extends Controller
     }
 
     /**
-     * Delete service
+     * Delete service from a laundry (detach from laundry and its branches)
      * DELETE /laundries/services/:id
+     *
+     * Removes the service from the laundry's catalog (vendor_service and branch_service)
+     * without deleting it from the global catalog (services table), so it remains in
+     * Categories & Services and can be re-selected from the "Add Service" popup.
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
         $service = Service::find($id);
 
@@ -350,7 +361,46 @@ class AdminLaundryServiceController extends Controller
             return notFoundResponse(__('service.not_found'));
         }
 
-        $service->delete();
+        $vendorId = $request->input('vendor_id') ?? $request->header('vendor-id');
+
+        // If vendor_id is not directly in the request, try to extract it from the Referer URL
+        // e.g. https://manager.nathefah.com/laundries/12/services or /laundries/12
+        if (! $vendorId && $referer = $request->header('referer')) {
+            if (preg_match('#/laundries/(\d+)#', $referer, $matches)) {
+                $vendorId = (int) $matches[1];
+            }
+        }
+
+        if ($vendorId) {
+            $vendorId = (int) $vendorId;
+
+            // 1. Remove from vendor_service
+            DB::table('vendor_service')
+                ->where('vendor_id', $vendorId)
+                ->where('service_id', $id)
+                ->delete();
+
+            // 2. Remove from branch_service for all branches of this vendor
+            $branchIds = Branch::where('vendor_id', $vendorId)->pluck('id')->all();
+            if (! empty($branchIds)) {
+                DB::table('branch_service')
+                    ->whereIn('branch_id', $branchIds)
+                    ->where('service_id', $id)
+                    ->delete();
+            }
+
+            // Invalidate caches
+            flushCacheTags(['services', 'categories', 'branches']);
+
+            return successResponse(null, __('service.deleted_successfully'));
+        }
+
+        // If no specific vendor was resolved, detach from all vendors in vendor_service
+        // while strictly keeping the service intact in the global catalog.
+        DB::table('vendor_service')->where('service_id', $id)->delete();
+        DB::table('branch_service')->where('service_id', $id)->delete();
+
+        flushCacheTags(['services', 'categories', 'branches']);
 
         return successResponse(null, __('service.deleted_successfully'));
     }
