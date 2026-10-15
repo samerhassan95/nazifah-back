@@ -186,12 +186,13 @@
             var saveWrap = document.querySelector('.save-card-opt');
             var canSaveCard = methods.indexOf('creditcard') !== -1;
 
-            // Moyasar renders the whole card form (fields + its own pay button) as one
-            // block into .mysr-form, so there is no mount point of our own between the
-            // CVC field and the pay button. Instead: park the checkbox outside .mysr-form
-            // (so clearing it on re-render never destroys it), then once Moyasar has
-            // rendered, move the checkbox into the form, just above its pay button
-            // (the last <button> — the card form's submit button renders after STC Pay's).
+            if (canSaveCard) {
+                init.credit_card = { save_card: true };
+            }
+
+            // Render Moyasar once
+            Moyasar.init(init);
+
             function placeCheckboxAboveSubmit() {
                 if (!canSaveCard || !saveWrap) return false;
                 var formEl = document.querySelector('.mysr-form');
@@ -204,123 +205,61 @@
                 return true;
             }
 
-            // Moyasar's card fields are plain <input> elements in our own DOM (confirmed
-            // against the moyasar.js source — no iframe), with stable identifiers:
-            // #mysr-cc-name, #mysr-cc-number, and the expiry/CVC inputs found by their
-            // fixed placeholder text. So a toggle-triggered re-render doesn't have to
-            // lose what was typed — just carry the values across to the fresh form.
-            function findCardInputs(root) {
-                if (!root) return {};
-                return {
-                    name: root.querySelector('#mysr-cc-name, input[name="mysr-cc-name"]'),
-                    number: root.querySelector('#mysr-cc-number'),
-                    expiry: root.querySelector('input[placeholder="MM / YY"]'),
-                    cvc: root.querySelector('input[placeholder="CVC"]')
-                };
-            }
-
-            function captureCardValues() {
-                var inputs = findCardInputs(document.querySelector('.mysr-form'));
-                var values = {};
-                Object.keys(inputs).forEach(function (key) {
-                    if (inputs[key]) values[key] = inputs[key].value;
-                });
-                return values;
-            }
-
-            var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-
-            function restoreCardValues(values, root) {
-                if (!values) return;
-                var inputs = findCardInputs(root);
-                Object.keys(inputs).forEach(function (key) {
-                    var input = inputs[key];
-                    var value = values[key];
-                    if (!input || !value) return;
-                    // Set via the native setter (not input.value = ...) so any internal
-                    // listener relying on a tracked/overridden setter still sees the
-                    // change, then dispatch a real input event for formatting/validation.
-                    nativeInputValueSetter.call(input, value);
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                });
-            }
-
-            function renderForm() {
-                var scrollY = window.scrollY || document.documentElement.scrollTop;
-                var carriedValues = captureCardValues();
-
-                // Detach the checkbox first so removing the old form node doesn't delete it.
-                document.body.appendChild(saveWrap);
-
-                // Replace (not just clear) the container: re-calling Moyasar.init() on the
-                // SAME node left its "card will be saved" notice showing even after a later
-                // init without credit_card.save_card — some internal state survived innerHTML
-                // being cleared. A brand-new node for every render avoids that entirely.
-                var oldFormEl = document.querySelector('.mysr-form');
-                var formEl = document.createElement('div');
-                formEl.className = 'mysr-form';
-                oldFormEl.parentNode.replaceChild(formEl, oldFormEl);
-
-                window.scrollTo({ top: scrollY, behavior: 'instant' });
-
-                var cfg = Object.assign({}, init);
-                if (canSaveCard && saveToggle && saveToggle.checked) {
-                    cfg.credit_card = { save_card: true };
-                }
-                Moyasar.init(cfg);
-
-                if (canSaveCard) {
-                    var attempts = 0;
-                    var observer = new MutationObserver(function (_mutations, obs) {
-                        var placed = placeCheckboxAboveSubmit();
-                        restoreCardValues(carriedValues, formEl);
-
-                        // If checkbox is NOT checked, hide Moyasar's internal "card will be
-                        // saved" notice. Confirmed against the actual moyasar.js source: it
-                        // renders as <span class="mysr-form-warn-icon warn-icon"><svg/>TEXT</span>
-                        // — an SVG icon child plus a bare text node, not wrapped in its own
-                        // leaf element. An earlier version of this hide logic matched on
-                        // leaf elements containing save/حفظ/بيانات keywords, which this
-                        // element could never satisfy (it has the <svg> as a child), so it
-                        // was never actually hidden. Target the stable class name directly.
-                        if (!saveToggle || !saveToggle.checked) {
-                            var formEl2 = document.querySelector('.mysr-form');
-                            if (formEl2) {
-                                formEl2.querySelectorAll('.mysr-form-warn-icon, .warn-icon').forEach(function (el) {
-                                    if (saveWrap && saveWrap.contains(el)) return; // skip our own label
-                                    el.style.display = 'none';
-                                });
-                            }
-                        }
-
-                        if ((placed || !canSaveCard) && ++attempts > 40) {
-                            obs.disconnect();
-                        }
+            // Always hide Moyasar's internal ugly warning text since we have our clean checkbox
+            function hideMoyasarInternalNotice() {
+                var formEl = document.querySelector('.mysr-form');
+                if (formEl) {
+                    formEl.querySelectorAll('.mysr-form-warn-icon, .warn-icon').forEach(function (el) {
+                        if (saveWrap && saveWrap.contains(el)) return;
+                        el.style.display = 'none';
                     });
-                    observer.observe(formEl, { childList: true, subtree: true });
-                    setTimeout(function () {
-                        placeCheckboxAboveSubmit();
-                        restoreCardValues(carriedValues, formEl);
-                        // Final sweep after Moyasar finishes rendering
-                        if (!saveToggle || !saveToggle.checked) {
-                            var formEl3 = document.querySelector('.mysr-form');
-                            if (formEl3) {
-                                formEl3.querySelectorAll('.mysr-form-warn-icon, .warn-icon').forEach(function (el) {
-                                    if (saveWrap && saveWrap.contains(el)) return; // skip our own label
-                                    el.style.display = 'none';
-                                });
-                            }
-                        }
-                        observer.disconnect();
-                    }, 2000);
                 }
             }
 
-            if (canSaveCard && saveToggle) {
-                saveToggle.addEventListener('change', renderForm);
+            if (canSaveCard) {
+                var attempts = 0;
+                var observer = new MutationObserver(function (_mutations, obs) {
+                    var placed = placeCheckboxAboveSubmit();
+                    hideMoyasarInternalNotice();
+                    if (placed && ++attempts > 20) {
+                        obs.disconnect();
+                    }
+                });
+                var targetForm = document.querySelector('.mysr-form');
+                if (targetForm) {
+                    observer.observe(targetForm, { childList: true, subtree: true });
+                }
+                setTimeout(function () {
+                    placeCheckboxAboveSubmit();
+                    hideMoyasarInternalNotice();
+                    observer.disconnect();
+                }, 2000);
             }
 
-            renderForm();
+            // Intercept form submission or click on the pay button to append save_card flag to callback_url
+            function updateCallbackUrlWithSaveCard() {
+                var isChecked = saveToggle && saveToggle.checked ? '1' : '0';
+                var formEl = document.querySelector('.mysr-form form');
+                if (formEl) {
+                    var callbackInput = formEl.querySelector('input[name="callback_url"]');
+                    if (callbackInput && callbackInput.value) {
+                        var url = new URL(callbackInput.value, window.location.origin);
+                        url.searchParams.set('save_card', isChecked);
+                        callbackInput.value = url.toString();
+                    }
+                }
+            }
+
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('button[type="submit"], .mysr-form button');
+                if (btn) {
+                    updateCallbackUrlWithSaveCard();
+                }
+            }, true);
+
+            document.addEventListener('submit', function (e) {
+                updateCallbackUrlWithSaveCard();
+            }, true);
         });
     </script>
 </body>

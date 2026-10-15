@@ -75,6 +75,11 @@ class ClientCardService
      */
     public function upsertFromMoyasarSource(PaymentTransaction $transaction, array $source): ?ClientCard
     {
+        // If save_card was explicitly opted out by user via callback/metadata, do not save
+        if (request()->has('save_card') && ! filter_var(request()->get('save_card'), FILTER_VALIDATE_BOOLEAN)) {
+            return null;
+        }
+
         $token = $source['token'] ?? null;
         if (! is_string($token) || $token === '') {
             return null;
