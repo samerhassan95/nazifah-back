@@ -290,7 +290,7 @@ class AdminClientController extends Controller
 
                 return [
                     'id' => $order->id,
-                    'order_code' => "#{$order->order_number}",
+                    'order_code' => $order->order_number,
                     'Pieces_count' => $piecesCount,
                     'Laundry' => $vendorName,
                     'Order_value' => (float) $order->final_amount,
