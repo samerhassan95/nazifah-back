@@ -648,23 +648,34 @@ class AdminLaundryBranchController extends Controller
         $serviceIds = $validated['service_ids'] ?? $validated['services'] ?? [];
         $serviceIds = array_unique($serviceIds);
 
-        $now = now();
-        foreach ($serviceIds as $serviceId) {
-            // Ensure vendor_service record exists for vendor catalog
-            DB::table('vendor_service')->insertOrIgnore([
-                'vendor_id' => $branch->vendor_id,
-                'service_id' => $serviceId,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
+        // Only allow services that are active globally AND active in the laundry (vendor) catalog
+        $allowedServiceIds = DB::table('services')
+            ->join('vendor_service', 'services.id', '=', 'vendor_service.service_id')
+            ->where('vendor_service.vendor_id', $branch->vendor_id)
+            ->where('vendor_service.is_active', true)
+            ->where('services.is_active', true)
+            ->whereIn('services.id', $serviceIds)
+            ->pluck('services.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
+        if (empty($allowedServiceIds)) {
+            return errorResponse(__('service.not_found'), null, 422);
+        }
+
+        $now = now();
+        foreach ($allowedServiceIds as $serviceId) {
             // Assign to branch_service
-            DB::table('branch_service')->insertOrIgnore([
-                'branch_id' => $branch->id,
-                'service_id' => $serviceId,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
+            DB::table('branch_service')->updateOrInsert(
+                [
+                    'branch_id' => $branch->id,
+                    'service_id' => $serviceId,
+                ],
+                [
+                    'is_active' => true,
+                    'updated_at' => $now,
+                ]
+            );
         }
 
         return successResponse(

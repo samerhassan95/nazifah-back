@@ -697,9 +697,17 @@ class BranchesController extends Controller
             return notFoundResponse(__('branch.branch_not_found'));
         }
 
-        // Get services for this branch (admin-deactivated system services are hidden)
+        // Get services for this branch (admin-deactivated and vendor-deactivated services are hidden)
         $services = $branch->services()
             ->where('services.is_active', true)
+            ->where('branch_service.is_active', true)
+            ->whereExists(function ($query) use ($vendorId) {
+                $query->select(\Illuminate\Support\Facades\DB::raw(1))
+                    ->from('vendor_service')
+                    ->whereColumn('vendor_service.service_id', 'services.id')
+                    ->where('vendor_service.vendor_id', $vendorId)
+                    ->where('vendor_service.is_active', true);
+            })
             ->get()
             ->map(function ($service) use ($branch, $vendorId) {
                 $rating = Order::whereHas('items.service', function ($query) use ($service) {

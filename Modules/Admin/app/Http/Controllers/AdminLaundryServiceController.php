@@ -48,13 +48,38 @@ class AdminLaundryServiceController extends Controller
             $query->where('services.is_active', true);
         }
 
+        $referer = (string) $request->header('referer', '');
+        $isBranchContext = $branchId
+            || str_contains($referer, '/branches/')
+            || str_contains($referer, '/branch/')
+            || $request->boolean('vendor_is_active')
+            || $request->boolean('active_only')
+            || $request->input('for') === 'branch';
+
         if ($scope === 'available' && $vendorId) {
             $query->whereDoesntHave('vendors', fn ($v) => $v->where('vendors.id', $vendorId))
                 ->orderBy('services.id');
         } elseif ($branchId) {
-            $query->whereHas('branches', fn ($q) => $q->where('branches.id', $branchId));
+            $branch = Branch::find($branchId);
+            $query->whereHas('branches', function ($q) use ($branchId) {
+                $q->where('branches.id', $branchId)
+                  ->where('branch_service.is_active', true);
+            });
+            if ($branch && $branch->vendor_id) {
+                $vId = $branch->vendor_id;
+                $query->whereHas('vendors', function ($v) use ($vId) {
+                    $v->where('vendors.id', $vId)
+                      ->where('vendor_service.is_active', true);
+                });
+            }
         } elseif ($vendorId) {
-            $query->whereHas('vendors', fn ($v) => $v->where('vendors.id', $vendorId));
+            $query->whereHas('vendors', function ($v) use ($vendorId, $isBranchContext) {
+                $v->where('vendors.id', $vendorId);
+                if ($isBranchContext) {
+                    // For branches, only show services that are active in the laundry
+                    $v->where('vendor_service.is_active', true);
+                }
+            });
         }
 
         $services = $query->paginate($request->input('per_page', 15));
