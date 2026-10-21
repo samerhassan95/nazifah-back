@@ -256,7 +256,10 @@ class OrderPieceHandoffService
         }
 
         // Must be declared first by sender
-        if ($order->active_handoff_type !== $currentStage || $order->active_handoff_declared_at === null) {
+        // Exception: for client_to_laundry, allow confirmation if client used legacy flow (client_pickup_handoff_at is set)
+        $legacyClientDropoffAllowed = ($currentStage === self::TYPE_CLIENT_TO_LAUNDRY && $order->client_pickup_handoff_at !== null);
+        
+        if (!$legacyClientDropoffAllowed && ($order->active_handoff_type !== $currentStage || $order->active_handoff_declared_at === null)) {
             throw new \LogicException(__('order.handoff_must_be_declared_first'));
         }
 
