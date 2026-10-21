@@ -342,6 +342,7 @@ class ClientBranchController extends Controller
 
         // Get pieces for this service that are available at this branch
         $serviceIds = [$serviceId];
+        $categoryId = $request->query('category_id') ? (int) $request->query('category_id') : null;
 
         // Get pieces for this service and all its children that are available at this branch
         $piecesCollection = \App\Support\CatalogActiveFilter::scopeActivePieces(
@@ -355,6 +356,7 @@ class ClientBranchController extends Controller
                 $q->where('branches.id', $branchId)
                     ->where('branch_piece.is_active', true);
             })
+            ->when($categoryId, fn ($q) => $q->where('pieces.category_id', $categoryId))
             ->with(['iconRelation'])
             ->get()
             ->unique('id');

@@ -37,6 +37,7 @@ class Piece extends Model
 
     protected $fillable = [
         'vendor_id',
+        'category_id',
         'name',
         'icon_id',
         'is_active',
@@ -69,6 +70,15 @@ class Piece extends Model
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    /**
+     * The category (section/department) this piece belongs to.
+     * Populated from 04_Pieces.Section_ID during catalog import.
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Category\Models\Category::class);
     }
 
     /**

@@ -377,7 +377,7 @@ class BranchService
     /**
      * Get all pieces available at a branch
      */
-    public function getPiecesByBranch(int $branchId): ?array
+    public function getPiecesByBranch(int $branchId, ?int $categoryId = null): ?array
     {
         $branch = $this->getBranchById($branchId);
 
@@ -388,6 +388,7 @@ class BranchService
         $locale = app()->getLocale();
 
         $pieces = $branch->activePieces()
+            ->when($categoryId, fn ($q) => $q->where('pieces.category_id', $categoryId))
             ->with([
                 'iconRelation',
                 'services' => function ($query) use ($branchId) {

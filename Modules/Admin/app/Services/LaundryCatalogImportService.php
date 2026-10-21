@@ -436,6 +436,17 @@ class LaundryCatalogImportService
                     $pieceToServicesMap[$pieceCode][] = ['code' => $svcCode, 'price' => $price];
                 }
 
+                // Map piece code -> category_id derived from Section_ID in 04_Pieces
+                // (the "Section_ID" column links each piece to its section/department)
+                $pieceToCategoryMap = [];
+                foreach ($piecesIn as $row) {
+                    $pCode = (string) ($row['Piece_ID'] ?? $row['piece_id'] ?? '');
+                    $secCode = (string) ($row['Section_ID'] ?? $row['section_id'] ?? '');
+                    if ($pCode !== '' && $secCode !== '' && isset($categoryIdMap[$secCode]) && is_int($categoryIdMap[$secCode])) {
+                        $pieceToCategoryMap[$pCode] = $categoryIdMap[$secCode];
+                    }
+                }
+
                 // Map piece code -> list of addon codes (no price on this sheet — the
                 // addon's own catalog price, set in section C, is used as the seed).
                 $pieceToAddonsMap = [];
@@ -459,6 +470,7 @@ class LaundryCatalogImportService
                 foreach ($piecesIn as $row) {
                     $name = $this->bilingualName($row, 'piece_name_AR', 'piece_name_EN', ['اسم القطعة', 'name']);
                     $pieceCode = (string) ($row['Piece_ID'] ?? $row['piece_id'] ?? '');
+                    $pieceCategoryId = $pieceToCategoryMap[$pieceCode] ?? null;
 
                     if ($name['ar'] === '') {
                         continue;
@@ -477,6 +489,11 @@ class LaundryCatalogImportService
                             $piece->setTranslation('name', 'en', $name['en'])->save();
                             $stats['pieces_updated'] = ($stats['pieces_updated'] ?? 0) + 1;
                         }
+                        // Update category_id if now known and not yet set
+                        if (! $dryRun && $pieceCategoryId !== null && $piece->category_id === null) {
+                            $piece->update(['category_id' => $pieceCategoryId]);
+                            $stats['pieces_updated'] = ($stats['pieces_updated'] ?? 0) + 1;
+                        }
                         $touchedPieceIds[] = $piece->id;
                         $stats['pieces_skipped']++;
                     } else {
@@ -489,9 +506,10 @@ class LaundryCatalogImportService
                         }
 
                         $piece = Piece::create([
-                            'vendor_id' => $vendorId,
-                            'name' => ['ar' => $name['ar'], 'en' => $name['en']],
-                            'is_active' => true,
+                            'vendor_id'   => $vendorId,
+                            'category_id' => $pieceCategoryId,
+                            'name'        => ['ar' => $name['ar'], 'en' => $name['en']],
+                            'is_active'   => true,
                         ]);
                         $existingPieces[$name['ar']] = $piece;
                         $touchedPieceIds[] = $piece->id;

@@ -135,7 +135,7 @@ class ServiceService
     /**
      * Get all pieces for a specific service at a specific branch
      */
-    public function getPiecesByServiceAndBranch(int $serviceId, int $branchId): array
+    public function getPiecesByServiceAndBranch(int $serviceId, int $branchId, ?int $categoryId = null): array
     {
         $locale = app()->getLocale();
         $service = $this->serviceRepository->find($serviceId);
@@ -217,6 +217,7 @@ class ServiceService
                     $query->where('branches.id', $branchId)
                         ->where('branch_piece.is_active', true);
                 })
+                ->when($categoryId, fn ($q) => $q->where('pieces.category_id', $categoryId))
         )
             ->with(['iconRelation'])
             ->get();

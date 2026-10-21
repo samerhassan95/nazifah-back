@@ -4,6 +4,7 @@ namespace Modules\Branch\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Modules\Branch\Http\Requests\StoreBranchRequest;
 use Modules\Branch\Http\Requests\UpdateBranchRequest;
 use Modules\Branch\Http\Resources\BranchResource;
@@ -153,9 +154,10 @@ class BranchController extends Controller
     /**
      * Get all pieces available at this branch
      */
-    public function getPieces(int $id): JsonResponse
+    public function getPieces(Request $request, int $id): JsonResponse
     {
-        $pieces = $this->branchService->getPiecesByBranch($id);
+        $categoryId = $request->query('category_id') ? (int) $request->query('category_id') : null;
+        $pieces = $this->branchService->getPiecesByBranch($id, $categoryId);
         if ($pieces === null) {
             return notFoundResponse('Branch not found');
         }

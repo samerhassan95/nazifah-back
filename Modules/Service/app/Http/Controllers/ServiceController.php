@@ -91,7 +91,8 @@ class ServiceController extends Controller
      */
     public function getPiecesByServiceAndBranch(int $serviceId, int $branchId): JsonResponse
     {
-        $pieces = $this->serviceService->getPiecesByServiceAndBranch($serviceId, $branchId);
+        $categoryId = request()->query('category_id') ? (int) request()->query('category_id') : null;
+        $pieces = $this->serviceService->getPiecesByServiceAndBranch($serviceId, $branchId, $categoryId);
 
         return successResponse($pieces, 'Pieces retrieved successfully');
     }
