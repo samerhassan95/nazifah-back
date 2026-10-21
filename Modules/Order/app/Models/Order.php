@@ -429,6 +429,14 @@ class Order extends Model
     }
 
     /**
+     * Get the order number without leading # if present.
+     */
+    public function getOrderNumberAttribute($value): ?string
+    {
+        return $value !== null ? ltrim((string) $value, '#') : null;
+    }
+
+    /**
      * Localized label for payment_status (Accept-Language aware).
      */
     public function getPaymentStatusLabelAttribute(): string
