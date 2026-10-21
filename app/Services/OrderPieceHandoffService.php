@@ -52,7 +52,8 @@ class OrderPieceHandoffService
         }
 
         // 2. Stage: Branch dropoff by client (Client -> Laundry)
-        if ($pickupAtVendor && ! $order->client_pickup_handoff_at) {
+        // Client can self-dropoff OR declare handoff, laundry must confirm
+        if ($pickupAtVendor && ! $order->vendor_pickup_received_at) {
             if (in_array($status, [OrderStatus::CONFIRMED->value, OrderStatus::PAYMENT_CONFIRMED->value, OrderStatus::DELIVERED_TO_BRANCH->value], true)) {
                 return self::TYPE_CLIENT_TO_LAUNDRY;
             }
