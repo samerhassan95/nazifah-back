@@ -80,26 +80,26 @@ enum OrderStatus: string
     public function labelAr(): string
     {
         return match ($this) {
-            self::PENDING => 'قيد الانتظار',
-            self::BRANCH_REVIEW => 'تم مراجعة الفرع',
-            self::CONFIRMED => 'مؤكد',
-            self::WAITING_PAYMENT => 'في انتظار الدفع',
-            self::PAYMENT_CONFIRMED => 'تم تأكيد الدفع',
-            self::AWAITING_REMAINING_PAYMENT => 'في انتظار سداد المبلغ المتبقي',
-            self::DRIVER_PICKUP_ASSIGNED => 'تم تعيين سائق الاستلام',
-            self::DRIVER_PICKUP_ACCEPTED => 'قبل سائق الاستلام',
-            self::ON_WAY_TO_PICKUP => 'في الطريق للاستلام',
-            self::PICKED_UP => 'تم الاستلام',
-            self::DELIVERED_TO_BRANCH => 'تم التسليم للفرع',
-            self::DRIVER_DELIVERY_ASSIGNED => 'تم تعيين سائق التوصيل',
-            self::DRIVER_DELIVERY_ACCEPTED => 'قبل سائق التوصيل',
-            self::ON_WAY_TO_DELIVERY => 'في الطريق للتوصيل',
-            self::WAITING_CLIENT_RECEIPT => 'تم الوصول — بانتظار العميل',
-            self::DELIVERED => 'تم التوصيل',
-            self::CLIENT_POSTPONED_PICKUP => 'أجل العميل موعد الاستلام',
-            self::CLIENT_POSTPONED_DELIVERY => 'أجل العميل موعد التسليم',
-            self::COMPLETED => 'مكتمل',
-            self::CANCELLED => 'ملغي',
+            self::PENDING                     => 'انتظار التأكيد',
+            self::BRANCH_REVIEW               => 'مراجعة الفرع',
+            self::CONFIRMED                   => 'مؤكد',
+            self::WAITING_PAYMENT             => 'انتظار الدفع',
+            self::PAYMENT_CONFIRMED           => 'تأكيد الدفع',
+            self::AWAITING_REMAINING_PAYMENT  => 'دفع متبقي',
+            self::DRIVER_PICKUP_ASSIGNED      => 'سائق قادم',
+            self::DRIVER_PICKUP_ACCEPTED      => 'سائق متوجه',
+            self::ON_WAY_TO_PICKUP            => 'في الطريق',
+            self::PICKED_UP                   => 'تم الاستلام',
+            self::DELIVERED_TO_BRANCH         => 'وصل الفرع',
+            self::DRIVER_DELIVERY_ASSIGNED    => 'سائق التوصيل',
+            self::DRIVER_DELIVERY_ACCEPTED    => 'توصيل قادم',
+            self::ON_WAY_TO_DELIVERY          => 'في التوصيل',
+            self::WAITING_CLIENT_RECEIPT      => 'بانتظارك الآن',
+            self::DELIVERED                   => 'تم التوصيل',
+            self::CLIENT_POSTPONED_PICKUP     => 'تأجيل الاستلام',
+            self::CLIENT_POSTPONED_DELIVERY   => 'تأجيل التسليم',
+            self::COMPLETED                   => 'مكتمل',
+            self::CANCELLED                   => 'ملغي',
         };
     }
 
@@ -109,27 +109,27 @@ enum OrderStatus: string
 
         if ($this === self::PAYMENT_CONFIRMED
             && $paymentMethod === \App\Enums\PaymentMethod::CASH_ON_DELIVERY->value) {
-            return $isAr ? 'تم تأكيد الطلب' : 'Order Confirmed';
+            return $isAr ? 'تأكيد الطلب' : 'Order Confirmed';
         }
 
         // From the vendor's side, "تم مراجعة الفرع" (branch reviewed) is stale —
         // the vendor already knows they reviewed it; what they need to see is that
         // it's now sitting with the client awaiting approval.
         if ($this === self::BRANCH_REVIEW && $forVendor) {
-            return $isAr ? 'بانتظار مراجعة العميل' : 'Awaiting Customer Review';
+            return $isAr ? 'مراجعة العميل' : 'Awaiting Customer Review';
         }
 
         // Branch self-pickup: waiting_client_receipt is reused for "vendor finished,
         // ready for you to collect" — its default wording ("arrived at delivery
         // location") is written for the home-delivery-driver case, so reword it here.
         if ($this === self::WAITING_CLIENT_RECEIPT && $deliveryAtVendor) {
-            return $isAr ? 'جاهز للاستلام من الفرع' : 'Ready for Pickup at Branch';
+            return $isAr ? 'جاهز للاستلام' : 'Ready for Pickup at Branch';
         }
 
         // Backward compatibility: orders still sitting at completed from before this
         // status was introduced, where the client hasn't actually received it yet.
         if ($this === self::COMPLETED && $awaitingClientReceipt) {
-            return $isAr ? 'جاهز - في انتظار استلامك' : 'Ready — Awaiting Your Receipt';
+            return $isAr ? 'جاهز بانتظارك' : 'Ready — Awaiting Your Receipt';
         }
 
         return $isAr ? $this->labelAr() : $this->label();
