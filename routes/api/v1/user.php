@@ -302,6 +302,10 @@ Route::middleware(['auth:client', 'banned'])->group(function () {
         Route::get('/order-action', [OrderController::class, 'getOrderActions'])
             ->name('user.orders.order-action');
 
+        // Client declares handoff (gave clothes)
+        Route::post('/{order_id}/handoff', [OrderController::class, 'declareHandoff'])
+            ->name('user.orders.handoff');
+
         // Client confirms actual handoff (gave/received clothes)
         Route::post('/{order_id}/confirm-handoff', [OrderController::class, 'confirmHandoff'])
             ->name('user.orders.confirm-handoff');

@@ -424,4 +424,11 @@ return [
     'split_requires_amounts' => 'Each split payment requires a positive amount',
     'split_duplicate_method' => 'Each payment method may appear once in a split',
     'order_fully_paid' => 'Order is already fully paid',
+    'handoff_sent_success' => 'Handoff declaration recorded successfully, waiting for the other party to confirm',
+    'handoff_must_be_declared_first' => 'The handing party must declare they handed over the items before receipt can be confirmed',
+    'handoff_not_sender_authorized' => 'You are not authorized to declare handing over items at this stage',
+    'handoff_not_receiver_authorized' => 'You are not authorized to confirm receiving items at this stage',
+    'handoff_already_declared' => 'Handoff was already declared, waiting for confirmation from the other party',
+    'handoff_type_mismatch' => 'Handoff type does not match current order stage',
+    'handoff_declared_log' => ':role declared handoff of items (:type), waiting for confirmation',
 ];

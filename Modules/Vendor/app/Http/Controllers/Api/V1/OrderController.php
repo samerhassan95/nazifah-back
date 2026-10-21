@@ -2100,11 +2100,61 @@ class OrderController extends Controller
         ?array $handoffActions = null
     ): array {
         $handoffActions ??= $handoffService->availableActions($order);
+        $pieceHandoffPayload = app(\App\Services\OrderPieceHandoffService::class)->buildHandoffPayload($order, 'laundry');
 
         return array_merge([
             'requires_handoff_action' => $handoffActions !== [],
             'available_handoff_actions' => $handoffActions,
-        ], $handoffService->vendorConfirmFlags($order));
+        ], $handoffService->vendorConfirmFlags($order), $pieceHandoffPayload);
+    }
+
+    /**
+     * Laundry declares handoff: "I handed over the items" (أنا سلّمت).
+     *
+     * POST /api/v1/vendor/orders/{orderId}/handoff
+     */
+    public function declareHandoff(Request $request, $orderId): JsonResponse
+    {
+        $employee = $request->user();
+        $vendorId = $employee->vendor_id;
+        $branchIds = $this->branchService->getBranchesByVendor($vendorId)->pluck('id')->toArray();
+
+        $order = Order::where('id', $orderId)
+            ->whereIn('branch_id', $branchIds)
+            ->first();
+
+        if (! $order) {
+            return notFoundResponse(__('order.order_not_found'));
+        }
+
+        $pieceHandoffService = app(\App\Services\OrderPieceHandoffService::class);
+        $handoffService = app(\App\Services\VendorOrderHandoffService::class);
+
+        try {
+            $order = $pieceHandoffService->declareHandoff(
+                $order,
+                'laundry',
+                (int) $employee->id,
+                $request->input('handoff_type'),
+                $request->input('notes')
+            );
+        } catch (\LogicException $e) {
+            return errorResponse($e->getMessage(), null, 400);
+        } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
+            return errorResponse($e->userMessage(), null, 400);
+        }
+
+        $order = $order->fresh();
+        $handoffActions = $handoffService->availableActions($order);
+
+        return successResponse(array_merge([
+            'id' => $order->id,
+            'status' => $order->status,
+            'status_label' => $order->vendor_status_label,
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
+            ...$this->vendorHandoffMeta($order, $handoffService, $handoffActions),
+        ], $order->handoffResponseFields()), __('order.handoff_sent_success'));
     }
 
     public function confirmHandoff(Request $request, $orderId): JsonResponse
@@ -2129,24 +2179,36 @@ class OrderController extends Controller
             return notFoundResponse(__('order.order_not_found'));
         }
 
+        $pieceHandoffService = app(\App\Services\OrderPieceHandoffService::class);
         $handoffService = app(\App\Services\VendorOrderHandoffService::class);
 
+        // Try unified two-step handoff first
         try {
-            $message = __('order.vendor_handoff_not_available');
-
-            if ($handoffService->canConfirmPickupFromDriver($order)) {
-                $order = $handoffService->confirmPickupFromDriver($order, (int) $employee->id, $request->notes);
-                $message = __('order.vendor_handoff_success_pickup_from_driver');
-            } elseif ($handoffService->canConfirmHandoverToDelivery($order)) {
-                $order = $handoffService->confirmHandoverToDelivery($order, (int) $employee->id, $request->notes);
-                $message = __('order.vendor_handoff_success_handover_to_delivery');
-            } else {
-                return errorResponse(__('order.vendor_handoff_not_available'), null, 400);
+            $order = $pieceHandoffService->confirmHandoff(
+                $order,
+                'laundry',
+                (int) $employee->id,
+                $request->input('handoff_type'),
+                $request->notes
+            );
+            $message = __('order.handoff_success');
+        } catch (\LogicException $pieceEx) {
+            // Fallback for legacy flow
+            try {
+                if ($handoffService->canConfirmPickupFromDriver($order)) {
+                    $order = $handoffService->confirmPickupFromDriver($order, (int) $employee->id, $request->notes);
+                    $message = __('order.vendor_handoff_success_pickup_from_driver');
+                } elseif ($handoffService->canConfirmHandoverToDelivery($order)) {
+                    $order = $handoffService->confirmHandoverToDelivery($order, (int) $employee->id, $request->notes);
+                    $message = __('order.vendor_handoff_success_handover_to_delivery');
+                } else {
+                    return errorResponse($pieceEx->getMessage() ?: __('order.vendor_handoff_not_available'), null, 400);
+                }
+            } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
+                return errorResponse($e->userMessage(), null, 400);
+            } catch (\LogicException $e) {
+                return errorResponse($e->getMessage() ?: __('order.vendor_handoff_not_available'), null, 400);
             }
-        } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
-            return errorResponse($e->userMessage(), null, 400);
-        } catch (\LogicException $e) {
-            return errorResponse($e->getMessage() ?: __('order.vendor_handoff_not_available'), null, 400);
         }
 
         $order = $order->fresh();

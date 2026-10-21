@@ -104,6 +104,8 @@ Route::middleware('auth:driver')->prefix('v1/driver')->group(function () {
         Route::get('/{orderId}/tracking', [OrderController::class, 'tracking'])->name('driver.orders.tracking');
         Route::post('/{orderId}/pickup-complete', [OrderController::class, 'pickupComplete'])->name('driver.orders.pickup-complete');
         Route::post('/{orderId}/confirm-qr', [OrderController::class, 'confirmQR'])->name('driver.orders.confirm-qr');
+        Route::post('/{orderId}/handoff', [OrderController::class, 'declareHandoff'])->name('driver.orders.handoff');
+        Route::post('/{orderId}/confirm-handoff', [OrderController::class, 'confirmHandoff'])->name('driver.orders.confirm-handoff');
     });
 
     // ========================================================================

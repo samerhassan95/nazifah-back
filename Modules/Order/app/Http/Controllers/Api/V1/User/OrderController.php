@@ -2042,7 +2042,7 @@ class OrderController extends Controller
                 'created_at' => $order->created_at->toISOString(),
                 'updated_at' => $order->updated_at->toISOString(),
                 ...$order->clientVisitResponseFields(),
-                'requires_handoff_confirmation' => $handoffService->canConfirmHandoff($order),
+                ...app(\App\Services\OrderPieceHandoffService::class)->buildHandoffPayload($order, 'client'),
                 ...$visitService->apiResponseFields($order),
                 'can_accept' => ($order->status === OrderStatus::BRANCH_REVIEW->value) || in_array($order->status, [
                     OrderStatus::PENDING->value,
@@ -4164,6 +4164,55 @@ class OrderController extends Controller
     }
 
     /**
+     * Client declares handoff: "I handed over the clothes" (أنا سلّمت).
+     *
+     * POST /api/v1/user/orders/{order_id}/handoff
+     */
+    public function declareHandoff(Request $request, int $order_id): JsonResponse
+    {
+        $user = $request->user();
+
+        $order = Order::where('client_id', $user->id)->where('id', $order_id)->first();
+        if (! $order) {
+            return errorResponse(__('order.order_not_found'), 404);
+        }
+
+        $pieceHandoffService = app(\App\Services\OrderPieceHandoffService::class);
+        $visitService = app(\App\Services\ClientOrderVisitService::class);
+
+        try {
+            $order = $pieceHandoffService->declareHandoff(
+                $order,
+                'client',
+                (int) $user->id,
+                $request->input('handoff_type'),
+                $request->input('notes')
+            );
+        } catch (\LogicException $e) {
+            return errorResponse($e->getMessage(), 400);
+        } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
+            return errorResponse($e->userMessage(), 400);
+        }
+
+        $handoffData = $pieceHandoffService->buildHandoffPayload($order, 'client');
+        $visitApi = $visitService->apiResponseFields($order);
+
+        return successResponse(array_merge([
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'status' => $order->status,
+            'status_label' => $order->status_label,
+            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
+            'requires_handoff_confirmation' => $handoffData['requires_handoff_confirmation'],
+            'requires_visit_response' => $visitApi['requires_visit_response'],
+            'available_actions' => array_merge($visitApi['available_actions'] ?? [], $handoffData['available_actions']),
+            'visit' => $visitApi['visit'],
+            'handoff' => $handoffData['handoff'],
+        ], $order->clientVisitResponseFields()), __('order.handoff_sent_success'));
+    }
+
+    /**
      * Client confirms actual handoff: gave or received clothes (driver or laundry).
      *
      * POST /api/v1/user/orders/{order_id}/confirm-handoff
@@ -4177,54 +4226,84 @@ class OrderController extends Controller
             return errorResponse(__('order.order_not_found'), 404);
         }
 
-        $handoffService = app(\App\Services\ClientOrderHandoffService::class);
+        $pieceHandoffService = app(\App\Services\OrderPieceHandoffService::class);
         $visitService = app(\App\Services\ClientOrderVisitService::class);
 
-        if (! $handoffService->canConfirmHandoff($order)) {
-            return errorResponse(__('order.handoff_not_available'), 400);
-        }
-
-        $context = $handoffService->resolveHandoffContext($order);
-
+        // Try new unified two-step handoff first
         try {
-            $order = $handoffService->confirmHandoff($order, (int) $user->id);
-        } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
-            return errorResponse($e->userMessage(), 400);
-        } catch (\LogicException) {
-            return errorResponse(__('order.handoff_not_available'), 400);
+            $order = $pieceHandoffService->confirmHandoff(
+                $order,
+                'client',
+                (int) $user->id,
+                $request->input('handoff_type'),
+                $request->input('notes')
+            );
+
+            $handoffData = $pieceHandoffService->buildHandoffPayload($order, 'client');
+            $visitApi = $visitService->apiResponseFields($order);
+
+            return successResponse(array_merge([
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'status_label' => $order->status_label,
+                'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+                'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
+                'requires_handoff_confirmation' => $handoffData['requires_handoff_confirmation'],
+                'requires_visit_response' => $visitApi['requires_visit_response'],
+                'available_actions' => array_merge($visitApi['available_actions'] ?? [], $handoffData['available_actions']),
+                'visit' => $visitApi['visit'],
+                'handoff' => $handoffData['handoff'],
+            ], $order->clientVisitResponseFields()), __('order.handoff_success'));
+        } catch (\LogicException $pieceEx) {
+            // Fallback for legacy flows
+            $handoffService = app(\App\Services\ClientOrderHandoffService::class);
+            if (! $handoffService->canConfirmHandoff($order)) {
+                return errorResponse($pieceEx->getMessage() ?: __('order.handoff_not_available'), 400);
+            }
+
+            $context = $handoffService->resolveHandoffContext($order);
+
+            try {
+                $order = $handoffService->confirmHandoff($order, (int) $user->id);
+            } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
+                return errorResponse($e->userMessage(), 400);
+            } catch (\LogicException) {
+                return errorResponse(__('order.handoff_not_available'), 400);
+            }
+
+            $message = match ($context['handoff_type'] ?? null) {
+                'give_to_driver' => __('order.handoff_success_give_to_driver'),
+                'give_to_laundry' => __('order.handoff_success_give_to_laundry'),
+                'receive_from_driver' => __('order.handoff_success_receive_from_driver'),
+                'receive_from_laundry' => __('order.handoff_success_receive_from_laundry'),
+                default => __('order.handoff_success'),
+            };
+
+            $handoffContext = $handoffService->resolveHandoffContext($order);
+            $handoffActions = $handoffService->availableActions($order);
+            $visitApi = $visitService->apiResponseFields($order);
+
+            return successResponse(array_merge([
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'status_label' => $order->status_label,
+                'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
+                'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
+                'requires_handoff_confirmation' => $handoffContext !== null,
+                'requires_visit_response' => $visitApi['requires_visit_response'],
+                'available_actions' => $handoffContext !== null ? $handoffActions : $visitApi['available_actions'],
+                'visit' => $visitApi['visit'],
+                'handoff' => $handoffContext ? [
+                    'type' => $handoffContext['handoff_type'],
+                    'direction' => $handoffContext['direction'],
+                    'confirm_label' => $handoffContext['confirm_label'],
+                    'endpoint' => '/api/v1/user/orders/'.$order->id.'/confirm-handoff',
+                    'confirm_action' => 'confirm',
+                ] : null,
+            ], $order->clientVisitResponseFields()), $message);
         }
-
-        $message = match ($context['handoff_type'] ?? null) {
-            'give_to_driver' => __('order.handoff_success_give_to_driver'),
-            'give_to_laundry' => __('order.handoff_success_give_to_laundry'),
-            'receive_from_driver' => __('order.handoff_success_receive_from_driver'),
-            'receive_from_laundry' => __('order.handoff_success_receive_from_laundry'),
-            default => __('order.handoff_success'),
-        };
-
-        $handoffContext = $handoffService->resolveHandoffContext($order);
-        $handoffActions = $handoffService->availableActions($order);
-        $visitApi = $visitService->apiResponseFields($order);
-
-        return successResponse(array_merge([
-            'order_id' => $order->id,
-            'order_number' => $order->order_number,
-            'status' => $order->status,
-            'status_label' => $order->status_label,
-            'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
-            'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
-            'requires_handoff_confirmation' => $handoffContext !== null,
-            'requires_visit_response' => $visitApi['requires_visit_response'],
-            'available_actions' => $handoffContext !== null ? $handoffActions : $visitApi['available_actions'],
-            'visit' => $visitApi['visit'],
-            'handoff' => $handoffContext ? [
-                'type' => $handoffContext['handoff_type'],
-                'direction' => $handoffContext['direction'],
-                'confirm_label' => $handoffContext['confirm_label'],
-                'endpoint' => '/api/v1/user/orders/'.$order->id.'/confirm-handoff',
-                'confirm_action' => 'confirm',
-            ] : null,
-        ], $order->clientVisitResponseFields()), $message);
     }
 
     /**

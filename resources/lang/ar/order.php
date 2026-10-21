@@ -425,4 +425,11 @@ return [
     'split_requires_amounts' => 'كل دفعة في التقسيم تتطلب مبلغًا أكبر من صفر',
     'split_duplicate_method' => 'يمكن أن تظهر كل طريقة دفع مرة واحدة في التقسيم',
     'order_fully_paid' => 'تم دفع الطلب بالكامل بالفعل',
+    'handoff_sent_success' => 'تم تسجيل التسليم بنجاح، بانتظار تأكيد الطرف الآخر',
+    'handoff_must_be_declared_first' => 'يجب أن يصرّح الطرف المسلّم أولاً بأنه سلّم القطع قبل تأكيد الاستلام',
+    'handoff_not_sender_authorized' => 'غير مصرح لك بتسليم القطع في هذه المرحلة',
+    'handoff_not_receiver_authorized' => 'غير مصرح لك بتأكيد استلام القطع في هذه المرحلة',
+    'handoff_already_declared' => 'تم تصريح التسليم مسبقاً، بانتظار تأكيد الطرف الآخر',
+    'handoff_type_mismatch' => 'نوع التسليم غير متطابق مع المرحلة الحالية للطلب',
+    'handoff_declared_log' => 'صرّح :role بتسليم القطع (:type)، بانتظار تأكيد الاستلام',
 ];

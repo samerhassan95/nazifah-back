@@ -1364,9 +1364,99 @@ class OrderController extends Controller
         return successResponse(['status_log' => $statusLog], __('order.status_log_retrieved'));
     }
 
+    /**
+     * Driver declares handoff: "I handed over the items" (أنا سلّمت).
+     *
+     * POST /api/v1/driver/orders/{orderId}/handoff
+     */
+    public function declareHandoff(Request $request, $orderId): JsonResponse
+    {
+        $driver = $request->user();
+
+        $order = Order::where('id', $orderId)
+            ->forDriver($driver->id)
+            ->first();
+
+        if (! $order) {
+            return notFoundResponse(__('order.order_not_found'));
+        }
+
+        $pieceHandoffService = app(\App\Services\OrderPieceHandoffService::class);
+
+        try {
+            $order = $pieceHandoffService->declareHandoff(
+                $order,
+                'driver',
+                (int) $driver->id,
+                $request->input('handoff_type'),
+                $request->input('notes')
+            );
+        } catch (\LogicException $e) {
+            return errorResponse($e->getMessage(), null, 400);
+        } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
+            return errorResponse($e->userMessage(), null, 400);
+        }
+
+        return successResponse(
+            $this->orderApiPayload($order, [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+            ], (int) $driver->id),
+            __('order.handoff_sent_success')
+        );
+    }
+
+    /**
+     * Driver confirms handoff: "I confirm receiving the items" (أؤكد الاستلام).
+     *
+     * POST /api/v1/driver/orders/{orderId}/confirm-handoff
+     */
+    public function confirmHandoff(Request $request, $orderId): JsonResponse
+    {
+        $driver = $request->user();
+
+        $order = Order::where('id', $orderId)
+            ->forDriver($driver->id)
+            ->first();
+
+        if (! $order) {
+            return notFoundResponse(__('order.order_not_found'));
+        }
+
+        $pieceHandoffService = app(\App\Services\OrderPieceHandoffService::class);
+
+        try {
+            $order = $pieceHandoffService->confirmHandoff(
+                $order,
+                'driver',
+                (int) $driver->id,
+                $request->input('handoff_type'),
+                $request->input('notes')
+            );
+        } catch (\LogicException $e) {
+            return errorResponse($e->getMessage(), null, 400);
+        } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
+            return errorResponse($e->userMessage(), null, 400);
+        }
+
+        return successResponse(
+            $this->orderApiPayload($order, [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'status_label' => OrderStatus::tryFrom($order->status)?->localizedLabel($order->payment_method) ?? $order->status,
+            ], (int) $driver->id),
+            __('order.handoff_success')
+        );
+    }
+
     private function orderApiPayload(Order $order, array $payload, ?int $viewerDriverId = null): array
     {
         $handoffService = app(\App\Services\VendorOrderHandoffService::class);
+        $pieceHandoffService = app(\App\Services\OrderPieceHandoffService::class);
+        $handoffPayload = $pieceHandoffService->buildHandoffPayload($order, 'driver');
 
         return array_merge(
             $payload,
@@ -1377,7 +1467,8 @@ class OrderController extends Controller
             $order->couponResponseFields(),
             $order->clientVisitResponseFields(),
             $handoffService->vendorConfirmFlags($order),
-            $handoffService->driverDeliveryActionFlags($order, $viewerDriverId)
+            $handoffService->driverDeliveryActionFlags($order, $viewerDriverId),
+            $handoffPayload
         );
     }
 }
