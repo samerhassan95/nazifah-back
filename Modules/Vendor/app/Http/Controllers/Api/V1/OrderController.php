@@ -2183,12 +2183,13 @@ class OrderController extends Controller
         $handoffService = app(\App\Services\VendorOrderHandoffService::class);
 
         // Try unified two-step handoff first
+        // Don't pass handoff_type - let the service auto-detect the correct stage
         try {
             $order = $pieceHandoffService->confirmHandoff(
                 $order,
                 'laundry',
                 (int) $employee->id,
-                $request->input('handoff_type'),
+                null,  // Let backend auto-detect handoff type
                 $request->notes
             );
             $message = __('order.handoff_success');
