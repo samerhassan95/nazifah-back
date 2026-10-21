@@ -220,9 +220,28 @@ class ServiceService
             ->with(['iconRelation'])
             ->get();
 
+        $pieceIds = $pieces->pluck('id')->map(fn ($id) => (int) $id)->all();
+
         $pivotMap = \Modules\Piece\Support\PieceBranchOffering::pivotMapForPieces(
             $branchId,
-            $pieces->pluck('id')->map(fn ($id) => (int) $id)->all()
+            $pieceIds
+        );
+
+        // Pre-fetch service_piece prices for this service + branch across all pieces in 1 query
+        $servicePiecePrices = $pieceIds === []
+            ? collect()
+            : DB::table('service_piece')
+                ->where('service_id', $serviceId)
+                ->where('branch_id', $branchId)
+                ->whereIn('piece_id', $pieceIds)
+                ->pluck('price', 'piece_id');
+
+        // Pre-fetch all additional services for all pieces in 1 query
+        $additionalServicesMap = \Modules\Piece\Support\PiecePricingFormatter::additionalServicesMapForPieces(
+            $pieces,
+            $branchId,
+            $locale,
+            true
         );
 
         return [
@@ -246,19 +265,32 @@ class ServiceService
                 ],
                 'delivery_price_per_km' => (float) ($branch->vendor?->delivery_price_per_km ?? 0),
             ],
-            'pieces' => $pieces->map(function ($piece) use ($service, $branchId, $pivotMap, $locale) {
-                $row = PiecePricingFormatter::pieceUnderService(
+            'pieces' => $pieces->map(function ($piece) use ($service, $branchId, $pivotMap, $locale, $servicePiecePrices, $additionalServicesMap) {
+                $pivotRow = $pivotMap[(int) $piece->id] ?? null;
+                $branchFields = \Modules\Piece\Support\PieceBranchOffering::branchApiFields(
                     $piece,
-                    $service,
                     $branchId,
                     $locale,
-                    $pivotMap[(int) $piece->id] ?? null,
+                    $pivotRow,
                     true
-
                 );
-                $additionalServices = collect(PiecePricingFormatter::additionalServicesForPiece($piece, $branchId, $locale, true))
+
+                $price = $servicePiecePrices->get((int) $piece->id);
+                if ($price === null) {
+                    $price = $service->getPriceForPieceAtBranch($piece->id, $branchId);
+                }
+
+                $row = array_merge($branchFields, [
+                    'id' => $piece->id,
+                    'icon' => $piece->iconRelation?->full_path,
+                    'service_id' => $service->id,
+                    'price' => (float) ($price ?? 0),
+                ]);
+
+                $additionalServices = collect($additionalServicesMap[(int) $piece->id] ?? [])
                     ->filter(fn (array $addition) => CatalogActivePresenter::isEffectivelyActive($addition))
                     ->values();
+
                 $row['additional_services'] = $additionalServices;
                 $row['additional_services_count'] = $additionalServices->count();
 
