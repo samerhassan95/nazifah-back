@@ -400,10 +400,45 @@ class BranchService
             ->get()
             ->keyBy('id');
 
+        $pieceIds = $pieces->pluck('id')->map(fn ($id) => (int) $id)->all();
+
         $pivotMap = \Modules\Piece\Support\PieceBranchOffering::pivotMapForPieces(
             $branchId,
-            $pieces->pluck('id')->map(fn ($id) => (int) $id)->all()
+            $pieceIds
         );
+
+        // Pre-fetch all additional services for all pieces at once (eliminates hundreds of DB queries)
+        $additionalServicesMap = \Modules\Piece\Support\PiecePricingFormatter::additionalServicesMapForPieces(
+            $pieces,
+            $branchId,
+            $locale,
+            true
+        );
+
+        // Pre-cache branch_service icon & pivot mappings for all services offered by the branch
+        $allBranchServiceIds = $branchServices->keys()->map(fn ($id) => (int) $id)->all();
+        $branchIconIds = $allBranchServiceIds === []
+            ? collect()
+            : DB::table('branch_service')
+                ->where('branch_id', $branchId)
+                ->whereIn('service_id', $allBranchServiceIds)
+                ->whereNotNull('icon_id')
+                ->pluck('icon_id', 'service_id');
+
+        $branchServicePivots = $allBranchServiceIds === []
+            ? collect()
+            : DB::table('branch_service')
+                ->where('branch_id', $branchId)
+                ->whereIn('service_id', $allBranchServiceIds)
+                ->get()
+                ->keyBy('service_id');
+
+        $iconsById = $branchIconIds->isEmpty()
+            ? collect()
+            : \Modules\Admin\Models\Icon::query()
+                ->whereIn('id', $branchIconIds->values()->unique()->all())
+                ->get()
+                ->keyBy('id');
 
         return [
             'branch' => [
@@ -417,29 +452,58 @@ class BranchService
                     'delivery_price_per_km' => (float) ($branch->vendor->delivery_price_per_km ?? 0),
                 ],
             ],
-            'pieces' => $pieces->map(function ($piece) use ($branchServices, $branchId, $locale, $pivotMap) {
-                $pieceRow = \Modules\Piece\Support\PiecePricingFormatter::pieceWithServices(
+            'pieces' => $pieces->map(function ($piece) use ($branchServices, $branchId, $locale, $pivotMap, $additionalServicesMap, $branchIconIds, $branchServicePivots, $iconsById) {
+                $pivotRow = $pivotMap[(int) $piece->id] ?? null;
+
+                $branchFields = \Modules\Piece\Support\PieceBranchOffering::branchApiFields(
                     $piece,
                     $branchId,
                     $locale,
-                    $pivotMap[(int) $piece->id] ?? null,
-                    true
-                );
-                $pieceRow['services'] = \Modules\Piece\Support\PiecePricingFormatter::mapServicesWithPrices(
-                    $piece->services->filter(fn ($service) => $branchServices->has($service->id)),
-                    $piece,
-                    $branchId,
-                    $locale,
-                    true
-                );
-                $pieceRow['additional_services'] = \Modules\Piece\Support\PiecePricingFormatter::additionalServicesForPiece(
-                    $piece,
-                    $branchId,
-                    $locale,
+                    $pivotRow,
                     true
                 );
 
-                return $pieceRow;
+                // Build services list from eager-loaded piece services
+                $pieceServices = $piece->services->filter(fn ($service) => $branchServices->has($service->id));
+
+                $servicesList = $pieceServices->map(function ($service) use ($piece, $branchId, $locale, $branchIconIds, $branchServicePivots, $iconsById) {
+                    $price = null;
+                    if ($service->pivot && (int) $service->pivot->branch_id === $branchId && $service->pivot->price !== null) {
+                        $price = (float) $service->pivot->price;
+                    } else {
+                        $price = $service->getPriceForPieceAtBranchOrNull($piece->id, $branchId);
+                    }
+
+                    $icon = null;
+                    $branchIconId = $branchIconIds->get($service->id);
+                    if ($branchIconId && $iconsById->has((int) $branchIconId)) {
+                        $icon = $iconsById->get((int) $branchIconId)?->full_path;
+                    } else {
+                        $icon = $service->icon;
+                    }
+
+                    $branchPivot = $branchServicePivots->get($service->id);
+                    $serviceLabel = method_exists($service, 'getTranslation')
+                        ? $service->getTranslation('service_name', $locale)
+                        : ($service->service_name ?? '');
+
+                    $row = array_merge([
+                        'service_id' => $service->id,
+                        'price' => (float) ($price ?? 0),
+                        'icon' => $icon,
+                        'name' => $serviceLabel,
+                    ], \App\Support\CatalogActivePresenter::service($service, $branchId, $branchPivot));
+
+                    return \App\Support\CatalogActivePresenter::isEffectivelyActive($row) ? $row : null;
+                })->filter()->values()->all();
+
+                return array_merge([
+                    'id' => $piece->id,
+                    'icon' => $piece->iconRelation?->full_path,
+                ], $branchFields, [
+                    'services' => $servicesList,
+                    'additional_services' => $additionalServicesMap[(int) $piece->id] ?? [],
+                ]);
             }),
         ];
     }
