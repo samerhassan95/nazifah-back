@@ -5,6 +5,7 @@ namespace Modules\Service\Services;
 use App\Support\CatalogActiveFilter;
 use App\Support\CatalogActivePresenter;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Modules\Piece\Models\Piece;
 use Modules\Piece\Support\PiecePricingFormatter;
 use Modules\Service\Interfaces\ServiceRepositoryInterface;

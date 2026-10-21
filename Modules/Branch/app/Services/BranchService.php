@@ -4,6 +4,7 @@ namespace Modules\Branch\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Modules\Address\Models\Address;
 use Modules\Branch\Interfaces\BranchRepositoryInterface;
 use Modules\Branch\Models\Branch;
