@@ -431,4 +431,7 @@ return [
     'handoff_already_declared' => 'Handoff was already declared, waiting for confirmation from the other party',
     'handoff_type_mismatch' => 'Handoff type does not match current order stage',
     'handoff_declared_log' => ':role declared handoff of items (:type), waiting for confirmation',
+    'handoff_notify_driver_client_declared_title' => 'Client handed over the order',
+    'handoff_notify_driver_client_declared_body' => 'Client confirmed handing over items for order :order_number — please confirm receipt',
+    'handoff_notify_driver_client_declared_body_en' => 'Client handed over items for order :order_number — please confirm receipt',
 ];

@@ -2042,8 +2042,10 @@ class OrderController extends Controller
                 'created_at' => $order->created_at->toISOString(),
                 'updated_at' => $order->updated_at->toISOString(),
                 ...$order->clientVisitResponseFields(),
-                ...app(\App\Services\OrderPieceHandoffService::class)->buildHandoffPayload($order, 'client'),
-                ...$visitService->apiResponseFields($order),
+                ...app(\App\Services\OrderPieceHandoffService::class)->mergeClientPayload(
+                    $order,
+                    $visitService->apiResponseFields($order)
+                ),
                 'can_accept' => ($order->status === OrderStatus::BRANCH_REVIEW->value) || in_array($order->status, [
                     OrderStatus::PENDING->value,
                     OrderStatus::DELIVERED_TO_BRANCH->value,
@@ -2747,7 +2749,7 @@ class OrderController extends Controller
     private function getHandoffNotificationTexts(array $context, string $lang): array
     {
         return match ($context['handoff_type']) {
-            'give_to_driver' => [
+            'give_to_driver', 'client_to_driver' => [
                 $this->transOrder('on_the_way_handoff_give_driver_title', $lang),
                 $this->transOrder('on_the_way_handoff_give_driver_message', $lang),
             ],
@@ -3983,13 +3985,25 @@ class OrderController extends Controller
                 }
             }
 
-            $handoffContext = $handoffService->resolveHandoffContext($order);
-            $handoffActions = $handoffService->availableActions($order);
-            $requiresHandoff = $handoffContext !== null;
             $visitApi = $visitService->apiResponseFields($order);
             $visitContext = $visitService->resolveVisitContext($order);
             $requiresVisitResponse = $visitApi['requires_visit_response'];
             $visitActions = $visitApi['available_actions'];
+            $pieceHandoffService = app(\App\Services\OrderPieceHandoffService::class);
+            $piecePayload = $pieceHandoffService->mergeClientPayload($order, $visitApi);
+            $pieceHandoff = $piecePayload['handoff'];
+            $legacyHandoffContext = $pieceHandoff ? null : $handoffService->resolveHandoffContext($order);
+            $handoffContext = $pieceHandoff
+                ? [
+                    'handoff_type' => $pieceHandoff['type'],
+                    'direction' => $pieceHandoff['sender_role'] === 'client' ? 'give' : 'receive',
+                    'confirm_label' => $pieceHandoff['declare_label'] ?? $pieceHandoff['confirm_label'],
+                ]
+                : $legacyHandoffContext;
+            $handoffActions = $pieceHandoff
+                ? $piecePayload['available_actions']
+                : $handoffService->availableActions($order);
+            $requiresHandoff = $piecePayload['requires_handoff_confirmation'] || $legacyHandoffContext !== null;
             $vendorHandoff = $vendorHandoffService->clientOnTheWayHandoff($order);
             $vendorPendingAction = $vendorHandoff['vendor_pending_action'] ?? null;
             // Vendor-side steps are informational on the client app — never a client action.
@@ -3999,7 +4013,10 @@ class OrderController extends Controller
                 && $vendorPendingAction === 'confirm_pickup_received'
                 && $order->client_pickup_handoff_at;
 
-            if ($requiresHandoff) {
+            if ($pieceHandoff && ($pieceHandoff['is_declared'] ?? false) && ! ($pieceHandoff['can_declare'] ?? false) && ! ($pieceHandoff['can_confirm'] ?? false)) {
+                $title = $pieceHandoff['waiting_label'] ?? $this->transOrder('on_the_way_handoff_give_driver_title', $lang);
+                $message = $pieceHandoff['waiting_label'] ?? $this->transOrder('on_the_way_handoff_give_driver_message', $lang);
+            } elseif ($requiresHandoff) {
                 [$title, $message] = $this->getHandoffNotificationTexts($handoffContext, $lang);
             } elseif ($requiresVisitResponse) {
                 [$title, $message] = $this->getVisitNotificationTexts($visitContext, $lang);
@@ -4038,15 +4055,22 @@ class OrderController extends Controller
                 $message = $this->transOrder('on_the_way_driver_approaching_message', $lang);
             }
 
-            $clientActions = $requiresHandoff
-                ? $handoffActions
-                : ($requiresVisitResponse ? $visitActions : []);
+            $waitingFor = $piecePayload['waiting_for']
+                ?? (($requiresHandoff || $requiresVisitResponse)
+                    ? 'client'
+                    : ($waitingForVendor ? 'vendor' : null));
+
+            $clientActions = $pieceHandoff
+                ? $piecePayload['available_actions']
+                : ($requiresHandoff
+                    ? $handoffActions
+                    : ($requiresVisitResponse ? $visitActions : []));
 
             $vendorHandoff = array_merge($vendorHandoff, [
                 'title' => $title,
                 'message' => $message,
                 'requires_vendor_action' => false,
-                'waiting_for' => $waitingForVendor ? 'vendor' : null,
+                'waiting_for' => $waitingForVendor ? 'vendor' : ($waitingFor === 'driver_handover' ? 'driver_handover' : null),
             ]);
             $cardPayload = $this->getOnTheWayCardPayload($order, $lang);
 
@@ -4062,22 +4086,21 @@ class OrderController extends Controller
                 'requires_handoff_confirmation' => $requiresHandoff,
                 'requires_visit_response' => $requiresVisitResponse,
                 'requires_vendor_action' => $requiresVendorAction,
-                'waiting_for' => ($requiresHandoff || $requiresVisitResponse)
-                    ? 'client'
-                    : ($waitingForVendor ? 'vendor' : null),
+                'waiting_for' => $waitingFor,
+                'required_action' => $piecePayload['required_action'] ?? null,
                 'vendor_pending_action' => $vendorPendingAction,
                 'time_remaining' => $timeRemainingText,
                 'distance' => $distanceKm !== null ? round($distanceKm, 1) : null,
                 'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
                 'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
                 'available_actions' => $clientActions,
-                'handoff' => $handoffContext ? [
+                'handoff' => $pieceHandoff ?: ($handoffContext ? [
                     'type' => $handoffContext['handoff_type'],
                     'direction' => $handoffContext['direction'],
                     'confirm_label' => $handoffContext['confirm_label'],
                     'endpoint' => '/api/v1/user/orders/'.$order->id.'/confirm-handoff',
                     'confirm_action' => 'confirm',
-                ] : null,
+                ] : null),
                 'visit' => $visitApi['visit'],
                 'vendor_handoff' => $vendorHandoff,
                 ...$order->handoffResponseFields(),
@@ -4150,8 +4173,15 @@ class OrderController extends Controller
                 // Same rules as the Flutter-side hasClientAction check this endpoint
                 // exists to replace: branch review, a handoff to confirm, a visit to
                 // respond to, or (legacy signal) a receipt-status prompt in the message.
+                $actions = $item['available_actions'] ?? [];
+                $clientCanAct = is_array($actions) && (
+                    ($actions['declare_handoff'] ?? false) === true
+                    || ($actions['confirm_handoff'] ?? false) === true
+                    || ($actions['confirm'] ?? false) === true
+                );
+
                 return ($item['status'] ?? null) === OrderStatus::BRANCH_REVIEW->value
-                    || ($item['requires_handoff_confirmation'] ?? false) === true
+                    || $clientCanAct
                     || ($item['requires_visit_response'] ?? false) === true
                     || (is_string($item['message'] ?? null) && str_contains($item['message'], 'receipt-status'));
             })
@@ -4194,8 +4224,8 @@ class OrderController extends Controller
             return errorResponse($e->userMessage(), 400);
         }
 
-        $handoffData = $pieceHandoffService->buildHandoffPayload($order, 'client');
         $visitApi = $visitService->apiResponseFields($order);
+        $handoffData = $pieceHandoffService->mergeClientPayload($order, $visitApi);
 
         return successResponse(array_merge([
             'order_id' => $order->id,
@@ -4205,9 +4235,11 @@ class OrderController extends Controller
             'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             'requires_handoff_confirmation' => $handoffData['requires_handoff_confirmation'],
-            'requires_visit_response' => $visitApi['requires_visit_response'],
-            'available_actions' => array_merge($visitApi['available_actions'] ?? [], $handoffData['available_actions']),
-            'visit' => $visitApi['visit'],
+            'requires_visit_response' => $handoffData['requires_visit_response'],
+            'available_actions' => $handoffData['available_actions'],
+            'waiting_for' => $handoffData['waiting_for'],
+            'required_action' => $handoffData['required_action'],
+            'visit' => $handoffData['visit'],
             'handoff' => $handoffData['handoff'],
         ], $order->clientVisitResponseFields()), __('order.handoff_sent_success'));
     }
@@ -4239,8 +4271,8 @@ class OrderController extends Controller
                 $request->input('notes')
             );
 
-            $handoffData = $pieceHandoffService->buildHandoffPayload($order, 'client');
             $visitApi = $visitService->apiResponseFields($order);
+            $handoffData = $pieceHandoffService->mergeClientPayload($order, $visitApi);
 
             return successResponse(array_merge([
                 'order_id' => $order->id,
@@ -4250,9 +4282,11 @@ class OrderController extends Controller
                 'pickup_at_vendor' => (bool) $order->pickup_at_vendor,
                 'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
                 'requires_handoff_confirmation' => $handoffData['requires_handoff_confirmation'],
-                'requires_visit_response' => $visitApi['requires_visit_response'],
-                'available_actions' => array_merge($visitApi['available_actions'] ?? [], $handoffData['available_actions']),
-                'visit' => $visitApi['visit'],
+                'requires_visit_response' => $handoffData['requires_visit_response'],
+                'available_actions' => $handoffData['available_actions'],
+                'waiting_for' => $handoffData['waiting_for'],
+                'required_action' => $handoffData['required_action'],
+                'visit' => $handoffData['visit'],
                 'handoff' => $handoffData['handoff'],
             ], $order->clientVisitResponseFields()), __('order.handoff_success'));
         } catch (\LogicException $pieceEx) {
@@ -4381,6 +4415,7 @@ class OrderController extends Controller
         }
 
         $visitApi = $visitService->apiResponseFields($order);
+        $handoffData = app(\App\Services\OrderPieceHandoffService::class)->mergeClientPayload($order, $visitApi);
 
         return successResponse(array_merge([
             'order_id' => $order->id,
@@ -4391,9 +4426,13 @@ class OrderController extends Controller
             'delivery_at_vendor' => (bool) $order->delivery_at_vendor,
             'pickup_time' => $order->pickup_time?->toIso8601String(),
             'estimated_delivery_time' => $order->estimated_delivery_time?->toIso8601String(),
-            'requires_visit_response' => $visitApi['requires_visit_response'],
-            'available_actions' => $visitApi['available_actions'],
-            'visit' => $visitApi['visit'],
+            'requires_visit_response' => $handoffData['requires_visit_response'],
+            'requires_handoff_confirmation' => $handoffData['requires_handoff_confirmation'],
+            'available_actions' => $handoffData['available_actions'],
+            'waiting_for' => $handoffData['waiting_for'],
+            'required_action' => $handoffData['required_action'],
+            'visit' => $handoffData['visit'],
+            'handoff' => $handoffData['handoff'],
         ], $order->clientVisitResponseFields()), $message);
     }
 

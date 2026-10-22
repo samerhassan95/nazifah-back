@@ -45,8 +45,13 @@ class OrderPieceHandoffService
         $deliveryAtVendor = (bool) $order->delivery_at_vendor;
 
         // 1. Stage: Home pickup (Client -> Driver)
+        // On the way: only after the client confirmed the pickup visit.
+        // picked_up: always (legacy driver-first flow, or already collected).
         if (! $pickupAtVendor && ! $order->client_pickup_handoff_at) {
-            if ($status === OrderStatus::ON_WAY_TO_PICKUP->value || $status === OrderStatus::PICKED_UP->value) {
+            if ($status === OrderStatus::ON_WAY_TO_PICKUP->value && $this->hasConfirmedPickupVisit($order)) {
+                return self::TYPE_CLIENT_TO_DRIVER;
+            }
+            if ($status === OrderStatus::PICKED_UP->value) {
                 return self::TYPE_CLIENT_TO_DRIVER;
             }
         }
@@ -122,6 +127,7 @@ class OrderPieceHandoffService
                 'available_actions' => [
                     'declare_handoff' => false,
                     'confirm_handoff' => false,
+                    'handoff_type' => null,
                 ],
             ];
         }
@@ -159,7 +165,56 @@ class OrderPieceHandoffService
             'available_actions' => [
                 'declare_handoff' => $canDeclare,
                 'confirm_handoff' => $canConfirm,
+                'handoff_type' => $currentStage,
             ],
+        ];
+    }
+
+    /**
+     * Merge two-step piece handoff with visit-response fields for client APIs.
+     * Visit stays first: handoff is hidden until the client confirms the visit.
+     *
+     * @param  array<string, mixed>  $visitApi
+     * @return array<string, mixed>
+     */
+    public function mergeClientPayload(Order $order, array $visitApi): array
+    {
+        $handoff = $this->buildHandoffPayload($order, 'client');
+        $visitRequired = (bool) ($visitApi['requires_visit_response'] ?? false);
+        $handoffObj = $visitRequired ? null : ($handoff['handoff'] ?? null);
+        $canDeclare = (bool) ($handoffObj['can_declare'] ?? false);
+        $canConfirm = (bool) ($handoffObj['can_confirm'] ?? false);
+        $isDeclared = (bool) ($handoffObj['is_declared'] ?? false);
+
+        $waitingFor = null;
+        $requiredAction = null;
+
+        if ($visitRequired) {
+            $waitingFor = 'client';
+        } elseif ($canDeclare || $canConfirm) {
+            $waitingFor = 'client';
+        } elseif ($isDeclared) {
+            $waitingFor = match ($handoffObj['receiver_role'] ?? null) {
+                'driver' => 'driver_handover',
+                'laundry' => 'vendor',
+                'client' => 'client',
+                default => $handoffObj['receiver_role'] ?? null,
+            };
+            if ($waitingFor === 'driver_handover') {
+                $requiredAction = 'driver_handover';
+            }
+        }
+
+        return [
+            'requires_handoff_confirmation' => $handoffObj !== null,
+            'handoff' => $handoffObj,
+            'available_actions' => $visitRequired
+                ? ($visitApi['available_actions'] ?? [])
+                : ($handoff['available_actions'] ?? []),
+            'waiting_for' => $waitingFor,
+            'required_action' => $requiredAction,
+            'visit' => $visitApi['visit'] ?? null,
+            'requires_visit_response' => $visitRequired,
         ];
     }
 
@@ -190,7 +245,7 @@ class OrderPieceHandoffService
 
         // Handle pre-conditions or initial transitions if needed
         if ($currentStage === self::TYPE_CLIENT_TO_DRIVER) {
-            // Client declared handoff to driver; driver is waiting to confirm
+            // Client declared handoff to driver; driver confirms next (driver_handover).
         } elseif ($currentStage === self::TYPE_DRIVER_TO_LAUNDRY) {
             // Driver arrived at branch and declared handing over
             $order->update([
@@ -231,7 +286,10 @@ class OrderPieceHandoffService
             'changed_by' => $actorId,
         ]);
 
-        return $order->fresh();
+        $order = $order->fresh();
+        $this->notifyReceiverOfDeclaration($order, $currentStage);
+
+        return $order;
     }
 
     /**
@@ -379,7 +437,7 @@ class OrderPieceHandoffService
 
         return match ($type) {
             self::TYPE_CLIENT_TO_DRIVER => [
-                'declare_label' => $isAr ? 'أنا سلّمت' : 'I handed over clothes',
+                'declare_label' => $isAr ? 'تسليم القطع للسائق' : 'Hand items to the driver',
                 'confirm_label' => $isAr ? 'أؤكد الاستلام' : 'Confirm receipt',
                 'waiting_label' => $isAr ? 'بانتظار تأكيد استلام السائق' : 'Waiting for driver confirmation',
             ],
@@ -414,6 +472,45 @@ class OrderPieceHandoffService
                 'waiting_label' => $isAr ? 'بانتظار تأكيد الاستلام' : 'Waiting for confirmation',
             ],
         };
+    }
+
+    protected function hasConfirmedPickupVisit(Order $order): bool
+    {
+        if (! $order->client_pickup_visit_confirmed_at) {
+            return false;
+        }
+
+        if (
+            $order->client_postponed_at
+            && $order->client_postponed_at->gt($order->client_pickup_visit_confirmed_at)
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function notifyReceiverOfDeclaration(Order $order, string $type): void
+    {
+        if ($type !== self::TYPE_CLIENT_TO_DRIVER) {
+            return;
+        }
+
+        $driverId = (int) ($order->pickup_driver_id ?? $order->driver_id ?? 0);
+        if ($driverId <= 0) {
+            return;
+        }
+
+        $num = $order->order_number;
+        app(OrderNotificationService::class)->sendToDriver(
+            $order,
+            $driverId,
+            __('order.handoff_notify_driver_client_declared_title'),
+            'Client handed over the order',
+            __('order.handoff_notify_driver_client_declared_body', ['order_number' => $num]),
+            __('order.handoff_notify_driver_client_declared_body_en', ['order_number' => $num]),
+            'driver_handover'
+        );
     }
 
     protected function markCashOnDeliveryPaidIfNeeded(Order $order): void

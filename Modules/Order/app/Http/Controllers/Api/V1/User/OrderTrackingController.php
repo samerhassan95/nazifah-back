@@ -288,6 +288,8 @@ class OrderTrackingController extends Controller
         // laundry" step is only surfaced at status=confirmed — payment_confirmed is not
         // treated as a trigger here (unlike the shared confirm-handoff/on-the-way endpoints).
         $clientHandoffService = app(\App\Services\ClientOrderHandoffService::class);
+        $visitApi = app(\App\Services\ClientOrderVisitService::class)->apiResponseFields($order);
+        $piecePayload = app(\App\Services\OrderPieceHandoffService::class)->mergeClientPayload($order, $visitApi);
         $handoffContext = $clientHandoffService->resolveHandoffContext($order);
         if ($handoffContext && $handoffContext['handoff_type'] === 'give_to_laundry' && $order->status !== OrderStatus::CONFIRMED->value) {
             $handoffContext = null;
@@ -589,14 +591,19 @@ class OrderTrackingController extends Controller
             ],
             'had_driver_rejection' => $hadDriverRejection,
             'driver_rejections' => $driverRejections,
-            'requires_handoff_confirmation' => $handoffContext !== null,
-            'handoff' => $handoffContext ? [
+            'requires_handoff_confirmation' => $piecePayload['requires_handoff_confirmation'] || $handoffContext !== null,
+            'requires_visit_response' => $piecePayload['requires_visit_response'],
+            'available_actions' => $piecePayload['available_actions'] ?: ($handoffContext ? $clientHandoffService->availableActions($order) : []),
+            'waiting_for' => $piecePayload['waiting_for'],
+            'required_action' => $piecePayload['required_action'],
+            'visit' => $piecePayload['visit'],
+            'handoff' => $piecePayload['handoff'] ?: ($handoffContext ? [
                 'type' => $handoffContext['handoff_type'],
                 'direction' => $handoffContext['direction'],
                 'confirm_label' => $handoffContext['confirm_label'],
                 'endpoint' => '/api/v1/user/orders/'.$order->id.'/confirm-handoff',
                 'confirm_action' => 'confirm',
-            ] : null,
+            ] : null),
             'pickup_time' => $order->pickup_time?->toISOString(),
             'estimated_delivery_time' => $order->estimated_delivery_time?->toISOString(),
             'actual_delivery_time' => $order->actual_delivery_time?->toISOString(),
