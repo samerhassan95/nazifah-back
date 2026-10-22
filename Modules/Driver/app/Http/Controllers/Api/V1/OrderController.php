@@ -911,11 +911,17 @@ class OrderController extends Controller
         $response['vendor_chat'] = $this->getVendorChatForOrder($order, $driver->id);
         $response['rating'] = $order->rating !== null ? (int) $order->rating : null;
         $response['review'] = $order->review;
+        
+        // Add unified handoff payload for two-step piece handoff process
+        $handoffService = app(\App\Services\OrderPieceHandoffService::class);
+        $handoffPayload = $handoffService->buildHandoffPayload($order, 'driver');
+        
         $response = array_merge(
             $response,
             $order->clientVisitResponseFields(),
             app(\App\Services\VendorOrderHandoffService::class)->vendorConfirmFlags($order),
-            app(\App\Services\VendorOrderHandoffService::class)->driverDeliveryActionFlags($order, (int) $driver->id)
+            app(\App\Services\VendorOrderHandoffService::class)->driverDeliveryActionFlags($order, (int) $driver->id),
+            $handoffPayload
         );
 
         return successResponse($response, 'Order details retrieved successfully');
@@ -1471,4 +1477,93 @@ class OrderController extends Controller
             $handoffPayload
         );
     }
+
+    /**
+     * Step 1: Driver declares "I handed over the items" (أنا سلّمت).
+     */
+    public function declareHandoff(Request $request, $orderId): JsonResponse
+    {
+        $driver = $request->user();
+
+        $validator = Validator::make($request->all(), [
+            'handoff_type' => ['nullable', 'string', 'in:client_to_driver,driver_to_laundry,laundry_to_driver,driver_to_client,client_to_laundry,laundry_to_client'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ($validator->fails()) {
+            return validationErrorResponse($validator->errors());
+        }
+
+        $order = Order::where('id', $orderId)
+            ->forDriver($driver->id)
+            ->first();
+
+        if (! $order) {
+            return notFoundResponse(__('driver.order_not_found_or_not_assigned'));
+        }
+
+        $handoffService = app(\App\Services\OrderPieceHandoffService::class);
+
+        try {
+            $handoffService->declareHandoff(
+                $order,
+                'driver',
+                (int) $driver->id,
+                $request->input('handoff_type'),
+                $request->input('notes')
+            );
+        } catch (\LogicException $e) {
+            return errorResponse($e->getMessage(), null, 400);
+        }
+
+        return successResponse(
+            $order->fresh(['vendor', 'client', 'items']),
+            __('order.handoff_declared_successfully')
+        );
+    }
+
+    /**
+     * Step 2: Driver confirms "I confirm receiving the items" (أؤكد الاستلام).
+     */
+    public function confirmHandoff(Request $request, $orderId): JsonResponse
+    {
+        $driver = $request->user();
+
+        $validator = Validator::make($request->all(), [
+            'handoff_type' => ['nullable', 'string', 'in:client_to_driver,driver_to_laundry,laundry_to_driver,driver_to_client,client_to_laundry,laundry_to_client'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ($validator->fails()) {
+            return validationErrorResponse($validator->errors());
+        }
+
+        $order = Order::where('id', $orderId)
+            ->forDriver($driver->id)
+            ->first();
+
+        if (! $order) {
+            return notFoundResponse(__('driver.order_not_found_or_not_assigned'));
+        }
+
+        $handoffService = app(\App\Services\OrderPieceHandoffService::class);
+
+        try {
+            $handoffService->confirmHandoff(
+                $order,
+                'driver',
+                (int) $driver->id,
+                $request->input('handoff_type'),
+                $request->input('notes')
+            );
+        } catch (\LogicException $e) {
+            return errorResponse($e->getMessage(), null, 400);
+        }
+
+        return successResponse(
+            $order->fresh(['vendor', 'client', 'items']),
+            __('order.handoff_confirmed_successfully')
+        );
+    }
 }
+
