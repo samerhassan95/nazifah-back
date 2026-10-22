@@ -32,7 +32,7 @@ class PiecesController extends Controller
         $branchId = $request->query('branch_id') ? (int) $request->query('branch_id') : null;
 
         $query = Piece::where('vendor_id', $vendorId)
-            ->with('iconRelation');
+            ->with(['iconRelation', 'category']);
 
         if ($branchId) {
             $branch = Branch::where('id', $branchId)->where('vendor_id', $vendorId)->first();
@@ -51,7 +51,7 @@ class PiecesController extends Controller
             ]);
         }
 
-        $pieces = $query->get();
+        $pieces = $query->orderBy('category_id')->orderBy('id')->get();
 
         $branchPivotMap = $branchId
             ? PieceBranchOffering::pivotMapForPieces($branchId, $pieces->pluck('id')->map(fn ($id) => (int) $id)->all())
@@ -890,6 +890,21 @@ class PiecesController extends Controller
         if ($piece->iconRelation) {
             $data['icon'] = $this->uploadFilesService->getFullUrl($piece->iconRelation->path);
         }
+        
+        // Add category information
+        $data['category_id'] = $piece->category_id;
+        if ($piece->category) {
+            $data['category'] = [
+                'id' => $piece->category->id,
+                'name' => [
+                    'ar' => $piece->category->getTranslation('name', 'ar'),
+                    'en' => $piece->category->getTranslation('name', 'en'),
+                ],
+                'display_name' => $piece->category->getTranslation('name', $lang),
+            ];
+        } else {
+            $data['category'] = null;
+        }
 
         return $data;
     }
@@ -911,7 +926,8 @@ class PiecesController extends Controller
             ->whereDoesntHave('branches', function ($q) use ($branchId) {
                 $q->where('branches.id', $branchId);
             })
-            ->with('iconRelation')
+            ->with(['iconRelation', 'category'])
+            ->orderBy('category_id')
             ->orderBy('id')
             ->get()
             ->map(fn (Piece $piece) => $this->formatPieceDropdownOption($piece, $lang));
@@ -924,16 +940,30 @@ class PiecesController extends Controller
     }
 
     /**
-     * @return array{id: int, name: array{ar: string, en: string}, display_name: string, icon: ?string}
+     * @return array{id: int, name: array{ar: string, en: string}, display_name: string, category: ?array, icon: ?string}
      */
     private function formatPieceDropdownOption(Piece $piece, string $lang): array
     {
         $names = PieceBranchOffering::catalogNameArray($piece);
+        
+        $category = null;
+        if ($piece->category) {
+            $category = [
+                'id' => $piece->category->id,
+                'name' => [
+                    'ar' => $piece->category->getTranslation('name', 'ar'),
+                    'en' => $piece->category->getTranslation('name', 'en'),
+                ],
+                'display_name' => $piece->category->getTranslation('name', $lang),
+            ];
+        }
 
         return [
             'id' => $piece->id,
             'name' => $names,
             'display_name' => $names[$lang] ?? $names['ar'] ?? $names['en'] ?? '',
+            'category_id' => $piece->category_id,
+            'category' => $category,
             'icon' => $piece->iconRelation
                 ? $this->uploadFilesService->getFullUrl($piece->iconRelation->path)
                 : null,
