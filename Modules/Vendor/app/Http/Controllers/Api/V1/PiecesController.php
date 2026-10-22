@@ -314,10 +314,14 @@ class PiecesController extends Controller
         $vendorId = $employee->vendor_id;
         $lang = app()->getLocale();
         $branchId = $request->query('branch_id');
+        $categoryId = $request->query('category_id');
+        $serviceId = $request->query('service_id');
 
         $validator = Validator::make($request->all(), [
             'name' => ['nullable', 'string'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'service_id' => ['nullable', 'integer', 'exists:services,id'],
         ]);
 
         if ($validator->fails()) {
@@ -325,7 +329,12 @@ class PiecesController extends Controller
         }
 
         $query = Piece::where('vendor_id', $vendorId)
-            ->with(['iconRelation']);
+            ->with(['iconRelation', 'category']);
+
+        // Filter by category if provided
+        if ($categoryId) {
+            $query->where('pieces.category_id', $categoryId);
+        }
 
         // Filter by branch relationship if provided
         if ($branchId) {
@@ -344,6 +353,14 @@ class PiecesController extends Controller
                         ->where('service_piece.branch_id', $branchIdInt);
                 },
             ]);
+            
+            // Filter by service if provided (only when branch_id is specified)
+            if ($serviceId) {
+                $query->whereHas('services', function ($q) use ($serviceId, $branchIdInt) {
+                    $q->where('services.id', $serviceId)
+                      ->where('service_piece.branch_id', $branchIdInt);
+                });
+            }
         }
 
         // Filter by name if provided
@@ -355,7 +372,7 @@ class PiecesController extends Controller
             });
         }
 
-        $pieces = $query->get();
+        $pieces = $query->orderBy('category_id')->orderBy('id')->get();
         $branchIdInt = $branchId ? (int) $branchId : null;
         $branchPivotMap = $branchIdInt
             ? PieceBranchOffering::pivotMapForPieces($branchIdInt, $pieces->pluck('id')->map(fn ($id) => (int) $id)->all())
