@@ -933,10 +933,28 @@ class BranchesController extends Controller
         }
 
         $locale = app()->getLocale();
+        
+        // Optional filters
+        $categoryId = $request->query('category_id'); // Filter by category/section
+        $serviceId = $request->query('service_id');   // Filter by service
 
         // Get active pieces for this branch
-        $pieces = $branch->activePieces()
-            ->get()
+        $piecesQuery = $branch->activePieces();
+        
+        // Filter by category if provided
+        if ($categoryId) {
+            $piecesQuery->where('pieces.category_id', $categoryId);
+        }
+        
+        // Filter by service if provided
+        if ($serviceId) {
+            $piecesQuery->whereHas('services', function ($q) use ($serviceId, $branchId) {
+                $q->where('services.id', $serviceId)
+                  ->where('service_piece.branch_id', $branchId);
+            });
+        }
+
+        $pieces = $piecesQuery->get()
             ->map(function ($piece) use ($branchId, $locale) {
                 // Get services for this piece at this branch
                 $services = $piece->services()
@@ -965,6 +983,7 @@ class BranchesController extends Controller
 
                 return array_merge($pieceFields, [
                     'piece_id' => $piece->id,
+                    'category_id' => $piece->category_id,
                     'icon' => $piece->iconRelation?->full_path,
                     'rating' => 0,
                     'services' => $servicesFormatted,
