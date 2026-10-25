@@ -383,10 +383,29 @@ class OrderPieceHandoffService
                 break;
 
             case self::TYPE_DRIVER_TO_CLIENT:
-                // Client confirms receiving items from delivery driver -> transition to delivered / completed
-                $targetStatus = $order->delivery_at_vendor ? OrderStatus::COMPLETED : OrderStatus::DELIVERED;
-                if ($this->statusService->canTransition($order, $targetStatus)) {
-                    $this->statusService->transitionTo($order, $targetStatus, [
+                // Client confirms receiving items from the delivery driver at home —
+                // this is the final step for home delivery, no other party confirms
+                // after this. Explicit product decision: every order ends at
+                // 'completed', not 'delivered' — step through delivered first where
+                // the status machine requires it (not every status this stage can be
+                // reached from allows jumping straight to completed).
+                if (
+                    ! in_array($order->status, [OrderStatus::DELIVERED->value, OrderStatus::COMPLETED->value], true)
+                    && $this->statusService->canTransition($order, OrderStatus::DELIVERED)
+                ) {
+                    $this->statusService->transitionTo($order, OrderStatus::DELIVERED, [
+                        'notes' => $notes ?? 'Client confirmed delivery receipt from driver',
+                        'changed_by' => $actorId,
+                        'actor_type' => 'client',
+                        'actor_id' => $actorId,
+                    ]);
+                    $order = $order->fresh();
+                }
+                if (
+                    $order->status !== OrderStatus::COMPLETED->value
+                    && $this->statusService->canTransition($order, OrderStatus::COMPLETED)
+                ) {
+                    $this->statusService->transitionTo($order, OrderStatus::COMPLETED, [
                         'notes' => $notes ?? 'Client confirmed delivery receipt from driver',
                         'changed_by' => $actorId,
                         'actor_type' => 'client',

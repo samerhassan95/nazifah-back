@@ -42,8 +42,26 @@ class ClientOrderHandoffService
             && $order->status === OrderStatus::DELIVERED->value
             && $this->statusService->canTransition($order, OrderStatus::COMPLETED)
         ) {
-            return $this->statusService->transitionTo($order, OrderStatus::COMPLETED, [
+            $order = $this->statusService->transitionTo($order, OrderStatus::COMPLETED, [
                 'notes' => __('order.handoff_log_repair_branch_completed'),
+                'changed_by' => null,
+            ]);
+        }
+
+        // Home-delivery orders confirmed by the client before the 2026-10-25 fix
+        // (OrderPieceHandoffService::confirmHandoff() now advances these straight
+        // to completed) are stuck at 'delivered' forever — nothing re-triggers the
+        // handoff stage once client_delivery_handoff_at is already set. Self-heal
+        // any order like that the next time it's read, instead of a one-off
+        // migration script.
+        if (
+            ! (bool) $order->delivery_at_vendor
+            && $order->client_delivery_handoff_at
+            && $order->status === OrderStatus::DELIVERED->value
+            && $this->statusService->canTransition($order, OrderStatus::COMPLETED)
+        ) {
+            $order = $this->statusService->transitionTo($order, OrderStatus::COMPLETED, [
+                'notes' => __('order.handoff_log_repair_home_delivery_completed'),
                 'changed_by' => null,
             ]);
         }

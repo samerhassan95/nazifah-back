@@ -340,6 +340,7 @@ return [
     'handoff_log_receive_from_driver_delivered' => 'Client confirmed receiving order from delivery driver',
     'handoff_log_receive_from_laundry' => 'Client confirmed picking up clothes from the laundry',
     'handoff_log_repair_branch_completed' => 'Auto: restored completed status — awaiting client branch pickup',
+    'handoff_log_repair_home_delivery_completed' => 'Auto: advanced delivered -> completed — client already confirmed receipt',
 
     'vendor_handoff_not_available' => 'Handoff action is not available for this order in its current state',
     'vendor_handoff_error_not_awaiting_pickup_receipt' => 'Order is not awaiting vendor pickup receipt confirmation',

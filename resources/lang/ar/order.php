@@ -341,6 +341,7 @@ return [
     'handoff_log_receive_from_driver_delivered' => 'أكّد العميل استلام الطلب من سائق التوصيل',
     'handoff_log_receive_from_laundry' => 'أكّد العميل استلام الطلب من المغسلة',
     'handoff_log_repair_branch_completed' => 'تلقائي: استعادة حالة مكتمل — بانتظار استلام العميل من الفرع',
+    'handoff_log_repair_home_delivery_completed' => 'تلقائي: ترقية الحالة من تم التوصيل إلى مكتمل — العميل أكّد الاستلام بالفعل',
 
     'vendor_handoff_not_available' => 'لا يمكن تنفيذ إجراء التسليم/الاستلام في حالة الطلب الحالية',
     'vendor_handoff_error_not_awaiting_pickup_receipt' => 'الطلب لا ينتظر تأكيد استلام المغسلة من العميل',
