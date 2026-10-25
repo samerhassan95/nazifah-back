@@ -1579,6 +1579,24 @@ class OrderController extends Controller
             return notFoundResponse(__('order.order_not_found'));
         }
 
+        // Self-heal an order stuck at waiting_payment from before isPaid() correctly
+        // treated a zero-total order as settled (or any other already-paid order
+        // that for whatever reason never advanced) — the same auto-skip the client
+        // on-the-way read path already does, so opening the order here also fixes
+        // a stale status instead of just displaying it.
+        if (
+            $order->status === OrderStatus::WAITING_PAYMENT->value
+            && ($order->isPaid() || $order->isCashOnDelivery())
+        ) {
+            $statusService = app(\App\Services\OrderStatusService::class);
+            if ($statusService->canTransition($order, OrderStatus::PAYMENT_CONFIRMED)) {
+                $order = $statusService->transitionTo($order, OrderStatus::PAYMENT_CONFIRMED, [
+                    'notes' => 'Auto: repaired stale waiting_payment on vendor order view',
+                    'changed_by' => null,
+                ]);
+            }
+        }
+
         $uploadService = app(\App\Services\UploadFilesService::class);
         $locale = app()->getLocale();
 
