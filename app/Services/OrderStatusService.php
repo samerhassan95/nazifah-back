@@ -212,6 +212,19 @@ class OrderStatusService
         }
 
         $previousPickupDriverId = $order->pickup_driver_id;
+
+        // Same driver, already assigned to this leg: a no-op repeat of the same
+        // request (double-tap / network retry from the vendor app) — skip the
+        // status log + DriverAssigned event instead of sending the driver a
+        // second "new pickup assignment" push for nothing.
+        if (
+            $currentStatus === OrderStatus::DRIVER_PICKUP_ASSIGNED
+            && $previousPickupDriverId
+            && (int) $previousPickupDriverId === (int) $driver->id
+        ) {
+            return $order;
+        }
+
         if ($previousPickupDriverId && (int) $previousPickupDriverId !== (int) $driver->id) {
             Driver::where('id', $previousPickupDriverId)->update(['is_available' => true]);
         }
@@ -291,6 +304,19 @@ class OrderStatusService
         }
 
         $previousDeliveryDriverId = $order->delivery_driver_id;
+
+        // Same driver, already assigned to this leg: a no-op repeat of the same
+        // request (double-tap / network retry from the vendor app) — skip the
+        // status log + DriverAssigned event instead of sending the driver a
+        // second "new delivery assignment" push for nothing.
+        if (
+            $currentStatus === OrderStatus::DRIVER_DELIVERY_ASSIGNED
+            && $previousDeliveryDriverId
+            && (int) $previousDeliveryDriverId === (int) $driver->id
+        ) {
+            return $order;
+        }
+
         if ($previousDeliveryDriverId && (int) $previousDeliveryDriverId !== (int) $driver->id) {
             Driver::where('id', $previousDeliveryDriverId)->update(['is_available' => true]);
         }
