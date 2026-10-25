@@ -274,6 +274,15 @@ class OrderPaymentService
     public function allocateSurcharge(array $methods, float $delta, float $walletBalance): array
     {
         $delta = round($delta, 2);
+
+        // Nothing due (free order, or an edit whose new total already matches what's
+        // paid) — there's nothing to split across payment methods, so don't demand
+        // the client picked one. Falling through to the "legs is empty" check below
+        // would otherwise reject a legitimately free order/update.
+        if ($delta <= 0) {
+            return ['legs' => [], 'error' => null];
+        }
+
         $methods = array_values(array_unique(array_map('strval', $methods)));
 
         if (empty($methods)) {
