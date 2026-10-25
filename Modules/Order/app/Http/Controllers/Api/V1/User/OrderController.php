@@ -1497,6 +1497,10 @@ class OrderController extends Controller
                         'wallet_balance' => $e->available,
                         'available_methods' => $this->orderPaymentService->gatewayMethods(),
                     ]);
+                } catch (\RuntimeException $e) {
+                    DB::rollBack();
+
+                    return errorResponse($this->orderPaymentService->resolvePaymentFailureMessage($e->getMessage()), 400);
                 } catch (\Throwable $e) {
                     DB::rollBack();
                     \Illuminate\Support\Facades\Log::error('Order creation payment init failed', [
@@ -1652,7 +1656,7 @@ class OrderController extends Controller
             } catch (\RuntimeException $e) {
                 DB::rollBack();
 
-                return errorResponse(__('order.payment_init_failed'), 400);
+                return errorResponse($this->orderPaymentService->resolvePaymentFailureMessage($e->getMessage()), 400);
             }
 
             DB::commit();

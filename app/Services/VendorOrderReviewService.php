@@ -580,7 +580,7 @@ class VendorOrderReviewService
         } catch (\RuntimeException $e) {
             return [
                 'success' => false,
-                'message' => __('order.payment_init_failed'),
+                'message' => $ops->resolvePaymentFailureMessage($e->getMessage()),
             ];
         }
 

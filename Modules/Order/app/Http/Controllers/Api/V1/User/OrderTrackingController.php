@@ -1127,7 +1127,7 @@ class OrderTrackingController extends Controller
                         } catch (\RuntimeException $e) {
                             DB::rollBack();
 
-                            return errorResponse(__('order.payment_init_failed'), 400);
+                            return errorResponse($this->orderPaymentService->resolvePaymentFailureMessage($e->getMessage()), 400);
                         }
 
                         $gatewayPayments = $settle['gateway_payments'];

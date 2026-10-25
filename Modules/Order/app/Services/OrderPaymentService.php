@@ -201,6 +201,18 @@ class OrderPaymentService
     }
 
     /**
+     * A failed-payment RuntimeException's message is either a translatable lang
+     * key (the generic "order.payment_init_failed" fallback) or the gateway's own
+     * raw failure reason (e.g. Moyasar's "insufficient balance" on a saved-card
+     * charge) — show the client the real reason instead of a generic one when
+     * the gateway gave one.
+     */
+    public function resolvePaymentFailureMessage(string $raw): string
+    {
+        return str_starts_with($raw, 'order.') ? __($raw) : $raw;
+    }
+
+    /**
      * Whether the split includes at least one gateway leg (wallet funds should be
      * reserved until that leg settles, not debited immediately).
      */
@@ -1218,7 +1230,9 @@ class OrderPaymentService
         $response = $this->paymentService->initializePayment($paymentRequest);
 
         if (! $response->isSuccessful()) {
-            return null;
+            // Surface the gateway's own reason (e.g. Moyasar's "insufficient balance"
+            // on a saved-card charge) instead of the generic fallback message below.
+            throw new \RuntimeException($response->message ?: 'order.payment_init_failed');
         }
 
         // STC Pay must keep its own payment option, never silently fall back.
@@ -2683,7 +2697,9 @@ class OrderPaymentService
         $response = $this->paymentService->initializePayment($paymentRequest);
 
         if (! $response->isSuccessful()) {
-            return null;
+            // Surface the gateway's own reason (e.g. Moyasar's "insufficient balance"
+            // on a saved-card charge) instead of the generic fallback message below.
+            throw new \RuntimeException($response->message ?: 'order.payment_init_failed');
         }
 
         $paymentParams = $response->data['payment_params'] ?? null;
