@@ -87,7 +87,7 @@ enum OrderStatus: string
             self::PAYMENT_CONFIRMED           => 'تأكيد الدفع',
             self::AWAITING_REMAINING_PAYMENT  => 'دفع متبقي',
             self::DRIVER_PICKUP_ASSIGNED      => 'سائق قادم',
-            self::DRIVER_PICKUP_ACCEPTED      => 'سائق متوجه',
+            self::DRIVER_PICKUP_ACCEPTED      => 'سائق بالطريق',
             self::ON_WAY_TO_PICKUP            => 'في الطريق',
             self::PICKED_UP                   => 'تم الاستلام',
             self::DELIVERED_TO_BRANCH         => 'وصل الفرع',
