@@ -476,7 +476,7 @@ class OrderPieceHandoffService
                 'waiting_label' => $isAr ? 'قام السائق بتسليم طلبك، يرجى تأكيد استلامك للطلب' : 'Driver delivered order, please confirm receipt',
             ],
             self::TYPE_CLIENT_TO_LAUNDRY => [
-                'declare_label' => $isAr ? 'أنا سلمت الطلب للمغسلة' : 'I delivered the order to the laundry',
+                'declare_label' => $isAr ? 'تسليم الطلب للمغسلة' : 'I delivered the order to the laundry',
                 'confirm_label' => $isAr ? 'أؤكد الاستلام' : 'Confirm receipt',
                 'waiting_label' => $isAr ? 'تم تسليم الطلب للمغسلة، بانتظار تأكيد المغسلة' : 'Handed to laundry, waiting for laundry confirmation',
             ],
