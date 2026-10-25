@@ -125,16 +125,18 @@ class PendingOrderService
             ]);
         }
 
-        $paymentService = app(\Modules\Order\Services\OrderPaymentService::class);
-        if ($paymentService->isFullyPaid($order)) {
-            $statusService = app(\App\Services\OrderStatusService::class);
-            if ($statusService->canTransition($order, \App\Enums\OrderStatus::PAYMENT_CONFIRMED)) {
-                $statusService->transitionTo($order, \App\Enums\OrderStatus::PAYMENT_CONFIRMED, [
-                    'notes' => 'Auto: pending order materialized and fully paid',
-                    'changed_by' => $order->client_id,
-                ]);
-            }
-        }
+        // A prepaid order (paid up front via card before the order row even existed)
+        // used to auto-advance straight to payment_confirmed here, skipping the
+        // vendor's normal branch_review/accept step entirely — the vendor only ever
+        // saw it in the general orders list, never in "new orders", and no
+        // acceptance happened. Per explicit product decision (2026-10-25): every
+        // order goes through the same vendor review/acceptance as a cash order,
+        // prepaid or not. The order simply stays at 'pending' here; it's already
+        // fully paid (the OrderPayment rows above reflect that), and the existing
+        // WAITING_PAYMENT auto-skip (OrderController::store()/update()) already
+        // fast-forwards an already-paid order past that step once the vendor does
+        // accept it, so nothing about settlement changes — only that the vendor
+        // now has to explicitly act on it first, like any other order.
 
         if ($pendingOrder->discount_id) {
             $discount = Discount::find($pendingOrder->discount_id);
