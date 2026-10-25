@@ -2753,15 +2753,15 @@ class OrderController extends Controller
                 $this->transOrder('on_the_way_handoff_give_driver_title', $lang),
                 $this->transOrder('on_the_way_handoff_give_driver_message', $lang),
             ],
-            'give_to_laundry' => [
+            'give_to_laundry', 'client_to_laundry' => [
                 $this->transOrder('on_the_way_handoff_give_laundry_title', $lang),
                 $this->transOrder('on_the_way_handoff_give_laundry_message', $lang),
             ],
-            'receive_from_driver' => [
+            'receive_from_driver', 'driver_to_client' => [
                 $this->transOrder('on_the_way_handoff_receive_driver_title', $lang),
                 $this->transOrder('on_the_way_handoff_receive_driver_message', $lang),
             ],
-            'receive_from_laundry' => [
+            'receive_from_laundry', 'laundry_to_client' => [
                 $this->transOrder('on_the_way_handoff_receive_laundry_title', $lang),
                 $this->transOrder('on_the_way_handoff_receive_laundry_message', $lang),
             ],

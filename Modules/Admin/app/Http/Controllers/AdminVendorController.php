@@ -89,7 +89,7 @@ class AdminVendorController extends Controller
         // Get orders statistics through branches
         $totalOrders = Order::whereIn('branch_id', $branchIds)->count();
         $completedOrders = Order::whereIn('branch_id', $branchIds)
-            ->where('status', OrderStatus::COMPLETED->value)
+            ->whereIn('status', [OrderStatus::DELIVERED->value, OrderStatus::COMPLETED->value])
             ->count();
         $cancelledOrders = Order::whereIn('branch_id', $branchIds)
             ->where('status', OrderStatus::CANCELLED->value)
