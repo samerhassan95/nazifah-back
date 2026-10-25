@@ -371,6 +371,13 @@ class Order extends Model
      */
     public function isPaid(): bool
     {
+        // Nothing due (free order, discount covers everything) — there's no
+        // payment transaction to find and none is needed; treat it as settled
+        // instead of leaving it stuck waiting for a payment that will never come.
+        if ((float) $this->final_amount <= 0.0) {
+            return true;
+        }
+
         return $this->paymentTransactions()
             ->whereIn('status', ['completed', 'authorized', 'partially_refunded'])
             ->exists();
