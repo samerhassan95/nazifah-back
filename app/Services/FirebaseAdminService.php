@@ -68,7 +68,23 @@ class FirebaseAdminService
      */
     public function sendToDevice(string $deviceToken, array $notification, ?array $data = null): bool
     {
-        if ($deviceToken === '' || ! $this->isConfigured()) {
+        if ($deviceToken === '') {
+            return false;
+        }
+
+        // This used to return false here with zero trace — a push that silently
+        // never left the server (e.g. the service account file became unreadable,
+        // or project/path resolved empty) was indistinguishable in the logs from
+        // one that was never attempted at all. Confirmed live: a vendor never got
+        // their "new order" push for a real paid order, and the log for that exact
+        // minute had nothing — not even a warning — to explain why.
+        if (! $this->isConfigured()) {
+            $this->logFailure('sendToDevice', new \RuntimeException(
+                'Firebase is not configured: project_id='.($this->projectId !== '' ? $this->projectId : '<empty>')
+                .', service_account_path='.($this->serviceAccountPath !== '' ? $this->serviceAccountPath : '<empty>')
+                .', readable='.(($this->serviceAccountPath !== '' && is_readable($this->serviceAccountPath)) ? 'yes' : 'no')
+            ), $deviceToken);
+
             return false;
         }
 
