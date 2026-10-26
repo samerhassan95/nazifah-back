@@ -457,32 +457,32 @@ class OrderPieceHandoffService
         return match ($type) {
             self::TYPE_CLIENT_TO_DRIVER => [
                 'declare_label' => $isAr ? 'تسليم القطع للسائق' : 'Hand items to the driver',
-                'confirm_label' => $isAr ? 'أؤكد الاستلام' : 'Confirm receipt',
+                'confirm_label' => $isAr ? 'أؤكد استلام الطلب من العميل' : 'Confirm receipt from the client',
                 'waiting_label' => $isAr ? 'بانتظار تأكيد استلام السائق' : 'Waiting for driver confirmation',
             ],
             self::TYPE_DRIVER_TO_LAUNDRY => [
                 'declare_label' => $isAr ? 'أنا سلمت الطلب للمغسلة' : 'I delivered the order to the laundry',
-                'confirm_label' => $isAr ? 'أؤكد الاستلام' : 'Confirm receipt',
+                'confirm_label' => $isAr ? 'أؤكد استلام الطلب من السائق' : 'Confirm receipt from the driver',
                 'waiting_label' => $isAr ? 'بانتظار تأكيد استلام المغسلة' : 'Waiting for laundry confirmation',
             ],
             self::TYPE_LAUNDRY_TO_DRIVER => [
                 'declare_label' => $isAr ? 'أنا سلمت الطلب للسائق' : 'I handed the order to the driver',
-                'confirm_label' => $isAr ? 'أؤكد الاستلام' : 'Confirm receipt',
+                'confirm_label' => $isAr ? 'أؤكد استلام الطلب من المغسلة' : 'Confirm receipt from the laundry',
                 'waiting_label' => $isAr ? 'بانتظار تأكيد استلام السائق' : 'Waiting for driver confirmation',
             ],
             self::TYPE_DRIVER_TO_CLIENT => [
                 'declare_label' => $isAr ? 'أنا سلمت الطلب للعميل' : 'I delivered the order to the client',
-                'confirm_label' => $isAr ? 'أؤكد الاستلام' : 'Confirm receipt',
+                'confirm_label' => $isAr ? 'أؤكد استلام الطلب من السائق' : 'Confirm receipt from the driver',
                 'waiting_label' => $isAr ? 'قام السائق بتسليم طلبك، يرجى تأكيد استلامك للطلب' : 'Driver delivered order, please confirm receipt',
             ],
             self::TYPE_CLIENT_TO_LAUNDRY => [
                 'declare_label' => $isAr ? 'تسليم الطلب للمغسلة' : 'I delivered the order to the laundry',
-                'confirm_label' => $isAr ? 'أؤكد الاستلام' : 'Confirm receipt',
+                'confirm_label' => $isAr ? 'أؤكد استلام الطلب من العميل' : 'Confirm receipt from the client',
                 'waiting_label' => $isAr ? 'تم تسليم الطلب للمغسلة، بانتظار تأكيد المغسلة' : 'Handed to laundry, waiting for laundry confirmation',
             ],
             self::TYPE_LAUNDRY_TO_CLIENT => [
                 'declare_label' => $isAr ? 'أنا سلمت الطلب للعميل' : 'I handed the order to the client',
-                'confirm_label' => $isAr ? 'أؤكد الاستلام' : 'Confirm receipt',
+                'confirm_label' => $isAr ? 'أؤكد استلام الطلب من المغسلة' : 'Confirm receipt from the laundry',
                 'waiting_label' => $isAr ? 'المغسلة سلّمت طلبك، يرجى تأكيد الاستلام' : 'Laundry handed over your order, please confirm receipt',
             ],
             default => [
