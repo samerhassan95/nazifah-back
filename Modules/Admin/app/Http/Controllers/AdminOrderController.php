@@ -482,9 +482,16 @@ class AdminOrderController extends Controller
                         $serviceNames[] = \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang)
                             ?: ($item->service->name ?? '');
                     }
-                    if ($statusKey !== 'rejected') {
-                        $totalPrice += (float) $item->total_price;
-                    }
+                    // VendorOrderReviewService zeroes out total_price on a rejected
+                    // item (correctly, so it drops out of the order's charged total)
+                    // but snapshots the real pre-rejection amount into
+                    // original_total_price first - use that here so the admin sees
+                    // what the piece would have cost instead of a flat 0. This is
+                    // for admin reference only; order totals below still come from
+                    // $order->total_amount, unaffected by this value.
+                    $totalPrice += $statusKey === 'rejected'
+                        ? (float) ($item->original_total_price ?? $item->total_price)
+                        : (float) $item->total_price;
                     foreach ($item->additionalServicesPivot ?? [] as $addition) {
                         $name = $addition->serviceAddition?->getTranslation('name', $lang)
                             ?? $addition->serviceAddition?->name;
@@ -539,6 +546,7 @@ class AdminOrderController extends Controller
                         'Image' => $clientImage,
                     ],
                     'name_operation' => $joinedServices,
+                    'vendor_status' => $statusKey,
                 ];
 
                 if ($statusKey === 'rejected') {
@@ -590,9 +598,21 @@ class AdminOrderController extends Controller
             : [];
 
         $orderInvoice = [
-            'pieces' => $acceptedItems->map(function ($item) {
+            // Rejected pieces are appended here for admin reference only, carrying
+            // their pre-rejection price (see original_total_price note above) - they
+            // are NOT included in total_price/total_price_after_tax/final_amount
+            // below, which stay sourced from $order->total_amount etc. and already
+            // correctly exclude rejected items.
+            'pieces' => $acceptedItems->concat(
+                $rejectedItems->map(function ($item) {
+                    $item['vendor_status'] = 'rejected';
+
+                    return $item;
+                })
+            )->map(function ($item) {
                 $clientImage = $item['piece_image'] ?? $item['image'] ?? $item['Item_details']['Image'] ?? '';
                 $pieceIcon = $item['Piece_logo'] ?? $item['piece_logo'] ?? $item['icon'] ?? '';
+                $isRejected = ($item['vendor_status'] ?? 'accepted') === 'rejected';
 
                 return [
                     'piece_count' => $item['Piece_count'],
@@ -605,6 +625,9 @@ class AdminOrderController extends Controller
                     'service' => $item['name_operation'] ?: ($item['Services'][0]['service_name'] ?? ''),
                     'additional_services' => $item['Item_details']['Services'][0]['Additional_services'] ?? [],
                     'price' => $item['Item_details']['Price'],
+                    'vendor_status' => $item['vendor_status'] ?? 'accepted',
+                    'rejected' => $isRejected,
+                    'is_rejected' => $isRejected,
                 ];
             })->values()->toArray(),
             'deleviery_price' => $deliveryFee,
