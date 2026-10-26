@@ -297,7 +297,7 @@ return [
     'on_the_way_self_tracking_title' => 'متابعة الطلب في المغسلة',
     'on_the_way_self_tracking_message' => 'تابع حالة طلبك من المغسلة',
 
-    'on_the_way_pickup_driver_assigned_title' => 'تم تعيين سائق الاستلام',
+    'on_the_way_pickup_driver_assigned_title' => 'السائق في الطريق إليك',
     'on_the_way_pickup_driver_assigned_message' => 'سائق الاستلام في الطريق إليك. يرجى تأكيد الجاهزية أو تأجيل الموعد',
     'on_the_way_delivery_driver_assigned_title' => 'تم تعيين سائق التسليم',
     'on_the_way_delivery_driver_assigned_message' => 'سائق التسليم في الطريق إليك. يرجى تأكيد الجاهزية أو تأجيل الموعد',
