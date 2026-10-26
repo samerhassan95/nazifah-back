@@ -456,7 +456,7 @@ class OrderPieceHandoffService
 
         return match ($type) {
             self::TYPE_CLIENT_TO_DRIVER => [
-                'declare_label' => $isAr ? 'تسليم القطع للسائق' : 'Hand items to the driver',
+                'declare_label' => $isAr ? 'تسليم الطلب للسائق' : 'Hand the order to the driver',
                 'confirm_label' => $isAr ? 'أؤكد استلام الطلب من العميل' : 'Confirm receipt from the client',
                 'waiting_label' => $isAr ? 'بانتظار تأكيد استلام السائق' : 'Waiting for driver confirmation',
             ],
