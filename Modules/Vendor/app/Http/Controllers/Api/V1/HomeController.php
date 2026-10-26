@@ -1085,11 +1085,24 @@ class HomeController extends Controller
         }
 
         try {
-            if ($assignmentType === 'pickup') {
-                $statusService->assignPickupDriver($order, $driver, $employee->id, 'vendor');
-            } else {
-                $statusService->assignDeliveryDriver($order, $driver, $employee->id, 'vendor');
-            }
+            \Illuminate\Support\Facades\DB::transaction(function () use (&$order, $assignmentType, $driver, $employee, $statusService) {
+                // Re-fetch under a row lock so two near-simultaneous requests for the
+                // same order (e.g. the vendor app double-submitting the same
+                // assign-driver tap) serialize here instead of racing past the
+                // status-based idempotency guard inside assignPickupDriver()/
+                // assignDeliveryDriver() — both would otherwise read the
+                // pre-assignment status before either request's write had
+                // committed, so neither saw the other's in-flight change and both
+                // proceeded to notify the driver. Confirmed live: two identical
+                // "new assignment" pushes ~1s apart for the same order/driver/leg
+                // even with that guard in place.
+                $order = Order::lockForUpdate()->find($order->id);
+                if ($assignmentType === 'pickup') {
+                    $statusService->assignPickupDriver($order, $driver, $employee->id, 'vendor');
+                } else {
+                    $statusService->assignDeliveryDriver($order, $driver, $employee->id, 'vendor');
+                }
+            });
         } catch (\Throwable $e) {
             return errorResponse($e->getMessage() ?: __('driver.driver_assignment_failed'), null, 400);
         }
