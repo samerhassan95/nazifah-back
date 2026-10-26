@@ -43,5 +43,9 @@ Route::prefix('v1')->group(function () {
 
         // Local hosted checkout page (for Moyasar `hosted_local` mode)
         Route::get('/moyasar/checkout/{transactionId}', [PaymentController::class, 'showMoyasarCheckout'])->name('payment.moyasar.checkout');
+
+        // Checkout page JS calls this right before submitting to Moyasar, to record
+        // the save-card checkbox's final state — see saveCardPreference() docblock.
+        Route::post('/moyasar/checkout/{transactionId}/save-card-preference', [PaymentController::class, 'saveCardPreference'])->name('payment.moyasar.checkout.save-card-preference');
     });
 });

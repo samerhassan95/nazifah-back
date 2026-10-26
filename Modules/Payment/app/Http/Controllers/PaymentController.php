@@ -942,6 +942,44 @@ class PaymentController extends Controller
     }
 
     /**
+     * Record whether the payer wants this card saved, called from the checkout
+     * page's JS right before submitting to Moyasar.
+     *
+     * Moyasar.init() is called once per page load with no supported way to change
+     * credit_card.save_card or metadata afterward (confirmed against the moyasar.js
+     * SDK itself: callback_url/metadata are only mutable via an internal method with
+     * no public wrapper, and Moyasar's own submit is a fetch() call that never reads
+     * back from the DOM) — so the save-card checkbox, which the payer can still
+     * toggle after typing their card details, can't reach Moyasar's own payload.
+     * An earlier attempt routed this through a query param appended to a hidden
+     * callback_url <input>; that element doesn't exist in Moyasar's rendered form,
+     * so it silently never worked and every card-save intent was lost. This endpoint
+     * is the reliable channel instead: our own JS, talking to our own server.
+     */
+    public function saveCardPreference(Request $request, string $transactionId)
+    {
+        $transaction = PaymentTransaction::query()
+            ->where('transaction_id', $transactionId)
+            ->first();
+
+        if (! $transaction) {
+            return response()->json(['status' => false], 404);
+        }
+
+        $validated = $request->validate([
+            'save_card' => ['required', 'boolean'],
+        ]);
+
+        $transaction->update([
+            'response_data' => array_merge($transaction->response_data ?? [], [
+                'save_card_intent' => $validated['save_card'],
+            ]),
+        ]);
+
+        return response()->json(['status' => true]);
+    }
+
+    /**
      * Moyasar server-to-server webhook (the reliable settlement path; the browser
      * redirect may be lost if the customer closes the tab).
      *

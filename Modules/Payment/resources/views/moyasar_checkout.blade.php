@@ -241,29 +241,39 @@
                 }
             }
 
-            // Intercept form submission or click on the pay button to append save_card flag to callback_url
-            function updateCallbackUrlWithSaveCard() {
-                var isChecked = saveToggle && saveToggle.checked ? '1' : '0';
-                var formEl = document.querySelector('.mysr-form form');
-                if (formEl) {
-                    var callbackInput = formEl.querySelector('input[name="callback_url"]');
-                    if (callbackInput && callbackInput.value) {
-                        var url = new URL(callbackInput.value, window.location.origin);
-                        url.searchParams.set('save_card', isChecked);
-                        callbackInput.value = url.toString();
-                    }
-                }
+            // Record the checkbox's final state on our own server right before
+            // submitting to Moyasar. Moyasar.init() only runs once per page load
+            // and there's no supported way to change credit_card.save_card or
+            // metadata afterward (confirmed against the moyasar.js SDK itself), so
+            // Moyasar can't be told the payer's choice directly here — and its
+            // submit is a fetch() call that never reads back from the DOM, so an
+            // in-page hidden input can't carry it either. keepalive lets this
+            // request finish even though the page navigates away immediately after.
+            var saveCardPreferenceUrl = @json(route('payment.moyasar.checkout.save-card-preference', $transaction->transaction_id));
+            var saveCardPreferenceSent = null;
+            function recordSaveCardPreference() {
+                var wantsSave = !!(saveToggle && saveToggle.checked);
+                if (saveCardPreferenceSent === wantsSave) return;
+                saveCardPreferenceSent = wantsSave;
+                try {
+                    fetch(saveCardPreferenceUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({ save_card: wantsSave }),
+                        keepalive: true
+                    }).catch(function () {});
+                } catch (e) {}
             }
 
             document.addEventListener('click', function (e) {
                 var btn = e.target.closest('button[type="submit"], .mysr-form button');
                 if (btn) {
-                    updateCallbackUrlWithSaveCard();
+                    recordSaveCardPreference();
                 }
             }, true);
 
             document.addEventListener('submit', function (e) {
-                updateCallbackUrlWithSaveCard();
+                recordSaveCardPreference();
             }, true);
         });
     </script>

@@ -69,14 +69,19 @@ class ClientCardService
     }
 
     /**
-     * Persist a Moyasar-tokenized card. Moyasar only returns source.token when the
-     * payer ticked "save card", so a token's presence is the opt-in signal. CVC is
-     * never stored — Moyasar tokens don't carry it.
+     * Persist a Moyasar-tokenized card. Moyasar's checkout page always requests a
+     * token now (credit_card.save_card is forced true at Moyasar.init() time, since
+     * that option can't be toggled after init without a disruptive form re-render —
+     * see moyasar_checkout.blade.php), so a token's presence is no longer itself the
+     * opt-in signal. The actual payer choice is recorded separately, by the checkout
+     * page's own JS calling PaymentController::saveCardPreference() right before
+     * submitting to Moyasar, and read here from the transaction. Default to NOT
+     * saving if that call never landed (e.g. a JS error) — never persist a card
+     * without a confirmed opt-in. CVC is never stored — Moyasar tokens don't carry it.
      */
     public function upsertFromMoyasarSource(PaymentTransaction $transaction, array $source): ?ClientCard
     {
-        // If save_card was explicitly opted out by user via callback/metadata, do not save
-        if (request()->has('save_card') && ! filter_var(request()->get('save_card'), FILTER_VALIDATE_BOOLEAN)) {
+        if (! (bool) ($transaction->response_data['save_card_intent'] ?? false)) {
             return null;
         }
 
