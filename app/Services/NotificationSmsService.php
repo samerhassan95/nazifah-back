@@ -33,6 +33,7 @@ class NotificationSmsService
         'order_cancelled',             // تم إلغاء الطلب
         'order_refund',                // تم استرداد مبلغ
         'order_reviewed',              // المغسلة عدّلت الطلب (بانتظار الموافقة)
+        'order_confirmed_dropoff_required', // وافقت المغسلة على الطلب، يرجى تسليمه للمغسلة (استلام ذاتي)
         'driver_on_the_way_pickup',    // السائق في الطريق للاستلام
         'order_picked_up',             // تم استلام الطلب من العميل
         'driver_on_the_way_delivery',  // السائق في الطريق للتوصيل
@@ -66,6 +67,10 @@ class NotificationSmsService
         'order_reviewed' => [
             'ar' => "تم تعديل طلبك رقم {order_number} من قِبل المغسلة.\nيرجى مراجعة التعديلات واختيار الإجراء المناسب.",
             'en' => 'Your order number {order_number} has been modified by the laundry. Please review the changes and choose the appropriate action.',
+        ],
+        'order_confirmed_dropoff_required' => [
+            'ar' => 'تم تأكيد طلبك رقم {order_number} من المغسلة، يرجى تسليم الطلب للمغسلة.',
+            'en' => 'Your order number {order_number} has been confirmed by the laundry. Please deliver it to the laundry.',
         ],
         'driver_on_the_way_pickup' => [
             'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للاستلام يرجى تأكيد جاهزيتك للتسليم.',

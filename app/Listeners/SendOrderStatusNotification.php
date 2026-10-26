@@ -95,11 +95,24 @@ class SendOrderStatusNotification
 
     private function onConfirmed(Order $order, string $num, array $context, ?string $actorType): void
     {
-        $this->notifyClient($order, $actorType,
-            'تم تأكيد الطلب', 'Order Confirmed',
-            "تم تأكيد طلبك رقم {$num}.", "Your order number {$num} has been confirmed.",
-            'order_confirmed',
-        );
+        // Branch self-dropoff: the vendor approving the order doesn't start any
+        // driver flow — the client is the one who still has to act (bring the
+        // clothes in), so tell them that directly instead of a bare "confirmed"
+        // that leaves them waiting on nothing.
+        if ((bool) $order->pickup_at_vendor) {
+            $this->notifyClient($order, $actorType,
+                'تم تأكيد الطلب', 'Order Confirmed',
+                "تم تأكيد طلبك رقم {$num}، يرجى تسليم الطلب للمغسلة.",
+                "Your order number {$num} has been confirmed. Please deliver it to the laundry.",
+                'order_confirmed_dropoff_required',
+            );
+        } else {
+            $this->notifyClient($order, $actorType,
+                'تم تأكيد الطلب', 'Order Confirmed',
+                "تم تأكيد طلبك رقم {$num}.", "Your order number {$num} has been confirmed.",
+                'order_confirmed',
+            );
+        }
 
         // Vendor auto-accepted every item: the client did not approve anything.
         if (! empty($context['auto_confirmed'])) {
