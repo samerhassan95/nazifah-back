@@ -472,7 +472,7 @@ class OrderPieceHandoffService
             ],
             self::TYPE_DRIVER_TO_CLIENT => [
                 'declare_label' => $isAr ? 'أنا سلمت الطلب للعميل' : 'I delivered the order to the client',
-                'confirm_label' => $isAr ? 'أؤكد استلام الطلب من السائق' : 'Confirm receipt from the driver',
+                'confirm_label' => $isAr ? 'تأكيد استلام الطلب' : 'Confirm receipt',
                 'waiting_label' => $isAr ? 'قام السائق بتسليم طلبك، يرجى تأكيد استلامك للطلب' : 'Driver delivered order, please confirm receipt',
             ],
             self::TYPE_CLIENT_TO_LAUNDRY => [
