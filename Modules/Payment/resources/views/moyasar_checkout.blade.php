@@ -249,7 +249,11 @@
             // submit is a fetch() call that never reads back from the DOM, so an
             // in-page hidden input can't carry it either. keepalive lets this
             // request finish even though the page navigates away immediately after.
-            var saveCardPreferenceUrl = @json(route('payment.moyasar.checkout.save-card-preference', $transaction->transaction_id));
+            // Built from the current page's own path rather than Laravel's route()
+            // helper — this module's routes are registered under an 'api.' name
+            // prefix added by its RouteServiceProvider, so the bare route name
+            // isn't guaranteed to resolve from every context.
+            var saveCardPreferenceUrl = window.location.pathname.replace(/\/+$/, '') + '/save-card-preference';
             var saveCardPreferenceSent = null;
             function recordSaveCardPreference() {
                 var wantsSave = !!(saveToggle && saveToggle.checked);
