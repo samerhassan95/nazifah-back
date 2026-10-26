@@ -800,7 +800,8 @@ class AdminOrderController extends Controller
         // Dynamic Title and Subtitle matching Figma specifications for every order status
         $deliveryTitle = match ($actualStatus) {
             'pending' => ($lang === 'ar' ? 'طلب جديد قيد الانتظار' : 'New Order Pending'),
-            'confirmed', 'branch_review', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب' : 'Order Confirmed'),
+            'confirmed', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب' : 'Order Confirmed'),
+            'branch_review' => ($lang === 'ar' ? 'بانتظار تأكيد العميل' : 'Awaiting Client Confirmation'),
             'driver_pickup_assigned', 'driver_delivery_assigned' => ($lang === 'ar' ? 'تم تعيين السائق وبانتظار تأكيده' : 'Driver Assigned and Awaiting Confirmation'),
             'driver_pickup_accepted', 'driver_delivery_accepted' => ($lang === 'ar' ? 'تم قبول الطلب من السائق' : 'Order Accepted by Driver'),
             'on_way_to_pickup' => ($lang === 'ar' ? 'السائق في طريقه لاستلام الطلب' : 'Driver on the way for pickup'),
@@ -819,7 +820,8 @@ class AdminOrderController extends Controller
 
         $deliverySubtitle = match ($actualStatus) {
             'pending' => ($lang === 'ar' ? 'تم استلام الطلب وجاري مراجعته وتأكيده.' : 'Order received and awaiting review and confirmation.'),
-            'confirmed', 'branch_review', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب من العميل وبانتظار تعيين السائق.' : 'Order confirmed by client and awaiting driver assignment.'),
+            'confirmed', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب من العميل وبانتظار تعيين السائق.' : 'Order confirmed by client and awaiting driver assignment.'),
+            'branch_review' => ($lang === 'ar' ? 'قامت المغسلة بمراجعة الطلب وتعديل أو رفض بعض الأصناف، وبانتظار موافقة العميل على التعديلات أو رفضها.' : "The laundry reviewed the order and modified or rejected some items, and is awaiting the client's approval or rejection of the changes."),
             'driver_pickup_assigned', 'driver_delivery_assigned' => ($lang === 'ar' ? 'تم تعيين سائق للطلب وبانتظار تأكيده لاستلام المهمة والبدء في التوصيل.' : 'Driver assigned and awaiting confirmation to start the mission.'),
             'driver_pickup_accepted', 'driver_delivery_accepted' => ($lang === 'ar' ? 'قبل السائق الطلب وهو بصدد الانطلاق للموقع.' : 'Driver accepted and preparing to head to location.'),
             'on_way_to_pickup' => ($lang === 'ar' ? 'السائق يقترب من موقع العميل لاستلام الطلب وبانتظار تأكيد العميل جاهزيته.' : 'Driver approaching client location for pickup and awaiting readiness confirmation.'),
@@ -836,18 +838,38 @@ class AdminOrderController extends Controller
             default => ($latestLog['sub_title'] ?? $estimatedArrivalText),
         };
 
-        // 'on_way_to_pickup', 'picked_up' and 'driver_delivery_accepted' each silently
-        // cover multiple very different real moments (one side still en route vs. one
-        // side already declared handoff and is waiting on the other's confirmation) -
-        // the status column alone can't tell them apart, but the two-step handoff
-        // service already tracks exactly this via its own timestamps, so surface it here.
-        $handoffStage = app(OrderPieceHandoffService::class)->determineCurrentHandoffStage($order);
-        if ($handoffStage === OrderPieceHandoffService::TYPE_CLIENT_TO_DRIVER) {
-            $deliveryTitle = $lang === 'ar' ? 'تسليم العميل الطلب للسائق' : 'Client Handed Order to Driver — Awaiting Confirmation';
+        // 'on_way_to_pickup', 'on_way_to_delivery', 'picked_up' and 'driver_delivery_accepted'
+        // each silently cover multiple very different real moments (one side still en
+        // route with nothing confirmed vs. the client already confirmed they're ready
+        // vs. one side already declared handoff and is waiting on the other's
+        // confirmation) - the status column alone can't tell them apart.
+        //
+        // Note: client_pickup_handoff_at/client_delivery_handoff_at are only set once
+        // the OTHER side (driver) confirms - there's no separate "client declared,
+        // not yet confirmed" column - so client_*_visit_confirmed_at is the earliest
+        // signal the backend actually has: the client is ready, before any physical
+        // handoff is declared.
+        if ($actualStatus === OrderStatus::ON_WAY_TO_PICKUP->value
+            && $order->client_pickup_visit_confirmed_at
+            && ! $order->client_pickup_handoff_at) {
+            $deliveryTitle = $lang === 'ar' ? 'العميل جاهز للتسليم' : 'Client Ready for Pickup';
             $deliverySubtitle = $lang === 'ar'
-                ? 'سلّم العميل الطلب للسائق وبانتظار تأكيد السائق الاستلام.'
-                : "The client handed the order to the driver and is awaiting the driver's confirmation of receipt.";
-        } elseif ($handoffStage === OrderPieceHandoffService::TYPE_DRIVER_TO_LAUNDRY) {
+                ? 'أكد العميل جاهزيته لتسليم الطلب، والسائق في طريقه إليه.'
+                : 'The client confirmed they are ready to hand over the order, and the driver is on the way.';
+        } elseif ($actualStatus === OrderStatus::ON_WAY_TO_DELIVERY->value
+            && $order->client_delivery_visit_confirmed_at
+            && ! $order->client_delivery_handoff_at) {
+            $deliveryTitle = $lang === 'ar' ? 'العميل جاهز للاستلام' : 'Client Ready for Delivery';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'أكد العميل جاهزيته لاستلام الطلب، والسائق في طريقه إليه.'
+                : 'The client confirmed they are ready to receive the order, and the driver is on the way.';
+        }
+
+        // The two-step handoff service tracks the driver<->laundry handoffs
+        // separately and does have a dedicated "declared, awaiting confirmation"
+        // signal for those two (unlike the client legs above).
+        $handoffStage = app(OrderPieceHandoffService::class)->determineCurrentHandoffStage($order);
+        if ($handoffStage === OrderPieceHandoffService::TYPE_DRIVER_TO_LAUNDRY) {
             $deliveryTitle = $lang === 'ar' ? 'تسليم الطلب للمغسلة' : 'Delivered to Laundry — Awaiting Confirmation';
             $deliverySubtitle = $lang === 'ar'
                 ? 'سلّم السائق الطلب للمغسلة وبانتظار تأكيد المغسلة الاستلام.'
