@@ -652,19 +652,33 @@ class AdminOrderController extends Controller
             $activeDriver = $order->driver ?? $order->deliveryDriver ?? $order->pickupDriver;
         }
 
-        $driverData = $activeDriver ? [
-            'id' => $activeDriver->id,
-            'name' => method_exists($activeDriver, 'getTranslation') ? ($activeDriver->getTranslation('full_name', $lang) ?? $activeDriver->full_name) : $activeDriver->full_name,
-            'full_name' => method_exists($activeDriver, 'getTranslation') ? ($activeDriver->getTranslation('full_name', $lang) ?? $activeDriver->full_name) : $activeDriver->full_name,
-            'phone' => $activeDriver->phone,
-            'avatar' => $activeDriver->image,
-            'image' => $activeDriver->image,
-            'rating' => (float) ($activeDriver->rating ?? 4.5),
-            'latitude' => $activeDriver->latitude !== null ? (float) $activeDriver->latitude : null,
-            'longitude' => $activeDriver->longitude !== null ? (float) $activeDriver->longitude : null,
-            'lat' => $activeDriver->latitude !== null ? (float) $activeDriver->latitude : null,
-            'lng' => $activeDriver->longitude !== null ? (float) $activeDriver->longitude : null,
-        ] : null;
+        $formatDriver = function ($driver) use ($lang) {
+            if (! $driver) {
+                return null;
+            }
+
+            return [
+                'id' => $driver->id,
+                'name' => method_exists($driver, 'getTranslation') ? ($driver->getTranslation('full_name', $lang) ?? $driver->full_name) : $driver->full_name,
+                'full_name' => method_exists($driver, 'getTranslation') ? ($driver->getTranslation('full_name', $lang) ?? $driver->full_name) : $driver->full_name,
+                'phone' => $driver->phone,
+                'avatar' => $driver->image,
+                'image' => $driver->image,
+                'rating' => (float) ($driver->rating ?? 4.5),
+                'latitude' => $driver->latitude !== null ? (float) $driver->latitude : null,
+                'longitude' => $driver->longitude !== null ? (float) $driver->longitude : null,
+                'lat' => $driver->latitude !== null ? (float) $driver->latitude : null,
+                'lng' => $driver->longitude !== null ? (float) $driver->longitude : null,
+            ];
+        };
+
+        $driverData = $formatDriver($activeDriver);
+        // Distinct from $driverData (which picks whichever leg is "currently active" for
+        // the tracking map): these always reflect each leg's own actual assignment, so the
+        // admin UI can show the pickup and delivery driver cards independently even when
+        // they're two different people.
+        $pickupDriverData = $formatDriver($order->pickupDriver);
+        $deliveryDriverData = $formatDriver($order->deliveryDriver);
 
         $clientName = $order->client ? (method_exists($order->client, 'getTranslation') ? ($order->client->getTranslation('full_name', $lang) ?? $order->client->full_name) : $order->client->full_name) : '';
 
@@ -874,6 +888,8 @@ class AdminOrderController extends Controller
             'status' => $actualStatus,
             'status_label' => $statusLabel,
             'driver' => $driverData,
+            'pickup_driver' => $pickupDriverData,
+            'delivery_driver' => $deliveryDriverData,
             'client' => $clientData,
             'track_order' => $trackOrder,
             'estimated_arrival_text' => $estimatedArrivalText,
