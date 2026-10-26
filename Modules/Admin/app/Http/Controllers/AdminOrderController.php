@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ErrorResponse;
 use App\Services\UploadFilesService;
 use App\Services\OrderStatusService;
+use App\Services\OrderPieceHandoffService;
 use App\Support\OrderStatusLogPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -834,6 +835,24 @@ class AdminOrderController extends Controller
             'cancelled' => ($lang === 'ar' ? 'تم إلغاء هذا الطلب ولا توجد إجراءات إضافية مطلوبة.' : 'This order has been cancelled.'),
             default => ($latestLog['sub_title'] ?? $estimatedArrivalText),
         };
+
+        // 'picked_up' and 'driver_delivery_accepted' each silently cover two very
+        // different real moments (driver still heading over vs. one side already
+        // declared handoff and is waiting on the other's confirmation) - the status
+        // column alone can't tell them apart, but the two-step handoff service already
+        // tracks exactly this via its own timestamps, so surface it here too.
+        $handoffStage = app(OrderPieceHandoffService::class)->determineCurrentHandoffStage($order);
+        if ($handoffStage === OrderPieceHandoffService::TYPE_DRIVER_TO_LAUNDRY) {
+            $deliveryTitle = $lang === 'ar' ? 'تسليم الطلب للمغسلة' : 'Delivered to Laundry — Awaiting Confirmation';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'سلّم السائق الطلب للمغسلة وبانتظار تأكيد المغسلة الاستلام.'
+                : "The driver handed the order to the laundry and is awaiting the laundry's confirmation of receipt.";
+        } elseif ($handoffStage === OrderPieceHandoffService::TYPE_LAUNDRY_TO_DRIVER) {
+            $deliveryTitle = $lang === 'ar' ? 'تسليم الطلب لسائق التوصيل' : 'Handed to Delivery Driver — Awaiting Confirmation';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'سلّمت المغسلة الطلب لسائق التوصيل وبانتظار تأكيد السائق الاستلام.'
+                : "The laundry handed the order to the delivery driver and is awaiting the driver's confirmation of receipt.";
+        }
 
         $deliveryStatusPayload = [
             'status' => $actualStatus,
