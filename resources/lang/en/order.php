@@ -166,7 +166,7 @@ return [
 
     // Client handoff confirmation (actual give/receive)
     'handoff_not_available' => 'Handoff confirmation is not available for this order in its current state',
-    'handoff_success' => 'Handoff confirmed successfully',
+    'handoff_success' => 'Receipt confirmed successfully',
     'handoff_confirm_give_to_driver' => 'Confirm I handed clothes to the driver',
     'handoff_confirm_give_to_laundry' => 'Confirm I dropped off clothes at the laundry',
     'handoff_confirm_receive_from_driver' => 'Confirm I received clothes from the driver',

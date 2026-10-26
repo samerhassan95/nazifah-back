@@ -167,7 +167,7 @@ return [
 
     // Client handoff confirmation (actual give/receive)
     'handoff_not_available' => 'لا يمكن تأكيد التسليم أو الاستلام في حالة الطلب الحالية',
-    'handoff_success' => 'تم تأكيد التسليم/الاستلام بنجاح',
+    'handoff_success' => 'تم تأكيد الاستلام بنجاح',
     'handoff_confirm_give_to_driver' => 'تأكيد تسليم الطلب للسائق',
     'handoff_confirm_give_to_laundry' => 'تأكيد تسليم الطلب للمغسلة',
     'handoff_confirm_receive_from_driver' => 'تأكيد استلام الطلب من السائق',
