@@ -358,9 +358,19 @@ class Order extends Model
      */
     public function getRawPaymentStatusAttribute(): string
     {
-        return $this->relationLoaded('latestPayment')
-            ? ($this->relations['latestPayment']?->status ?? 'pending')
-            : ($this->latestPayment?->status ?? 'pending');
+        $latestPayment = $this->relationLoaded('latestPayment')
+            ? $this->relations['latestPayment']
+            : $this->latestPayment;
+
+        if ($latestPayment) {
+            return $latestPayment->status;
+        }
+
+        // Nothing due (free order, discount covers everything) — there's no
+        // checkout transaction to find and none is needed, so this isn't
+        // "pending" (which reads to the client as "still waiting to be
+        // charged"); it's already settled.
+        return (float) $this->final_amount <= 0.0 ? 'completed' : 'pending';
     }
 
     /**
