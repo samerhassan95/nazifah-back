@@ -27,6 +27,9 @@ class StoreZoneRequest extends FormRequest
             'description' => ['nullable', 'array'],
             'description.ar' => ['nullable', 'string', 'max:1000'],
             'description.en' => ['nullable', 'string', 'max:1000'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'related_zone_ids' => ['nullable', 'array'],
+            'related_zone_ids.*' => ['integer', 'exists:zones,id'],
             'points' => [
                 'required',
                 'array',

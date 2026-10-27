@@ -15,6 +15,7 @@ class ZoneRepository implements ZoneRepositoryInterface
     public function all(array $filters = []): LengthAwarePaginator
     {
         $query = Zone::query()
+            ->with('relatedZones')
             ->withCount(['branches', 'addresses'])
             ->addSelect([
                 'clients_count' => Address::query()
@@ -47,7 +48,7 @@ class ZoneRepository implements ZoneRepositoryInterface
 
     public function find(int $id): ?Zone
     {
-        return Zone::find($id);
+        return Zone::with('relatedZones')->find($id);
     }
 
     public function create(array $data): Zone
@@ -56,7 +57,16 @@ class ZoneRepository implements ZoneRepositoryInterface
             $data['points'] = $this->normalizePoints($data['points']);
         }
 
-        return Zone::create($data);
+        $relatedZoneIds = $data['related_zone_ids'] ?? null;
+        unset($data['related_zone_ids']);
+
+        $zone = Zone::create($data);
+
+        if ($relatedZoneIds !== null) {
+            $zone->syncRelatedZones($relatedZoneIds);
+        }
+
+        return $zone;
     }
 
     public function update(Zone $zone, array $data): bool
@@ -65,7 +75,16 @@ class ZoneRepository implements ZoneRepositoryInterface
             $data['points'] = $this->normalizePoints($data['points']);
         }
 
-        return $zone->update($data);
+        $relatedZoneIds = $data['related_zone_ids'] ?? null;
+        unset($data['related_zone_ids']);
+
+        $result = $zone->update($data);
+
+        if ($relatedZoneIds !== null) {
+            $zone->syncRelatedZones($relatedZoneIds);
+        }
+
+        return $result;
     }
 
     public function delete(Zone $zone): bool
