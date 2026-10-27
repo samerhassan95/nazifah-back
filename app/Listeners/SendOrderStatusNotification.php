@@ -186,16 +186,17 @@ class SendOrderStatusNotification
 
     private function onPickedUp(Order $order, string $num, ?string $actorType, ?int $actorId): void
     {
-        $this->notifyClient($order, $actorType,
-            'تم استلام الطلب', 'Order Picked Up',
-            "تم استلام طلبك رقم {$num}.", "Your order number {$num} has been picked up.",
-            'order_picked_up',
-        );
-        $this->notifyVendorAndAdmins($order, $actorType,
-            'تم استلام الطلب', 'Clothes Picked Up',
-            "تم استلام الطلب رقم {$num}.", "Clothes for order number {$num} have been picked up.",
-            'order_picked_up',
-        );
+        // Client and vendor both already got the driver-declared-pickup /
+        // confirm-handoff notifications for this same moment, so this one (and its
+        // SMS) was pure duplication for them. Admins still get it.
+        if ($actorType !== 'admin') {
+            $this->notifications->sendToAdmins(
+                $order,
+                'تم استلام الطلب', 'Clothes Picked Up',
+                "تم استلام الطلب رقم {$num}.", "Clothes for order number {$num} have been picked up.",
+                'order_picked_up',
+            );
+        }
         $this->notifyOrderDrivers($order, 'pickup', $actorType, $actorId,
             'تم الاستلام', 'Pickup Completed',
             "تم استلام الطلب رقم {$num}.", "Order number {$num} has been picked up.",

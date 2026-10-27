@@ -35,7 +35,6 @@ class NotificationSmsService
         'order_reviewed',              // المغسلة عدّلت الطلب (بانتظار الموافقة)
         'order_confirmed_dropoff_required', // وافقت المغسلة على الطلب، يرجى تسليمه للمغسلة (استلام ذاتي)
         'driver_on_the_way_pickup',    // السائق في الطريق للاستلام
-        'order_picked_up',             // تم استلام الطلب من العميل
         'driver_on_the_way_delivery',  // السائق في الطريق للتوصيل
         'waiting_client_receipt',      // الطلب جاهز (فرع) / السائق في موقع التسليم
         'order_ready_for_pickup_notice', // تنبيه الفيندور اليدوي: الطلب جاهز (بدون تغيير الستاتس)
@@ -76,10 +75,6 @@ class NotificationSmsService
         'driver_on_the_way_pickup' => [
             'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للاستلام يرجى تأكيد جاهزيتك للتسليم.',
             'en' => 'Order number {order_number}: the driver is on the way to pick up your items. Please confirm you are ready for the handover.',
-        ],
-        'order_picked_up' => [
-            'ar' => 'تم استلام طلبك رقم {order_number} من السائق، يرجى تأكيد تسليم الطلب.',
-            'en' => 'Your order number {order_number} has been picked up by the driver. Please confirm the handover.',
         ],
         'driver_on_the_way_delivery' => [
             'ar' => 'الطلب رقم {order_number}، السائق في الطريق إليك للتسليم، يرجى تأكيد جاهزيتك لاستلام الطلب.',
