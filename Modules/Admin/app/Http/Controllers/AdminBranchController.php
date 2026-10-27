@@ -233,8 +233,31 @@ class AdminBranchController extends Controller
 
         return successResponse([
             'branch_id' => $branch->id,
-            'pieces' => $branch->pieces,
+            'pieces' => $this->withAdditionalServices($branch->pieces, $id),
         ], __('admin.branch_pieces_retrieved'));
+    }
+
+    /**
+     * Attach each piece's additional services for this branch (service_addition_piece,
+     * scoped to $branchId) — the pieces() relation itself only carries the branch_piece
+     * pivot (name/is_active), so without this the dashboard's "pieces in branch" screen
+     * has no way to show which additional services are linked to each piece there.
+     */
+    private function withAdditionalServices($pieces, int $branchId)
+    {
+        $locale = app()->getLocale();
+
+        return $pieces->each(function ($piece) use ($branchId, $locale) {
+            $piece->additional_services = $piece->additionalServicesAtBranch($branchId)
+                ->get()
+                ->map(fn ($service) => [
+                    'id' => $service->id,
+                    'name' => $service->getTranslation('name', $locale),
+                    'icon_id' => $service->icon_id,
+                    'price' => (float) ($service->pivot->price ?? 0),
+                ])
+                ->values();
+        });
     }
 
     /**
@@ -260,7 +283,7 @@ class AdminBranchController extends Controller
 
         return successResponse([
             'branch_id' => $branch->id,
-            'pieces' => $branch->pieces()->orderBy('pieces.id', 'asc')->get(),
+            'pieces' => $this->withAdditionalServices($branch->pieces()->orderBy('pieces.id', 'asc')->get(), $id),
         ], __('admin.pieces_added_to_branch'));
     }
 
@@ -287,7 +310,7 @@ class AdminBranchController extends Controller
 
         return successResponse([
             'branch_id' => $branch->id,
-            'pieces' => $branch->pieces()->orderBy('pieces.id', 'asc')->get(),
+            'pieces' => $this->withAdditionalServices($branch->pieces()->orderBy('pieces.id', 'asc')->get(), $id),
         ], __('admin.pieces_removed_from_branch'));
     }
 
@@ -311,7 +334,7 @@ class AdminBranchController extends Controller
 
         return successResponse([
             'branch_id' => $branch->id,
-            'pieces' => $branch->pieces()->orderBy('pieces.id', 'asc')->get(),
+            'pieces' => $this->withAdditionalServices($branch->pieces()->orderBy('pieces.id', 'asc')->get(), $id),
         ], __('admin.branch_pieces_synced'));
     }
 
