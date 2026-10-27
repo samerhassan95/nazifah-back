@@ -399,15 +399,11 @@ class SendOrderStatusNotification
             : "Driver is on the way to deliver order number {$num}.";
         $onTheWayType = $leg === 'pickup' ? 'driver_on_the_way_pickup' : 'driver_on_the_way_delivery';
 
-        if ($leg === 'pickup') {
-            // The vendor has nothing to do while the pickup driver is still on the
-            // way to the client — they only need to know once the driver actually
-            // arrives at the laundry. Admins still get it, same as every other step.
-            if ($actorType !== 'admin') {
-                $this->notifications->sendToAdmins($order, $onTheWayTitleAr, $onTheWayTitleEn, $onTheWayBodyAr, $onTheWayBodyEn, $onTheWayType);
-            }
-        } else {
-            $this->notifyVendorAndAdmins($order, $actorType, $onTheWayTitleAr, $onTheWayTitleEn, $onTheWayBodyAr, $onTheWayBodyEn, $onTheWayType);
+        // The vendor has nothing to do while the driver is still on the way to or
+        // from the client — they only need to know once the driver actually arrives
+        // (at the laundry, or back with the client). Admins still get it either way.
+        if ($actorType !== 'admin') {
+            $this->notifications->sendToAdmins($order, $onTheWayTitleAr, $onTheWayTitleEn, $onTheWayBodyAr, $onTheWayBodyEn, $onTheWayType);
         }
 
         $this->notifyOrderDrivers($order, $driverLeg, $actorType, $actorId,
