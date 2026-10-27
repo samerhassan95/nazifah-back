@@ -482,7 +482,7 @@ class OrderPieceHandoffService
             ],
             self::TYPE_LAUNDRY_TO_CLIENT => [
                 'declare_label' => $isAr ? 'أنا سلمت الطلب للعميل' : 'I handed the order to the client',
-                'confirm_label' => $isAr ? 'أؤكد استلام الطلب من المغسلة' : 'Confirm receipt from the laundry',
+                'confirm_label' => $isAr ? 'تأكيد استلام الطلب' : 'Confirm receipt',
                 'waiting_label' => $isAr ? 'المغسلة سلّمت طلبك، يرجى تأكيد الاستلام' : 'Laundry handed over your order, please confirm receipt',
             ],
             default => [
