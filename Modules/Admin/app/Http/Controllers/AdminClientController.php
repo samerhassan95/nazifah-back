@@ -306,20 +306,24 @@ class AdminClientController extends Controller
         $walletBalance = $client->wallet_balance ?? 0;
 
         // Get wallet transactions
-        $walletTransactions = DB::table('wallet_transactions')
+        $walletTransactionsRaw = DB::table('wallet_transactions')
             ->where('client_id', $client->id)
             ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($transaction) {
-                return [
-                    'Process_number' => "#R{$transaction->id}",
-                    'Order_number' => $transaction->order_id ? "#ORD-{$transaction->order_id}" : null,
-                    'Process_date' => date('d-m-Y', strtotime($transaction->created_at)),
-                    'Total_money' => (float) $transaction->amount,
-                    'process_type' => $transaction->type === 'credit' ? 'deposit' : 'pay',
-                    'Payment_method' => $transaction->payment_method ?? 'cash',
-                ];
-            });
+            ->get();
+
+        $orderNumbersById = Order::whereIn('id', $walletTransactionsRaw->pluck('order_id')->filter()->unique())
+            ->pluck('order_number', 'id');
+
+        $walletTransactions = $walletTransactionsRaw->map(function ($transaction) use ($orderNumbersById) {
+            return [
+                'Process_number' => "#R{$transaction->id}",
+                'Order_number' => $transaction->order_id ? ($orderNumbersById[$transaction->order_id] ?? null) : null,
+                'Process_date' => date('d-m-Y', strtotime($transaction->created_at)),
+                'Total_money' => (float) $transaction->amount,
+                'process_type' => $transaction->type === 'credit' ? 'deposit' : 'pay',
+                'Payment_method' => $transaction->payment_method ?? 'cash',
+            ];
+        });
 
         // Calculate wallet statistics
         $totalDeposits = DB::table('wallet_transactions')

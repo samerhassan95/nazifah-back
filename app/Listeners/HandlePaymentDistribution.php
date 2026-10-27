@@ -128,7 +128,7 @@ class HandlePaymentDistribution
             $driver = Driver::find($driverId);
             if ($driver) {
                 $wallet = $driver->getOrCreateWallet();
-                $wallet->credit($amount, $order->id, "Delivery fee for order #{$order->order_number}");
+                $wallet->credit($amount, $order->id, "Delivery fee for order {$order->order_number}");
             }
         }
     }
