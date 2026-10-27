@@ -636,6 +636,17 @@ class LaundryCatalogImportService
                                     $stats['piece_addon_price_updated']++;
                                 }
                             }
+
+                            // The sheet is authoritative on re-import: drop any addon link
+                            // for this piece+branch that isn't in the new sheet anymore,
+                            // instead of only ever adding to what's already there.
+                            $staleAddonQuery = \DB::table('service_addition_piece')
+                                ->where('piece_id', $pieceId)
+                                ->where('branch_id', $branchId);
+                            if (! empty($realAddonIds)) {
+                                $staleAddonQuery->whereNotIn('service_addition_id', $realAddonIds);
+                            }
+                            $stats['piece_addon_removed'] = ($stats['piece_addon_removed'] ?? 0) + $staleAddonQuery->delete();
                         }
                     }
                 } elseif (! $dryRun) {
@@ -692,6 +703,17 @@ class LaundryCatalogImportService
                                 $stats['piece_addon_price_updated']++;
                             }
                         }
+
+                        // Same re-import rule as the branch-scoped path above: the sheet
+                        // is authoritative, so drop branch-less addon links it no longer lists.
+                        $pieceAddonIds = array_unique($pieceRealAddons[$pieceId] ?? []);
+                        $staleAddonQuery = \DB::table('service_addition_piece')
+                            ->where('piece_id', $pieceId)
+                            ->whereNull('branch_id');
+                        if (! empty($pieceAddonIds)) {
+                            $staleAddonQuery->whereNotIn('service_addition_id', $pieceAddonIds);
+                        }
+                        $stats['piece_addon_removed'] = ($stats['piece_addon_removed'] ?? 0) + $staleAddonQuery->delete();
                     }
                 }
             }
