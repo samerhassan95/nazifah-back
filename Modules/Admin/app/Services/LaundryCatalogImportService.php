@@ -611,6 +611,18 @@ class LaundryCatalogImportService
                                 }
                             }
 
+                            // Same re-import rule as the addons below: the sheet is
+                            // authoritative, so drop any base-service link for this
+                            // piece+branch that isn't in the new sheet anymore.
+                            $realServiceIds = array_column($realServices, 'service_id');
+                            $staleServiceQuery = \DB::table('service_piece')
+                                ->where('piece_id', $pieceId)
+                                ->where('branch_id', $branchId);
+                            if (! empty($realServiceIds)) {
+                                $staleServiceQuery->whereNotIn('service_id', $realServiceIds);
+                            }
+                            $stats['piece_service_removed'] = ($stats['piece_service_removed'] ?? 0) + $staleServiceQuery->delete();
+
                             foreach ($realAddonIds as $realAddonId) {
                                 $existingLink = \DB::table('service_addition_piece')
                                     ->where('piece_id', $pieceId)
@@ -678,6 +690,18 @@ class LaundryCatalogImportService
                                 $stats['piece_service_price_updated']++;
                             }
                         }
+
+                        // Same re-import rule as the branch-scoped path above: the sheet
+                        // is authoritative, so drop branch-less base-service links it no
+                        // longer lists.
+                        $pieceServiceIds = array_column($pieceRealServices[$pieceId] ?? [], 'service_id');
+                        $staleServiceQuery = \DB::table('service_piece')
+                            ->where('piece_id', $pieceId)
+                            ->whereNull('branch_id');
+                        if (! empty($pieceServiceIds)) {
+                            $staleServiceQuery->whereNotIn('service_id', $pieceServiceIds);
+                        }
+                        $stats['piece_service_removed'] = ($stats['piece_service_removed'] ?? 0) + $staleServiceQuery->delete();
 
                         foreach (array_unique($pieceRealAddons[$pieceId] ?? []) as $realAddonId) {
                             $existingLink = \DB::table('service_addition_piece')
