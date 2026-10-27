@@ -33,14 +33,8 @@ class ClientOrderVisitNotificationService
             return;
         }
 
-        $this->notifications->sendToVendorBranch(
-            $order,
-            __('order.visit_notify_vendor_confirm_delivery_title'),
-            'Client ready for delivery',
-            __('order.visit_notify_vendor_confirm_delivery_body', ['order_number' => $num]),
-            __('order.visit_notify_vendor_confirm_delivery_body_en', ['order_number' => $num]),
-            'client_visit_confirmed_delivery'
-        );
+        // The vendor has nothing to do when the client confirms they're ready to
+        // receive from the delivery driver either — same as the pickup leg above.
         $this->notifications->sendToDriver(
             $order,
             (int) $order->delivery_driver_id,

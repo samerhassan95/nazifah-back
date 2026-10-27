@@ -245,7 +245,7 @@ return [
     'visit_notify_vendor_confirm_delivery_title' => 'العميل جاهز للتسليم',
     'visit_notify_vendor_confirm_delivery_body' => 'أكد العميل جاهزيته لاستلام الطلب :order_number من السائق',
     'visit_notify_vendor_confirm_delivery_body_en' => 'Client confirmed readiness to receive order :order_number',
-    'visit_notify_driver_confirm_delivery_title' => 'العميل جاهز للتسليم',
+    'visit_notify_driver_confirm_delivery_title' => 'العميل جاهز للاستلام',
     'visit_notify_driver_confirm_delivery_body' => 'العميل جاهز لاستلام الطلب :order_number — يمكنك التوجه الآن',
     'visit_notify_driver_confirm_delivery_body_en' => 'Client is ready to receive order :order_number — you may proceed',
 
