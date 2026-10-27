@@ -32,11 +32,14 @@ class VendorOrderHandoffService
      * for a branch self-pickup order — deliberately separate from
      * canRequestClientDelivery()/requestClientDelivery(), which also advances the
      * order's status to waiting_client_receipt. This one never touches the status.
+     * Once sent (vendor_ready_notice_sent_at is set), it's no longer offered again -
+     * that's what lets the vendor app stop showing the button after first use.
      */
     public function canNotifyClientOrderReady(Order $order): bool
     {
         return (bool) $order->delivery_at_vendor
-            && $order->status === OrderStatus::DELIVERED_TO_BRANCH->value;
+            && $order->status === OrderStatus::DELIVERED_TO_BRANCH->value
+            && $order->vendor_ready_notice_sent_at === null;
     }
 
     public function canConfirmClientPickupReceived(Order $order): bool
@@ -271,7 +274,9 @@ class VendorOrderHandoffService
             'order_ready_for_pickup_notice',
         );
 
-        return $order;
+        $order->update(['vendor_ready_notice_sent_at' => now()]);
+
+        return $order->fresh();
     }
 
     public function confirmClientPickupReceived(Order $order, int $changedBy, ?string $notes = null): Order

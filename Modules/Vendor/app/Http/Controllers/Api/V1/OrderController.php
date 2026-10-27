@@ -2123,6 +2123,7 @@ class OrderController extends Controller
         return array_merge([
             'requires_handoff_action' => $handoffActions !== [],
             'available_handoff_actions' => $handoffActions,
+            'vendor_ready_notice_sent_at' => $order->vendor_ready_notice_sent_at?->toISOString(),
         ], $handoffService->vendorConfirmFlags($order), $pieceHandoffPayload);
     }
 
@@ -2207,6 +2208,7 @@ class OrderController extends Controller
             'id' => $order->id,
             'status' => $order->status,
             'status_label' => $order->vendor_status_label,
+            'vendor_ready_notice_sent_at' => $order->vendor_ready_notice_sent_at?->toISOString(),
         ], __('order.vendor_handoff_notify_client_ready_success'));
     }
 
