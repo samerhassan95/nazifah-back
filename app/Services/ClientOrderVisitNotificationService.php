@@ -18,14 +18,8 @@ class ClientOrderVisitNotificationService
         $num = $order->order_number;
 
         if ($leg === 'pickup') {
-            $this->notifications->sendToVendorBranch(
-                $order,
-                __('order.visit_notify_vendor_confirm_pickup_title'),
-                'Client ready for pickup',
-                __('order.visit_notify_vendor_confirm_pickup_body', ['order_number' => $num]),
-                __('order.visit_notify_vendor_confirm_pickup_body_en', ['order_number' => $num]),
-                'client_visit_confirmed_pickup'
-            );
+            // The vendor has nothing to do when the client confirms they're ready
+            // for the pickup driver — that's between the client and the driver.
             $this->notifications->sendToDriver(
                 $order,
                 (int) $order->pickup_driver_id,
