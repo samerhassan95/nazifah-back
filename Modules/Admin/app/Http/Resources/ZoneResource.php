@@ -22,10 +22,19 @@ class ZoneResource extends JsonResource
             'name' => $isDetailView ? ['ar' => $this->getTranslation('name', 'ar'), 'en' => $this->getTranslation('name', 'en')] : $this->getTranslation('name', $locale),
             'description' => $isDetailView ? ['ar' => $this->getTranslation('description', 'ar'), 'en' => $this->getTranslation('description', 'en')] : $this->getTranslation('description', $locale),
             'city_name' => $this->city,
-            'related_zones' => $this->relatedZones->map(fn ($zone) => [
-                'id' => $zone->id,
-                'name' => $zone->getTranslation('name', $locale),
-            ])->values(),
+            'related_zones' => $this->relatedZones->map(function ($zone) {
+                $zoneCenter = $zone->centerPoint();
+
+                return [
+                    'id' => $zone->id,
+                    'name' => $zone->getTranslation('name', app()->getLocale()),
+                    'distance_km' => $zoneCenter ? $this->distanceFromPoint($zoneCenter['latitude'], $zoneCenter['longitude']) : null,
+                ];
+            })->values(),
+            // Distance from a point passed via ?latitude=&longitude= (the new/edited
+            // zone's own map center, which may not be saved yet) to this zone - used
+            // by the related-zones picker. Null when no point was given.
+            'distance_km' => $this->distance_km ?? null,
             'points' => $this->normalizePoints($this->points),
             'is_active' => (bool) $this->is_active,
             'zone_color' => $this->zone_color,

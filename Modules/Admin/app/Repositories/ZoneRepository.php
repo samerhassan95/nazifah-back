@@ -39,11 +39,39 @@ class ZoneRepository implements ZoneRepositoryInterface
             });
         }
 
+        if (isset($filters['city']) && $filters['city'] !== '') {
+            $query->where('city', $filters['city']);
+        }
+
         $sortBy = $filters['sort_by'] ?? 'created_at';
         $sortOrder = $filters['sort_order'] ?? 'desc';
         $query->orderBy($sortBy, $sortOrder);
 
-        return $query->paginate($filters['per_page'] ?? 15);
+        $zones = $query->paginate($filters['per_page'] ?? 15);
+
+        // Distance from the zone currently being added/edited (its map center,
+        // not yet saved) to each candidate zone, for the related-zones picker.
+        if (isset($filters['latitude'], $filters['longitude']) && $filters['latitude'] !== '' && $filters['longitude'] !== '') {
+            $latitude = (float) $filters['latitude'];
+            $longitude = (float) $filters['longitude'];
+            foreach ($zones as $zone) {
+                $zone->distance_km = $zone->distanceFromPoint($latitude, $longitude);
+            }
+        }
+
+        return $zones;
+    }
+
+    public function getCities(): array
+    {
+        return Zone::query()
+            ->whereNotNull('city')
+            ->where('city', '!=', '')
+            ->distinct()
+            ->orderBy('city')
+            ->pluck('city')
+            ->values()
+            ->all();
     }
 
     public function find(int $id): ?Zone

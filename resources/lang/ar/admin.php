@@ -115,6 +115,7 @@ return [
     'zone_not_found' => 'المنطقة غير موجودة',
     'zone_status_updated' => 'تم تحديث حالة المنطقة بنجاح',
     'zone_statistics_retrieved' => 'تم استرجاع إحصائيات المناطق بنجاح',
+    'zone_cities_retrieved' => 'تم استرجاع قائمة المدن بنجاح',
 
     // Branch messages
     'branches_retrieved' => 'تم استرجاع الفروع بنجاح',

@@ -101,4 +101,9 @@ class ZoneService
     {
         return $this->zoneRepository->getStatistics();
     }
+
+    public function getCities(): array
+    {
+        return $this->zoneRepository->getCities();
+    }
 }
