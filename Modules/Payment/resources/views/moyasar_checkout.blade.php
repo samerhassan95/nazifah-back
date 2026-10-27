@@ -247,12 +247,23 @@
             // metadata afterward (confirmed against the moyasar.js SDK itself), so
             // Moyasar can't be told the payer's choice directly here — and its
             // submit is a fetch() call that never reads back from the DOM, so an
-            // in-page hidden input can't carry it either. keepalive lets this
-            // request finish even though the page navigates away immediately after.
+            // in-page hidden input can't carry it either.
             // Built from the current page's own path rather than Laravel's route()
             // helper — this module's routes are registered under an 'api.' name
             // prefix added by its RouteServiceProvider, so the bare route name
             // isn't guaranteed to resolve from every context.
+            //
+            // This MUST finish before Moyasar's own submit — not just be "sent in
+            // time" on a fast connection. Moyasar settles the charge and redirects
+            // the browser back to our callback almost immediately, and the callback
+            // handler is idempotent/row-locked (payment.callback), so whichever of
+            // {this preference write, the redirect} lands first in the DB "wins" -
+            // a race that was previously lost often enough that cards silently kept
+            // not being saved. Our click listener runs in the CAPTURE phase, which
+            // fires before Moyasar's own (bubble-phase) click handler on the same
+            // button — so a synchronous XHR here genuinely blocks their submit from
+            // starting until this request has completed, closing the race instead
+            // of just narrowing it.
             var saveCardPreferenceUrl = window.location.pathname.replace(/\/+$/, '') + '/save-card-preference';
             var saveCardPreferenceSent = null;
             function recordSaveCardPreference() {
@@ -260,13 +271,19 @@
                 if (saveCardPreferenceSent === wantsSave) return;
                 saveCardPreferenceSent = wantsSave;
                 try {
-                    fetch(saveCardPreferenceUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                        body: JSON.stringify({ save_card: wantsSave }),
-                        keepalive: true
-                    }).catch(function () {});
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', saveCardPreferenceUrl, false); // synchronous — see note above
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.send(JSON.stringify({ save_card: wantsSave }));
                 } catch (e) {}
+            }
+
+            // Also record it the moment the checkbox is touched, so by the time the
+            // payer actually submits, the preference is very likely already saved
+            // and this capture-phase call below is just confirming the final state.
+            if (saveToggle) {
+                saveToggle.addEventListener('change', recordSaveCardPreference);
             }
 
             document.addEventListener('click', function (e) {
