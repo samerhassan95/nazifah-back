@@ -944,7 +944,35 @@ class OrderController extends Controller
             'items.*.additional_service_ids' => ['nullable', 'array'],
             'items.*.additional_service_ids.*' => ['integer', 'exists:service_additions,id'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
-            'items.*.image' => ['nullable', 'sometimes', 'file', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'],
+            // A fresh item image arrives as an uploaded file; an item filled in from
+            // the client's cart (CartService::itemsForOrderCreation) carries its image
+            // as an already-uploaded path string instead — both are valid here.
+            'items.*.image' => [
+                'nullable',
+                'sometimes',
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    if (is_string($value)) {
+                        return;
+                    }
+
+                    if (! $value instanceof \Illuminate\Http\UploadedFile) {
+                        $fail(__('validation.file', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
+                    $allowedExtensions = ['jpeg', 'png', 'jpg', 'gif', 'webp'];
+                    if (! in_array(strtolower((string) $value->getClientOriginalExtension()), $allowedExtensions, true)) {
+                        $fail(__('validation.mimes', ['attribute' => $attribute, 'values' => implode(', ', $allowedExtensions)]));
+
+                        return;
+                    }
+
+                    if ($value->getSize() > 10240 * 1024) {
+                        $fail(__('validation.max.file', ['attribute' => $attribute, 'max' => 10240]));
+                    }
+                },
+            ],
         ]);
 
         if ($validator->fails()) {
@@ -1374,12 +1402,19 @@ class OrderController extends Controller
             // Multipart files live on $request->file('items.N.image'), not in input('items').
             foreach ($itemsData as $index => &$itemData) {
                 $imageFile = $itemData['image'] ?? null;
-                if (! ($imageFile instanceof \Illuminate\Http\UploadedFile)) {
+                if (! ($imageFile instanceof \Illuminate\Http\UploadedFile) && ! is_string($imageFile)) {
+                    // Only fall back to the raw request's file bag when the item didn't
+                    // already carry an already-uploaded path (e.g. from the cart) — that
+                    // string would otherwise get overwritten by this null lookup.
                     $imageFile = $request->file("items.{$index}.image");
                 }
 
                 if ($imageFile instanceof \Illuminate\Http\UploadedFile) {
                     $itemData['uploaded_image'] = $this->uploadFilesService->uploadImage($imageFile, 'orders/items');
+                } elseif (is_string($imageFile) && $imageFile !== '') {
+                    // Already-uploaded path carried over from a cart item — nothing to
+                    // re-upload, just keep pointing at the same stored file.
+                    $itemData['uploaded_image'] = $imageFile;
                 } else {
                     $itemData['uploaded_image'] = null;
                 }

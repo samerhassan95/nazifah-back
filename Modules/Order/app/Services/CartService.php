@@ -259,6 +259,7 @@ class CartService
             'service_ids' => $item->service_ids,
             'additional_service_ids' => $item->additional_service_ids ?? [],
             'note' => $item->note,
+            'image' => $item->image,
         ])->all();
 
         return ['items' => $items, 'branch_id' => (int) $cart->branch_id];
