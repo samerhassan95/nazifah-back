@@ -254,6 +254,7 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
         Route::get('/', [AdminZoneController::class, 'index']);
         Route::post('/', [AdminZoneController::class, 'store']);
         Route::get('statistics', [AdminZoneController::class, 'statistics']);
+        Route::get('cities', [AdminZoneController::class, 'cities']);
         Route::get('{id}', [AdminZoneController::class, 'show']);
         Route::put('{id}', [AdminZoneController::class, 'update']);
         Route::delete('{id}', [AdminZoneController::class, 'destroy']);

@@ -198,9 +198,49 @@ class Zone extends Model
     }
 
     /**
+     * This zone's own lat/lng - center_latitude/longitude when set, else the
+     * centroid of its polygon points. Returns null if neither is available.
+     */
+    public function centerPoint(): ?array
+    {
+        $lat = $this->center_latitude !== null ? (float) $this->center_latitude : null;
+        $lng = $this->center_longitude !== null ? (float) $this->center_longitude : null;
+        $isZeroCenter = ($lat === 0.0 && $lng === 0.0);
+
+        if ((is_null($lat) || is_null($lng) || $isZeroCenter) && $this->points) {
+            $centroid = self::calculatePolygonCentroid(self::normalizePointsArray($this->points));
+            if ($centroid === null) {
+                return null;
+            }
+
+            return ['latitude' => (float) $centroid['lat'], 'longitude' => (float) $centroid['lng']];
+        }
+
+        if ($lat === null || $lng === null) {
+            return null;
+        }
+
+        return ['latitude' => $lat, 'longitude' => $lng];
+    }
+
+    /**
+     * Distance in km from this zone's center to a given point, or null if
+     * this zone has no usable center (no stored center and no points yet).
+     */
+    public function distanceFromPoint(float $latitude, float $longitude): ?float
+    {
+        $center = $this->centerPoint();
+        if ($center === null) {
+            return null;
+        }
+
+        return round($this->calculateDistance($center['latitude'], $center['longitude'], $latitude, $longitude), 2);
+    }
+
+    /**
      * Calculate distance between two points using Haversine formula
      */
-    private function calculateDistance(float $lat1, float $lon1, float $lat2, float $lon2): float
+    public function calculateDistance(float $lat1, float $lon1, float $lat2, float $lon2): float
     {
         $earthRadius = 6371; // Earth's radius in kilometers
 

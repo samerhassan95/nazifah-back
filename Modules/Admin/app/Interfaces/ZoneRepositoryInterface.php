@@ -20,4 +20,6 @@ interface ZoneRepositoryInterface
     public function toggleStatus(Zone $zone): bool;
 
     public function getStatistics(): array;
+
+    public function getCities(): array;
 }

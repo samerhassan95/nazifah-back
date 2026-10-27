@@ -22,6 +22,9 @@ class AdminZoneController extends Controller
         $filters = [
             'is_active' => $request->is_active,
             'search' => $request->search,
+            'city' => $request->input('city'),
+            'latitude' => $request->input('latitude'),
+            'longitude' => $request->input('longitude'),
             'sort_by' => $request->input('sort_by', 'created_at'),
             'sort_order' => $request->input('sort_order', 'desc'),
         ];
@@ -102,6 +105,14 @@ class AdminZoneController extends Controller
         return successResponse(
             new ZoneResource($zone),
             __('admin.zone_status_updated')
+        );
+    }
+
+    public function cities(): JsonResponse
+    {
+        return successResponse(
+            $this->zoneService->getCities(),
+            __('admin.zone_cities_retrieved')
         );
     }
 

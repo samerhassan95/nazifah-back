@@ -115,6 +115,7 @@ return [
     'zone_not_found' => 'Zone not found',
     'zone_status_updated' => 'Zone status updated successfully',
     'zone_statistics_retrieved' => 'Zone statistics retrieved successfully',
+    'zone_cities_retrieved' => 'Cities list retrieved successfully',
 
     // Branch messages
     'branches_retrieved' => 'Branches retrieved successfully',
