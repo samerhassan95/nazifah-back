@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ErrorResponse;
 use App\Services\UploadFilesService;
 use App\Services\OrderStatusService;
+use App\Services\OrderPieceHandoffService;
 use App\Support\OrderStatusLogPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -481,9 +482,16 @@ class AdminOrderController extends Controller
                         $serviceNames[] = \App\Support\OrderItemDisplayNames::serviceName($item->service, $branchId, $lang)
                             ?: ($item->service->name ?? '');
                     }
-                    if ($statusKey !== 'rejected') {
-                        $totalPrice += (float) $item->total_price;
-                    }
+                    // VendorOrderReviewService zeroes out total_price on a rejected
+                    // item (correctly, so it drops out of the order's charged total)
+                    // but snapshots the real pre-rejection amount into
+                    // original_total_price first - use that here so the admin sees
+                    // what the piece would have cost instead of a flat 0. This is
+                    // for admin reference only; order totals below still come from
+                    // $order->total_amount, unaffected by this value.
+                    $totalPrice += $statusKey === 'rejected'
+                        ? (float) ($item->original_total_price ?? $item->total_price)
+                        : (float) $item->total_price;
                     foreach ($item->additionalServicesPivot ?? [] as $addition) {
                         $name = $addition->serviceAddition?->getTranslation('name', $lang)
                             ?? $addition->serviceAddition?->name;
@@ -538,6 +546,7 @@ class AdminOrderController extends Controller
                         'Image' => $clientImage,
                     ],
                     'name_operation' => $joinedServices,
+                    'vendor_status' => $statusKey,
                 ];
 
                 if ($statusKey === 'rejected') {
@@ -589,9 +598,21 @@ class AdminOrderController extends Controller
             : [];
 
         $orderInvoice = [
-            'pieces' => $acceptedItems->map(function ($item) {
+            // Rejected pieces are appended here for admin reference only, carrying
+            // their pre-rejection price (see original_total_price note above) - they
+            // are NOT included in total_price/total_price_after_tax/final_amount
+            // below, which stay sourced from $order->total_amount etc. and already
+            // correctly exclude rejected items.
+            'pieces' => $acceptedItems->concat(
+                $rejectedItems->map(function ($item) {
+                    $item['vendor_status'] = 'rejected';
+
+                    return $item;
+                })
+            )->map(function ($item) {
                 $clientImage = $item['piece_image'] ?? $item['image'] ?? $item['Item_details']['Image'] ?? '';
                 $pieceIcon = $item['Piece_logo'] ?? $item['piece_logo'] ?? $item['icon'] ?? '';
+                $isRejected = ($item['vendor_status'] ?? 'accepted') === 'rejected';
 
                 return [
                     'piece_count' => $item['Piece_count'],
@@ -604,6 +625,9 @@ class AdminOrderController extends Controller
                     'service' => $item['name_operation'] ?: ($item['Services'][0]['service_name'] ?? ''),
                     'additional_services' => $item['Item_details']['Services'][0]['Additional_services'] ?? [],
                     'price' => $item['Item_details']['Price'],
+                    'vendor_status' => $item['vendor_status'] ?? 'accepted',
+                    'rejected' => $isRejected,
+                    'is_rejected' => $isRejected,
                 ];
             })->values()->toArray(),
             'deleviery_price' => $deliveryFee,
@@ -652,19 +676,33 @@ class AdminOrderController extends Controller
             $activeDriver = $order->driver ?? $order->deliveryDriver ?? $order->pickupDriver;
         }
 
-        $driverData = $activeDriver ? [
-            'id' => $activeDriver->id,
-            'name' => method_exists($activeDriver, 'getTranslation') ? ($activeDriver->getTranslation('full_name', $lang) ?? $activeDriver->full_name) : $activeDriver->full_name,
-            'full_name' => method_exists($activeDriver, 'getTranslation') ? ($activeDriver->getTranslation('full_name', $lang) ?? $activeDriver->full_name) : $activeDriver->full_name,
-            'phone' => $activeDriver->phone,
-            'avatar' => $activeDriver->image,
-            'image' => $activeDriver->image,
-            'rating' => (float) ($activeDriver->rating ?? 4.5),
-            'latitude' => $activeDriver->latitude !== null ? (float) $activeDriver->latitude : null,
-            'longitude' => $activeDriver->longitude !== null ? (float) $activeDriver->longitude : null,
-            'lat' => $activeDriver->latitude !== null ? (float) $activeDriver->latitude : null,
-            'lng' => $activeDriver->longitude !== null ? (float) $activeDriver->longitude : null,
-        ] : null;
+        $formatDriver = function ($driver) use ($lang) {
+            if (! $driver) {
+                return null;
+            }
+
+            return [
+                'id' => $driver->id,
+                'name' => method_exists($driver, 'getTranslation') ? ($driver->getTranslation('full_name', $lang) ?? $driver->full_name) : $driver->full_name,
+                'full_name' => method_exists($driver, 'getTranslation') ? ($driver->getTranslation('full_name', $lang) ?? $driver->full_name) : $driver->full_name,
+                'phone' => $driver->phone,
+                'avatar' => $driver->image,
+                'image' => $driver->image,
+                'rating' => (float) ($driver->rating ?? 4.5),
+                'latitude' => $driver->latitude !== null ? (float) $driver->latitude : null,
+                'longitude' => $driver->longitude !== null ? (float) $driver->longitude : null,
+                'lat' => $driver->latitude !== null ? (float) $driver->latitude : null,
+                'lng' => $driver->longitude !== null ? (float) $driver->longitude : null,
+            ];
+        };
+
+        $driverData = $formatDriver($activeDriver);
+        // Distinct from $driverData (which picks whichever leg is "currently active" for
+        // the tracking map): these always reflect each leg's own actual assignment, so the
+        // admin UI can show the pickup and delivery driver cards independently even when
+        // they're two different people.
+        $pickupDriverData = $formatDriver($order->pickupDriver);
+        $deliveryDriverData = $formatDriver($order->deliveryDriver);
 
         $clientName = $order->client ? (method_exists($order->client, 'getTranslation') ? ($order->client->getTranslation('full_name', $lang) ?? $order->client->full_name) : $order->client->full_name) : '';
 
@@ -785,7 +823,8 @@ class AdminOrderController extends Controller
         // Dynamic Title and Subtitle matching Figma specifications for every order status
         $deliveryTitle = match ($actualStatus) {
             'pending' => ($lang === 'ar' ? 'طلب جديد قيد الانتظار' : 'New Order Pending'),
-            'confirmed', 'branch_review', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب' : 'Order Confirmed'),
+            'confirmed', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب' : 'Order Confirmed'),
+            'branch_review' => ($lang === 'ar' ? 'بانتظار تأكيد العميل' : 'Awaiting Client Confirmation'),
             'driver_pickup_assigned', 'driver_delivery_assigned' => ($lang === 'ar' ? 'تم تعيين السائق وبانتظار تأكيده' : 'Driver Assigned and Awaiting Confirmation'),
             'driver_pickup_accepted', 'driver_delivery_accepted' => ($lang === 'ar' ? 'تم قبول الطلب من السائق' : 'Order Accepted by Driver'),
             'on_way_to_pickup' => ($lang === 'ar' ? 'السائق في طريقه لاستلام الطلب' : 'Driver on the way for pickup'),
@@ -794,7 +833,7 @@ class AdminOrderController extends Controller
             'delivered_to_branch' => ($lang === 'ar' ? 'تم تسليم الطلب إلى المغسلة' : 'Delivered to Laundry Branch'),
             'preparing' => ($lang === 'ar' ? 'الطلب قيد التجهيز والغسيل' : 'Order is Being Prepared and Washed'),
             'ready' => ($lang === 'ar' ? 'الطلب جاهز للتوصيل' : 'Order Ready for Delivery'),
-            'waiting_client_receipt' => ($lang === 'ar' ? 'تم الوصول — بانتظار العميل' : 'Arrived — Waiting for Client'),
+            'waiting_client_receipt' => ($lang === 'ar' ? 'سلم السائق الطلب' : 'Driver Delivered the Order'),
             'delivered', 'completed' => ($lang === 'ar' ? 'تم تسليم الطلب بنجاح' : 'Order Delivered Successfully'),
             'client_postponed_pickup' => ($lang === 'ar' ? 'أجل العميل موعد الاستلام' : 'Client Postponed Pickup'),
             'client_postponed_delivery' => ($lang === 'ar' ? 'أجل العميل موعد التسليم' : 'Client Postponed Delivery'),
@@ -804,7 +843,8 @@ class AdminOrderController extends Controller
 
         $deliverySubtitle = match ($actualStatus) {
             'pending' => ($lang === 'ar' ? 'تم استلام الطلب وجاري مراجعته وتأكيده.' : 'Order received and awaiting review and confirmation.'),
-            'confirmed', 'branch_review', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب من العميل وبانتظار تعيين السائق.' : 'Order confirmed by client and awaiting driver assignment.'),
+            'confirmed', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment' => ($lang === 'ar' ? 'تم تأكيد الطلب من العميل وبانتظار تعيين السائق.' : 'Order confirmed by client and awaiting driver assignment.'),
+            'branch_review' => ($lang === 'ar' ? 'قامت المغسلة بمراجعة الطلب وتعديل أو رفض بعض الأصناف، وبانتظار موافقة العميل على التعديلات أو رفضها.' : "The laundry reviewed the order and modified or rejected some items, and is awaiting the client's approval or rejection of the changes."),
             'driver_pickup_assigned', 'driver_delivery_assigned' => ($lang === 'ar' ? 'تم تعيين سائق للطلب وبانتظار تأكيده لاستلام المهمة والبدء في التوصيل.' : 'Driver assigned and awaiting confirmation to start the mission.'),
             'driver_pickup_accepted', 'driver_delivery_accepted' => ($lang === 'ar' ? 'قبل السائق الطلب وهو بصدد الانطلاق للموقع.' : 'Driver accepted and preparing to head to location.'),
             'on_way_to_pickup' => ($lang === 'ar' ? 'السائق يقترب من موقع العميل لاستلام الطلب وبانتظار تأكيد العميل جاهزيته.' : 'Driver approaching client location for pickup and awaiting readiness confirmation.'),
@@ -813,13 +853,56 @@ class AdminOrderController extends Controller
             'delivered_to_branch' => ($lang === 'ar' ? 'تم تسليم الملابس إلى المغسلة وبدء مرحلة الفرز والمعالجة.' : 'Clothes delivered to laundry and sorting stage started.'),
             'preparing' => ($lang === 'ar' ? 'المغسلة تعمل حالياً على غسيل وكي وتجهيز الملابس.' : 'Laundry is currently washing, ironing and preparing clothes.'),
             'ready' => ($lang === 'ar' ? 'تم الانتهاء من تجهيز الطلب بالكامل وهو جاهز للتسليم أو التوصيل.' : 'Order processing complete and ready for pickup/delivery.'),
-            'waiting_client_receipt' => ($lang === 'ar' ? 'السائق متواجد في الموقع وبانتظار خروج العميل للاستلام.' : 'Driver arrived at location and waiting for client to receive.'),
+            'waiting_client_receipt' => ($lang === 'ar' ? 'سلم السائق الطلب للعميل بنجاح، بأنتظار تأكيد استلام الطلب من العميل لإتمام عملية التسليم.' : "Driver delivered the order to the client successfully, awaiting the client's confirmation of receipt to complete the delivery."),
             'delivered', 'completed' => ($lang === 'ar' ? 'تم تسليم الطلب للعميل واكتمال عملية التوصيل بنجاح.' : 'Order delivered successfully to client.'),
             'client_postponed_pickup' => ($lang === 'ar' ? 'طلب العميل تأجيل موعد استلام الملابس وسيتم المتابعة لاحقاً.' : 'Client requested to postpone pickup time.'),
             'client_postponed_delivery' => ($lang === 'ar' ? 'طلب العميل تأجيل موعد تسليم الملابس وسيتم إعادة الجدولة.' : 'Client requested to postpone delivery time.'),
             'cancelled' => ($lang === 'ar' ? 'تم إلغاء هذا الطلب ولا توجد إجراءات إضافية مطلوبة.' : 'This order has been cancelled.'),
             default => ($latestLog['sub_title'] ?? $estimatedArrivalText),
         };
+
+        // 'on_way_to_pickup', 'on_way_to_delivery', 'picked_up' and 'driver_delivery_accepted'
+        // each silently cover multiple very different real moments (one side still en
+        // route with nothing confirmed vs. the client already confirmed they're ready
+        // vs. one side already declared handoff and is waiting on the other's
+        // confirmation) - the status column alone can't tell them apart.
+        //
+        // Note: client_pickup_handoff_at/client_delivery_handoff_at are only set once
+        // the OTHER side (driver) confirms - there's no separate "client declared,
+        // not yet confirmed" column - so client_*_visit_confirmed_at is the earliest
+        // signal the backend actually has: the client is ready, before any physical
+        // handoff is declared.
+        if ($actualStatus === OrderStatus::ON_WAY_TO_PICKUP->value
+            && $order->client_pickup_visit_confirmed_at
+            && ! $order->client_pickup_handoff_at) {
+            $deliveryTitle = $lang === 'ar' ? 'العميل جاهز للتسليم' : 'Client Ready for Pickup';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'أكد العميل جاهزيته لتسليم الطلب، والسائق في طريقه إليه.'
+                : 'The client confirmed they are ready to hand over the order, and the driver is on the way.';
+        } elseif ($actualStatus === OrderStatus::ON_WAY_TO_DELIVERY->value
+            && $order->client_delivery_visit_confirmed_at
+            && ! $order->client_delivery_handoff_at) {
+            $deliveryTitle = $lang === 'ar' ? 'العميل جاهز للاستلام' : 'Client Ready for Delivery';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'أكد العميل جاهزيته لاستلام الطلب، والسائق في طريقه إليه.'
+                : 'The client confirmed they are ready to receive the order, and the driver is on the way.';
+        }
+
+        // The two-step handoff service tracks the driver<->laundry handoffs
+        // separately and does have a dedicated "declared, awaiting confirmation"
+        // signal for those two (unlike the client legs above).
+        $handoffStage = app(OrderPieceHandoffService::class)->determineCurrentHandoffStage($order);
+        if ($handoffStage === OrderPieceHandoffService::TYPE_DRIVER_TO_LAUNDRY) {
+            $deliveryTitle = $lang === 'ar' ? 'تسليم الطلب للمغسلة' : 'Delivered to Laundry — Awaiting Confirmation';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'سلّم السائق الطلب للمغسلة وبانتظار تأكيد المغسلة الاستلام.'
+                : "The driver handed the order to the laundry and is awaiting the laundry's confirmation of receipt.";
+        } elseif ($handoffStage === OrderPieceHandoffService::TYPE_LAUNDRY_TO_DRIVER) {
+            $deliveryTitle = $lang === 'ar' ? 'تسليم الطلب لسائق التوصيل' : 'Handed to Delivery Driver — Awaiting Confirmation';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'سلّمت المغسلة الطلب لسائق التوصيل وبانتظار تأكيد السائق الاستلام.'
+                : "The laundry handed the order to the delivery driver and is awaiting the driver's confirmation of receipt.";
+        }
 
         $deliveryStatusPayload = [
             'status' => $actualStatus,
@@ -874,6 +957,8 @@ class AdminOrderController extends Controller
             'status' => $actualStatus,
             'status_label' => $statusLabel,
             'driver' => $driverData,
+            'pickup_driver' => $pickupDriverData,
+            'delivery_driver' => $deliveryDriverData,
             'client' => $clientData,
             'track_order' => $trackOrder,
             'estimated_arrival_text' => $estimatedArrivalText,

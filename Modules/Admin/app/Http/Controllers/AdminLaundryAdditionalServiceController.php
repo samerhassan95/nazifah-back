@@ -203,9 +203,28 @@ class AdminLaundryAdditionalServiceController extends Controller
             'Service_description.ar' => 'nullable|string',
             'Service_description.en' => 'nullable|string',
             'Price' => 'sometimes|numeric|min:0',
+            'branch_id' => 'nullable|exists:branches,id',
             'service_ids' => 'nullable|array',
             'service_ids.*' => 'nullable|exists:services,id',
         ]);
+
+        // A Price submitted alongside a branch_id is that branch's own override
+        // (shown to the admin as this service's price while viewing that branch -
+        // see show()'s $branchPrice), not the vendor-wide catalog price. Routing it
+        // into $service->price here would silently overwrite the shared vendor
+        // price for every branch from what looked like a single-branch edit, so it
+        // goes to the branch offering table instead; every other field below still
+        // applies at the vendor/catalog level since name/description/icon/services
+        // aren't branch-specific.
+        if ($request->filled('branch_id') && isset($validated['Price'])) {
+            $branchId = (int) $validated['branch_id'];
+            $branch = Branch::where('vendor_id', $service->vendor_id)->find($branchId);
+            if (! $branch) {
+                return errorResponse(__('admin.branch_vendor_mismatch'), null, 422);
+            }
+
+            ServiceAdditionBranchOffering::upsert($branchId, $service, ['price' => $validated['Price']]);
+        }
 
         $serviceData = [];
 
@@ -217,7 +236,7 @@ class AdminLaundryAdditionalServiceController extends Controller
             $serviceData['description'] = $validated['Service_description'];
         }
 
-        if (isset($validated['Price'])) {
+        if (isset($validated['Price']) && ! $request->filled('branch_id')) {
             $serviceData['price'] = $validated['Price'];
         }
 
