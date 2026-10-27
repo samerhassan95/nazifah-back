@@ -13,7 +13,8 @@ use Modules\Order\Models\Order;
 class VendorOrderHandoffService
 {
     public function __construct(
-        protected OrderStatusService $statusService
+        protected OrderStatusService $statusService,
+        protected OrderNotificationService $notifications
     ) {}
 
     public function canConfirmPickupReceived(Order $order): bool
@@ -24,6 +25,18 @@ class VendorOrderHandoffService
     public function canRequestClientDelivery(Order $order): bool
     {
         return $this->resolveClientDeliveryContext($order) !== null;
+    }
+
+    /**
+     * Whether the vendor can send the client a plain "your order is ready" heads-up
+     * for a branch self-pickup order — deliberately separate from
+     * canRequestClientDelivery()/requestClientDelivery(), which also advances the
+     * order's status to waiting_client_receipt. This one never touches the status.
+     */
+    public function canNotifyClientOrderReady(Order $order): bool
+    {
+        return (bool) $order->delivery_at_vendor
+            && $order->status === OrderStatus::DELIVERED_TO_BRANCH->value;
     }
 
     public function canConfirmClientPickupReceived(Order $order): bool
@@ -170,6 +183,15 @@ class VendorOrderHandoffService
             ]);
         }
 
+        if ($this->canNotifyClientOrderReady($order)) {
+            $actions[] = [
+                'action' => 'notify_client_order_ready',
+                'method' => 'POST',
+                'endpoint' => '/api/v1/vendor/orders/'.$order->id.'/notify-ready-for-pickup',
+                'confirm_label' => __('order.vendor_handoff_notify_client_ready'),
+            ];
+        }
+
         return $actions;
     }
 
@@ -225,6 +247,31 @@ class VendorOrderHandoffService
         $order->update(['vendor_delivery_ready_at' => now()]);
 
         return $order->fresh();
+    }
+
+    /**
+     * Pure notification — no status transition, no order field update. Lets the
+     * vendor tell the client "your order is ready" for a branch self-pickup order
+     * while it stays at delivered_to_branch; the vendor marks it complete separately,
+     * whenever the client actually comes to collect it.
+     */
+    public function notifyClientOrderReady(Order $order): Order
+    {
+        if (! $this->canNotifyClientOrderReady($order)) {
+            throw new \LogicException(__('order.vendor_handoff_error_not_ready_notify_client'));
+        }
+
+        $num = $order->order_number;
+
+        $this->notifications->sendToClient(
+            $order,
+            'طلبك جاهز للاستلام', 'Your Order is Ready',
+            "طلبك رقم {$num} جاهز، يمكنك استلامه من الفرع.",
+            "Your order number {$num} is ready — you can pick it up from the branch.",
+            'order_ready_for_pickup_notice',
+        );
+
+        return $order;
     }
 
     public function confirmClientPickupReceived(Order $order, int $changedBy, ?string $notes = null): Order

@@ -38,6 +38,7 @@ class NotificationSmsService
         'order_picked_up',             // تم استلام الطلب من العميل
         'driver_on_the_way_delivery',  // السائق في الطريق للتوصيل
         'waiting_client_receipt',      // الطلب جاهز (فرع) / السائق في موقع التسليم
+        'order_ready_for_pickup_notice', // تنبيه الفيندور اليدوي: الطلب جاهز (بدون تغيير الستاتس)
         'order_delivered',             // تم التوصيل
         'payment_failed',              // فشل الدفع (no dedicated template below —
                                         // falls through to the push body, which is
@@ -87,6 +88,10 @@ class NotificationSmsService
         'order_delivered' => [
             'ar' => 'تم توصيل طلبك رقم {order_number} بنجاح. يرجى تأكيد استلام الطلب.',
             'en' => 'Your order number {order_number} has been delivered successfully. Please confirm receipt of your order.',
+        ],
+        'order_ready_for_pickup_notice' => [
+            'ar' => 'طلبك رقم {order_number} جاهز، يمكنك استلامه من الفرع.',
+            'en' => 'Your order number {order_number} is ready — you can pick it up from the branch.',
         ],
     ];
 

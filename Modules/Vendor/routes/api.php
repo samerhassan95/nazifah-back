@@ -122,6 +122,7 @@ Route::middleware(['auth:vendor', 'banned'])->prefix('v1/vendor')->group(functio
         Route::get('/{orderId}/status-log', [OrderController::class, 'getStatusLog'])->name('vendor.orders.status-log');
         Route::put('/{orderId}/status', [OrderController::class, 'updateStatus'])->name('vendor.orders.update-status');
         Route::post('/{orderId}/handoff', [OrderController::class, 'declareHandoff'])->name('vendor.orders.handoff');
+        Route::post('/{orderId}/notify-ready-for-pickup', [OrderController::class, 'notifyReadyForPickup'])->name('vendor.orders.notify-ready-for-pickup');
         Route::post('/{orderId}/confirm-handoff', [OrderController::class, 'confirmHandoff'])->name('vendor.orders.confirm-handoff');
         Route::post('/accept_order', [OrderController::class, 'acceptOrder'])->name('vendor.orders.accept-order');
         Route::post('/{orderId}/accept', [OrderController::class, 'acceptOrder'])->name('vendor.orders.accept');

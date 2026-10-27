@@ -2175,6 +2175,41 @@ class OrderController extends Controller
         ], $order->handoffResponseFields()), __('order.handoff_sent_success'));
     }
 
+    /**
+     * Vendor-initiated "your order is ready" heads-up for a branch self-pickup
+     * order. Pure notification — unlike updateStatus(status=waiting_client_receipt),
+     * this never moves the order's status; it stays at delivered_to_branch until
+     * the vendor marks it complete separately.
+     */
+    public function notifyReadyForPickup(Request $request, $orderId): JsonResponse
+    {
+        $employee = $request->user();
+        $vendorId = $employee->vendor_id;
+        $branchIds = $this->branchService->getBranchesByVendor($vendorId)->pluck('id')->toArray();
+
+        $order = Order::where('id', $orderId)
+            ->whereIn('branch_id', $branchIds)
+            ->first();
+
+        if (! $order) {
+            return notFoundResponse(__('order.order_not_found'));
+        }
+
+        $handoffService = app(\App\Services\VendorOrderHandoffService::class);
+
+        try {
+            $order = $handoffService->notifyClientOrderReady($order);
+        } catch (\LogicException $e) {
+            return errorResponse($e->getMessage(), null, 400);
+        }
+
+        return successResponse([
+            'id' => $order->id,
+            'status' => $order->status,
+            'status_label' => $order->vendor_status_label,
+        ], __('order.vendor_handoff_notify_client_ready_success'));
+    }
+
     public function confirmHandoff(Request $request, $orderId): JsonResponse
     {
         $employee = $request->user();
