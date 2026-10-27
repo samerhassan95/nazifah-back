@@ -382,17 +382,26 @@ class SendOrderStatusNotification
         $num = $order->order_number;
         $driverLeg = $leg === 'pickup' ? 'pickup' : 'delivery';
 
-        $this->notifyVendorAndAdmins($order, $actorType,
-            $leg === 'pickup' ? 'السائق في الطريق للاستلام' : 'السائق في الطريق للتوصيل',
-            $leg === 'pickup' ? 'Driver On the Way to Pickup' : 'Driver On the Way to Delivery',
-            $leg === 'pickup'
-                ? "السائق في الطريق لاستلام الطلب رقم {$num}."
-                : "السائق في الطريق لتوصيل الطلب رقم {$num}.",
-            $leg === 'pickup'
-                ? "Driver is on the way to pick up order number {$num}."
-                : "Driver is on the way to deliver order number {$num}.",
-            $leg === 'pickup' ? 'driver_on_the_way_pickup' : 'driver_on_the_way_delivery',
-        );
+        $onTheWayTitleAr = $leg === 'pickup' ? 'السائق في الطريق للاستلام' : 'السائق في الطريق للتوصيل';
+        $onTheWayTitleEn = $leg === 'pickup' ? 'Driver On the Way to Pickup' : 'Driver On the Way to Delivery';
+        $onTheWayBodyAr = $leg === 'pickup'
+            ? "السائق في الطريق لاستلام الطلب رقم {$num}."
+            : "السائق في الطريق لتوصيل الطلب رقم {$num}.";
+        $onTheWayBodyEn = $leg === 'pickup'
+            ? "Driver is on the way to pick up order number {$num}."
+            : "Driver is on the way to deliver order number {$num}.";
+        $onTheWayType = $leg === 'pickup' ? 'driver_on_the_way_pickup' : 'driver_on_the_way_delivery';
+
+        if ($leg === 'pickup') {
+            // The vendor has nothing to do while the pickup driver is still on the
+            // way to the client — they only need to know once the driver actually
+            // arrives at the laundry. Admins still get it, same as every other step.
+            if ($actorType !== 'admin') {
+                $this->notifications->sendToAdmins($order, $onTheWayTitleAr, $onTheWayTitleEn, $onTheWayBodyAr, $onTheWayBodyEn, $onTheWayType);
+            }
+        } else {
+            $this->notifyVendorAndAdmins($order, $actorType, $onTheWayTitleAr, $onTheWayTitleEn, $onTheWayBodyAr, $onTheWayBodyEn, $onTheWayType);
+        }
 
         $this->notifyOrderDrivers($order, $driverLeg, $actorType, $actorId,
             'أنت في الطريق', 'You Are On the Way',
