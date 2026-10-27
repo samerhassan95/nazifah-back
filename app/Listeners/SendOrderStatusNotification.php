@@ -186,9 +186,15 @@ class SendOrderStatusNotification
 
     private function onPickedUp(Order $order, string $num, ?string $actorType, ?int $actorId): void
     {
-        // Client and vendor both already got the driver-declared-pickup /
-        // confirm-handoff notifications for this same moment, so this one (and its
-        // SMS) was pure duplication for them. Admins still get it.
+        // Push + in-app only for the client — order_picked_up stays out of
+        // CLIENT_SMS_ALLOWED_TYPES (no SMS here), that part was kept removed.
+        $this->notifyClient($order, $actorType,
+            'تم استلام الطلب من السائق', 'Order Picked Up',
+            "تم استلام طلبك رقم {$num}.", "Your order number {$num} has been picked up.",
+            'order_picked_up',
+        );
+        // Vendor still doesn't get this (pure duplication of the handoff-confirm
+        // notice they already got for the same moment) — only admins do.
         if ($actorType !== 'admin') {
             $this->notifications->sendToAdmins(
                 $order,

@@ -264,7 +264,7 @@ return [
     'visit_notify_driver_postpone_delivery_body_en' => 'Client postponed delivery for order :order_number to :time',
 
     // Driver on the way — push to client
-    'driver_on_the_way_title_pickup' => 'السائق في الطريق — استلام',
+    'driver_on_the_way_title_pickup' => 'السائق في الطريق لاستلام الطلب',
     'driver_on_the_way_title_delivery' => 'السائق في الطريق — تسليم',
     'visit_type_pickup' => 'استلام',
     'visit_type_delivery' => 'تسليم',
