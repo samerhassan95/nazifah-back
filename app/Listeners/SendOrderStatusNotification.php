@@ -304,16 +304,17 @@ class SendOrderStatusNotification
             "تم توصيل طلبك رقم {$num}.", "Your order number {$num} has been delivered.",
             'order_delivered',
         );
-        $this->notifyVendorAndAdmins($order, $actorType,
-            'تم التوصيل', 'Order Delivered',
-            "تم توصيل الطلب رقم {$num}.", "Order number {$num} has been delivered.",
-            'order_delivered',
-        );
-        $this->notifyOrderDrivers($order, 'delivery', $actorType, $actorId,
-            'تم التوصيل', 'Delivery Completed',
-            "تم توصيل الطلب رقم {$num}.", "Order number {$num} has been delivered.",
-            'order_delivered',
-        );
+        // Vendor and the delivery driver both have nothing left to do once the
+        // order is delivered - the driver is the one who just did it, and the
+        // vendor's part ended when they handed it off. Admins still get it.
+        if ($actorType !== 'admin') {
+            $this->notifications->sendToAdmins(
+                $order,
+                'تم التوصيل', 'Order Delivered',
+                "تم توصيل الطلب رقم {$num}.", "Order number {$num} has been delivered.",
+                'order_delivered',
+            );
+        }
     }
 
     private function onClientPostponedPickup(Order $order, string $num, ?string $actorType, ?int $actorId): void
@@ -352,11 +353,15 @@ class SendOrderStatusNotification
             "Your order number {$num} is completed. Please rate the service.",
             'order_completed',
         );
-        $this->notifyVendorAndAdmins($order, $actorType,
-            'تم إكمال الطلب', 'Order Completed',
-            "تم إكمال الطلب رقم {$num}.", "Order number {$num} has been completed.",
-            'order_completed',
-        );
+        // Vendor has nothing left to do once the order is completed. Admins still get it.
+        if ($actorType !== 'admin') {
+            $this->notifications->sendToAdmins(
+                $order,
+                'تم إكمال الطلب', 'Order Completed',
+                "تم إكمال الطلب رقم {$num}.", "Order number {$num} has been completed.",
+                'order_completed',
+            );
+        }
     }
 
     private function onCancelled(Order $order, string $num, ?string $actorType, ?int $actorId): void
