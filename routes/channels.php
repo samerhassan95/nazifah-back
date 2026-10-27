@@ -38,3 +38,13 @@ Broadcast::channel('conversation.{conversationId}', function ($user, string $con
 
     return false;
 });
+
+// Admin dashboard order-details page: live status updates for one order.
+Broadcast::channel('order.{orderId}', function ($user) {
+    return $user instanceof \Modules\Admin\Models\Admin;
+});
+
+// Admin dashboard orders list/table: live status updates across all orders.
+Broadcast::channel('admin.orders', function ($user) {
+    return $user instanceof \Modules\Admin\Models\Admin;
+});
