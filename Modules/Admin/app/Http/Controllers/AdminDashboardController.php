@@ -430,13 +430,13 @@ class AdminDashboardController extends Controller
                     'delivered' => 'تم توصيل الطلب',
                     'completed' => 'تم إكمال الطلب',
                     'cancelled' => 'تم إلغاء الطلب',
-                    default => "طلب جديد #{$order->order_number}",
+                    default => "طلب جديد {$order->order_number}",
                 };
 
                 return [
                     'id' => $order->id,
                     'title' => $title,
-                    'description' => "طلب #{$order->order_number} - {$clientName} من {$vendorName}",
+                    'description' => "طلب {$order->order_number} - {$clientName} من {$vendorName}",
                     'time' => $order->created_at->format('H:i'),
                     'date' => $order->created_at->format('Y-m-d'),
                     'type' => 'orders',

@@ -116,7 +116,7 @@ class FinanceController extends Controller
                 return [
                     'id' => $order->id,
                     'title' => 'إنشاء طلب جديد',
-                    'description' => "تم إنشاء طلب جديد #{$order->order_number} بواسطة العميل {$clientName}",
+                    'description' => "تم إنشاء طلب جديد {$order->order_number} بواسطة العميل {$clientName}",
                     'time' => $time,
                 ];
             })
