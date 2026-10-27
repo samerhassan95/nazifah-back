@@ -587,7 +587,13 @@ class OrderTrackingController extends Controller
             'delivery_data' => [
                 'current_driver' => $formatDriver($activeDriver),
                 'pickup_driver' => $formatDriver($order->pickupDriver),
-                'delivery_driver' => $formatDriver($order->deliveryDriver),
+                // Hidden until the delivery driver has actually received the order
+                // from the vendor (vendor_handed_to_delivery_at set) — before that,
+                // showing the driver's name/photo/contact is premature: they haven't
+                // even picked up the clothes yet, only accepted the assignment.
+                'delivery_driver' => $order->vendor_handed_to_delivery_at !== null
+                    ? $formatDriver($order->deliveryDriver)
+                    : null,
             ],
             'had_driver_rejection' => $hadDriverRejection,
             'driver_rejections' => $driverRejections,
