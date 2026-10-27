@@ -6,6 +6,7 @@ use App\Traits\Cacheable;
 use App\Traits\HasSoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Address\Models\Address;
 use Modules\Vendor\Models\Vendor;
@@ -21,6 +22,7 @@ class Zone extends Model
         'code',
         'name',
         'description',
+        'city',
         'points',
         'center_latitude',
         'center_longitude',
@@ -102,6 +104,43 @@ class Zone extends Model
     public function branches(): HasMany
     {
         return $this->hasMany(\Modules\Branch\Models\Branch::class);
+    }
+
+    /**
+     * Other zones manually linked to this one (e.g. districts grouped under
+     * the same city). The relation is kept symmetric by syncRelatedZones().
+     */
+    public function relatedZones(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'zone_related_zone', 'zone_id', 'related_zone_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Replace this zone's related-zones set, keeping the reverse side of the
+     * relation in sync so each linked zone also lists this one back.
+     */
+    public function syncRelatedZones(array $relatedZoneIds): void
+    {
+        $relatedZoneIds = array_values(array_unique(array_filter(
+            array_map('intval', $relatedZoneIds),
+            fn (int $id) => $id !== $this->id
+        )));
+
+        $previousIds = $this->relatedZones()->pluck('zones.id')->toArray();
+
+        $this->relatedZones()->sync($relatedZoneIds);
+
+        $removedIds = array_diff($previousIds, $relatedZoneIds);
+        $addedIds = array_diff($relatedZoneIds, $previousIds);
+
+        foreach ($addedIds as $relatedId) {
+            self::find($relatedId)?->relatedZones()->syncWithoutDetaching([$this->id]);
+        }
+
+        foreach ($removedIds as $relatedId) {
+            self::find($relatedId)?->relatedZones()->detach($this->id);
+        }
     }
 
     /**

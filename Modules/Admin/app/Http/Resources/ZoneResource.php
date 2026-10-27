@@ -21,6 +21,11 @@ class ZoneResource extends JsonResource
             'id' => $this->id,
             'name' => $isDetailView ? ['ar' => $this->getTranslation('name', 'ar'), 'en' => $this->getTranslation('name', 'en')] : $this->getTranslation('name', $locale),
             'description' => $isDetailView ? ['ar' => $this->getTranslation('description', 'ar'), 'en' => $this->getTranslation('description', 'en')] : $this->getTranslation('description', $locale),
+            'city_name' => $this->city,
+            'related_zones' => $this->relatedZones->map(fn ($zone) => [
+                'id' => $zone->id,
+                'name' => $zone->getTranslation('name', $locale),
+            ])->values(),
             'points' => $this->normalizePoints($this->points),
             'is_active' => (bool) $this->is_active,
             'zone_color' => $this->zone_color,
