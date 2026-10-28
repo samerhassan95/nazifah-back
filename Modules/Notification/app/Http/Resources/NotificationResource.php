@@ -12,10 +12,13 @@ class NotificationResource extends JsonResource
     public function toArray($request): array
     {
         $isDetailView = $request->route() && $request->route()->getName() && str_contains($request->route()->getName(), 'show');
-        $user = $request->user();
-        $lang = $user && method_exists($user, 'getNotificationLang')
-            ? $user->getNotificationLang($request->input('device_id'))
-            : \App\Support\NotificationLocale::normalize(app()->getLocale());
+        // Use the app's current language for this request (set from the
+        // Accept-Language header), not the language saved on the FCM token
+        // row — that's only updated when the push token is (re)registered,
+        // so it goes stale the moment someone switches the app's language
+        // without that happening, and the notifications list would keep
+        // showing the old language forever.
+        $lang = \App\Support\NotificationLocale::normalize(app()->getLocale());
 
         $data = is_array($this->data) ? $this->data : [];
 

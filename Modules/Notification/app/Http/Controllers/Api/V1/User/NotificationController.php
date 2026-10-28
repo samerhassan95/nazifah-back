@@ -35,7 +35,13 @@ class NotificationController extends Controller
         $notifications = $query->paginate($perPage);
 
         $uploader = new UploadFilesService;
-        $lang = $user->getNotificationLang($request->input('device_id'));
+        // Use the app's current language for this request (set from the
+        // Accept-Language header), not the language saved on the FCM token
+        // row — that's only updated when the push token is (re)registered,
+        // so it goes stale the moment someone switches the app's language
+        // without that happening, and the notifications list would keep
+        // showing the old language forever.
+        $lang = NotificationLocale::normalize(app()->getLocale());
 
         $notifications->getCollection()->transform(function ($notification) use ($uploader, $lang) {
             return array_merge([
