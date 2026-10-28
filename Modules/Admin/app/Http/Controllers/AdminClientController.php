@@ -216,6 +216,13 @@ class AdminClientController extends Controller
             });
 
         $stats['top_requested_clients'] = $topClients;
+        $stats['clients_per_city'] = $this->clientsPerCityQuery()
+            ->take(10)
+            ->map(fn ($item) => [
+                'City_name' => $item->city,
+                'Clients_count' => (int) $item->count,
+            ])
+            ->values();
 
         return successResponse(
             $stats,
@@ -224,42 +231,35 @@ class AdminClientController extends Controller
     }
 
     /**
+     * Distinct client count per zone city, based on the client's address zone.
+     * Zones without a city set are excluded.
+     */
+    private function clientsPerCityQuery(): \Illuminate\Support\Collection
+    {
+        return DB::table('clients')
+            ->join('addresses', 'clients.id', '=', 'addresses.client_id')
+            ->join('zones', 'addresses.zone_id', '=', 'zones.id')
+            ->whereNotNull('zones.city')
+            ->where('zones.city', '!=', '')
+            ->select('zones.city as city', DB::raw('COUNT(DISTINCT clients.id) as count'))
+            ->groupBy('zones.city')
+            ->orderByDesc('count')
+            ->get();
+    }
+
+    /**
      * Get clients per city
      * GET /clients/clients_per_city
      */
     public function clientsPerCity(Request $request): JsonResponse
     {
-        // Get clients grouped by zone/city
-        // Use distinct to count unique clients per zone
-        $clientsPerCity = DB::table('clients')
-            ->join('addresses', 'clients.id', '=', 'addresses.client_id')
-            ->join('zones', 'addresses.zone_id', '=', 'zones.id')
-            ->select('zones.id', 'zones.name', DB::raw('COUNT(DISTINCT clients.id) as count'))
-            ->groupBy('zones.id', 'zones.name')
-            ->orderBy('count', 'desc')
-            ->limit(13)
-            ->get()
-            ->map(function ($item) {
-                // Get Arabic name from JSON field
-                $zoneName = $item->name;
-                $cityName = 'Unknown';
-
-                if (is_string($zoneName)) {
-                    $decoded = json_decode($zoneName, true);
-                    if (is_array($decoded)) {
-                        $cityName = $decoded['ar'] ?? $decoded['en'] ?? 'Unknown';
-                    } else {
-                        $cityName = $zoneName;
-                    }
-                } elseif (is_array($zoneName)) {
-                    $cityName = $zoneName['ar'] ?? $zoneName['en'] ?? 'Unknown';
-                }
-
-                return [
-                    'city' => $cityName,
-                    'count' => (int) $item->count,
-                ];
-            });
+        $clientsPerCity = $this->clientsPerCityQuery()
+            ->take(13)
+            ->map(fn ($item) => [
+                'city' => $item->city,
+                'count' => (int) $item->count,
+            ])
+            ->values();
 
         return successResponse([
             'customers_by_city' => $clientsPerCity,
