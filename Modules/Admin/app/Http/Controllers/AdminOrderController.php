@@ -384,27 +384,69 @@ class AdminOrderController extends Controller
             $query->whereDate('orders.created_at', '<=', $request->to_date);
         }
 
-        // Get orders grouped by zone/city
-        $ordersPerCity = $query
+        // Top cities by revenue: a zone's "city" is free text set by the admin
+        // (Modules/Zone/app/Models/Zone.php), so every zone sharing a city name
+        // rolls up into that one bucket. zones.code (the old SA01-SA14 scheme)
+        // is unused on current data - grouping by it previously collapsed
+        // everything into a single null bucket.
+        $revenueByCity = $query
             ->join('addresses', 'orders.delivery_address_id', '=', 'addresses.id')
             ->join('zones', 'addresses.zone_id', '=', 'zones.id')
-            ->selectRaw('zones.code as Area_id, COUNT(orders.id) as Value')
-            ->groupBy('zones.code')
+            ->where('orders.status', '!=', 'cancelled')
+            ->whereNotNull('zones.city')
+            ->where('zones.city', '!=', '')
+            ->selectRaw('zones.city as City_name, COALESCE(SUM(orders.final_amount), 0) as Value')
+            ->groupBy('zones.city')
             ->orderByDesc('Value')
             ->limit(4)
             ->get();
 
-        $totalOrders = $ordersPerCity->sum('Value');
+        $totalRevenue = (float) $revenueByCity->sum('Value');
 
-        $result = $ordersPerCity->map(function ($item) use ($totalOrders) {
+        $result = $revenueByCity->map(function ($item) use ($totalRevenue) {
             return [
-                'Area_id' => $item->Area_id,
-                'Value' => (int) $item->Value,
-                'Percentage' => $totalOrders > 0 ? round(($item->Value / $totalOrders) * 100, 2) : 0,
+                // SA01-SA14 code so the admin dashboard's Saudi-regions map can still
+                // highlight the right region; null when the city name doesn't match
+                // one of the 13 regions (e.g. a district name was used instead).
+                'Area_id' => $this->resolveSaudiRegionCode($item->City_name),
+                'City_name' => $item->City_name,
+                'Value' => round((float) $item->Value, 2),
+                'Percentage' => $totalRevenue > 0 ? round(((float) $item->Value / $totalRevenue) * 100, 2) : 0,
             ];
-        });
+        })->values();
 
         return successResponse($result, __('admin.orders_per_city_retrieved'));
+    }
+
+    /**
+     * Map a zone's free-text city name to its Saudi region code (SA01-SA14),
+     * the same scheme database/seeders/SaudiCitiesZoneSeeder.php and the
+     * admin dashboard's Saudi-regions map use. Returns null for a city name
+     * that doesn't match one of the 13 regions (e.g. a district name).
+     */
+    private function resolveSaudiRegionCode(?string $cityName): ?string
+    {
+        if (! $cityName) {
+            return null;
+        }
+
+        static $codesByCity = [
+            'الرياض' => 'SA01', 'riyadh' => 'SA01', 'ar riyad' => 'SA01',
+            'جدة' => 'SA02', 'مكة' => 'SA02', 'مكة المكرمة' => 'SA02', 'jeddah' => 'SA02', 'makkah' => 'SA02',
+            'المدينة' => 'SA03', 'المدينة المنورة' => 'SA03', 'medina' => 'SA03', 'madinah' => 'SA03', 'al madinah' => 'SA03',
+            'الدمام' => 'SA04', 'الشرقية' => 'SA04', 'المنطقة الشرقية' => 'SA04', 'dammam' => 'SA04', 'sharqiyah' => 'SA04', 'ash sharqiyah' => 'SA04',
+            'القصيم' => 'SA05', 'qassim' => 'SA05', 'al quassim' => 'SA05',
+            'حائل' => 'SA06', 'hail' => 'SA06', "ha'il" => 'SA06',
+            'تبوك' => 'SA07', 'tabuk' => 'SA07',
+            'الحدود الشمالية' => 'SA08', 'عرعر' => 'SA08', 'الشمالية' => 'SA08', 'arar' => 'SA08', 'shamaliyah' => 'SA08', 'al hudud ash shamaliyah' => 'SA08',
+            'جازان' => 'SA09', 'جيزان' => 'SA09', 'jizan' => 'SA09', 'jazan' => 'SA09',
+            'نجران' => 'SA10', 'najran' => 'SA10',
+            'الباحة' => 'SA11', 'bahah' => 'SA11', 'al bahah' => 'SA11',
+            'الجوف' => 'SA12', 'jawf' => 'SA12', 'al jawf' => 'SA12',
+            'أبها' => 'SA14', 'عسير' => 'SA14', 'abha' => 'SA14', 'asir' => 'SA14',
+        ];
+
+        return $codesByCity[mb_strtolower(trim($cityName))] ?? null;
     }
 
     /**
@@ -861,6 +903,18 @@ class AdminOrderController extends Controller
             default => ($latestLog['sub_title'] ?? $estimatedArrivalText),
         };
 
+        // "awaiting driver assignment" only makes sense when a driver actually
+        // picks up the order. When the client drops it off at the branch
+        // themselves (pickup_at_vendor), there's no driver to assign next.
+        if (
+            in_array($actualStatus, ['confirmed', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment'], true)
+            && (bool) $order->pickup_at_vendor
+        ) {
+            $deliverySubtitle = $lang === 'ar'
+                ? 'تم تأكيد الطلب من العميل، ويمكنه الآن تسليم الطلب إلى الفرع المحدد لبدء التنفيذ.'
+                : 'The order has been confirmed by the client, who can now hand it over to the selected branch to begin processing.';
+        }
+
         // 'on_way_to_pickup', 'on_way_to_delivery', 'picked_up' and 'driver_delivery_accepted'
         // each silently cover multiple very different real moments (one side still en
         // route with nothing confirmed vs. the client already confirmed they're ready
@@ -902,6 +956,24 @@ class AdminOrderController extends Controller
             $deliverySubtitle = $lang === 'ar'
                 ? 'سلّمت المغسلة الطلب لسائق التوصيل وبانتظار تأكيد السائق الاستلام.'
                 : "The laundry handed the order to the delivery driver and is awaiting the driver's confirmation of receipt.";
+        }
+
+        // Self-pickup (pickup_at_vendor) branch dropoff: determineCurrentHandoffStage()
+        // returns TYPE_CLIENT_TO_LAUNDRY for the whole confirmed/payment_confirmed
+        // window regardless of whether the client has actually dropped the order off
+        // yet - unlike the driver legs above, that window also covers "client hasn't
+        // delivered yet" (handled by the self-pickup override further up). Only
+        // switch to "delivered, awaiting laundry confirmation" wording once the
+        // client has actually declared the handoff.
+        if (
+            $handoffStage === OrderPieceHandoffService::TYPE_CLIENT_TO_LAUNDRY
+            && $order->active_handoff_type === OrderPieceHandoffService::TYPE_CLIENT_TO_LAUNDRY
+            && $order->active_handoff_declared_at !== null
+        ) {
+            $deliveryTitle = $lang === 'ar' ? 'تم تسليم الطلب إلى المغسلة' : 'Order Delivered to Laundry';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'تم تأكيد تسليم العميل الطلب للمغسلة بنجاح، وبانتظار تأكيد المغسلة.'
+                : "The client's handover of the order to the laundry has been confirmed, and it is awaiting the laundry's confirmation of receipt.";
         }
 
         $deliveryStatusPayload = [
