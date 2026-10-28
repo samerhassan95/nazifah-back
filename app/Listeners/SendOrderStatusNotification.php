@@ -285,11 +285,17 @@ class SendOrderStatusNotification
             "The driver has arrived with your order number {$num}. Please receive your order.",
             'waiting_client_receipt',
         );
-        $this->notifyVendorAndAdmins($order, $actorType,
-            'السائق في موقع التسليم', 'Driver at Delivery Location',
-            "وصل السائق لموقع تسليم الطلب رقم {$num}.", "Driver arrived at delivery location for order number {$num}.",
-            'waiting_client_receipt',
-        );
+        // Vendor is done with this order by now (already handed off to the
+        // delivery driver) — only admins still need to know the driver reached
+        // the client's location.
+        if ($actorType !== 'admin') {
+            $this->notifications->sendToAdmins(
+                $order,
+                'السائق في موقع التسليم', 'Driver at Delivery Location',
+                "وصل السائق لموقع تسليم الطلب رقم {$num}.", "Driver arrived at delivery location for order number {$num}.",
+                'waiting_client_receipt',
+            );
+        }
         $this->notifyOrderDrivers($order, 'delivery', $actorType, $actorId,
             'في انتظار العميل', 'Waiting for Client',
             "أنت في موقع تسليم الطلب رقم {$num} بانتظار العميل.", "You are at the delivery location for order number {$num}, waiting for the client.",
