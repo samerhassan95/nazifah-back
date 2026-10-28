@@ -408,7 +408,7 @@ class AdminOrderController extends Controller
                 // SA01-SA14 code so the admin dashboard's Saudi-regions map can still
                 // highlight the right region; null when the city name doesn't match
                 // one of the 13 regions (e.g. a district name was used instead).
-                'Area_id' => $this->resolveSaudiRegionCode($item->City_name),
+                'Area_id' => \Modules\Zone\Models\Zone::resolveSaudiRegionCode($item->City_name),
                 'City_name' => $item->City_name,
                 'Value' => round((float) $item->Value, 2),
                 'Percentage' => $totalRevenue > 0 ? round(((float) $item->Value / $totalRevenue) * 100, 2) : 0,
@@ -416,37 +416,6 @@ class AdminOrderController extends Controller
         })->values();
 
         return successResponse($result, __('admin.orders_per_city_retrieved'));
-    }
-
-    /**
-     * Map a zone's free-text city name to its Saudi region code (SA01-SA14),
-     * the same scheme database/seeders/SaudiCitiesZoneSeeder.php and the
-     * admin dashboard's Saudi-regions map use. Returns null for a city name
-     * that doesn't match one of the 13 regions (e.g. a district name).
-     */
-    private function resolveSaudiRegionCode(?string $cityName): ?string
-    {
-        if (! $cityName) {
-            return null;
-        }
-
-        static $codesByCity = [
-            'الرياض' => 'SA01', 'riyadh' => 'SA01', 'ar riyad' => 'SA01',
-            'جدة' => 'SA02', 'مكة' => 'SA02', 'مكة المكرمة' => 'SA02', 'jeddah' => 'SA02', 'makkah' => 'SA02',
-            'المدينة' => 'SA03', 'المدينة المنورة' => 'SA03', 'medina' => 'SA03', 'madinah' => 'SA03', 'al madinah' => 'SA03',
-            'الدمام' => 'SA04', 'الشرقية' => 'SA04', 'المنطقة الشرقية' => 'SA04', 'dammam' => 'SA04', 'sharqiyah' => 'SA04', 'ash sharqiyah' => 'SA04',
-            'القصيم' => 'SA05', 'qassim' => 'SA05', 'al quassim' => 'SA05',
-            'حائل' => 'SA06', 'hail' => 'SA06', "ha'il" => 'SA06',
-            'تبوك' => 'SA07', 'tabuk' => 'SA07',
-            'الحدود الشمالية' => 'SA08', 'عرعر' => 'SA08', 'الشمالية' => 'SA08', 'arar' => 'SA08', 'shamaliyah' => 'SA08', 'al hudud ash shamaliyah' => 'SA08',
-            'جازان' => 'SA09', 'جيزان' => 'SA09', 'jizan' => 'SA09', 'jazan' => 'SA09',
-            'نجران' => 'SA10', 'najran' => 'SA10',
-            'الباحة' => 'SA11', 'bahah' => 'SA11', 'al bahah' => 'SA11',
-            'الجوف' => 'SA12', 'jawf' => 'SA12', 'al jawf' => 'SA12',
-            'أبها' => 'SA14', 'عسير' => 'SA14', 'abha' => 'SA14', 'asir' => 'SA14',
-        ];
-
-        return $codesByCity[mb_strtolower(trim($cityName))] ?? null;
     }
 
     /**

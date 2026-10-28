@@ -303,48 +303,42 @@ class AdminDashboardController extends Controller
 
     public function topAreas(Request $request): JsonResponse
     {
-        $limit = $request->input('limit', 4);
+        $limit = (int) $request->input('limit', 4);
 
-        // Get top areas by order count grouped by zone
-        $topAreas = Order::select('delivery_address_id', DB::raw('COUNT(*) as order_count'))
-            ->whereNotNull('delivery_address_id')
-            ->groupBy('delivery_address_id')
-            ->get()
-            ->map(function ($order) {
-                $address = \Modules\Address\Models\Address::with('zone')->find($order->delivery_address_id);
+        // A zone's "city" is free text set by the admin (Modules/Zone/app/Models/Zone.php),
+        // so every zone sharing a city name rolls up into that one bucket.
+        $rows = Order::query()
+            ->join('addresses', 'orders.delivery_address_id', '=', 'addresses.id')
+            ->join('zones', 'addresses.zone_id', '=', 'zones.id')
+            ->whereNotNull('orders.delivery_address_id')
+            ->whereNotNull('zones.city')
+            ->where('zones.city', '!=', '')
+            ->select(
+                'zones.city as city',
+                'zones.id as zone_id',
+                'zones.zone_color as zone_color',
+                DB::raw('COUNT(*) as order_count')
+            )
+            ->groupBy('zones.city', 'zones.id', 'zones.zone_color')
+            ->get();
+
+        $result = $rows
+            ->groupBy('city')
+            ->map(function ($zonesInCity, $city) {
+                // Use the color of the zone contributing the most orders to this city
+                // as the city's representative color.
+                $topZone = $zonesInCity->sortByDesc('order_count')->first();
 
                 return [
-                    'zone_id' => $address?->zone_id,
-                    'zone' => $address?->zone,
-                    'order_count' => $order->order_count,
-                ];
-            })
-            ->groupBy('zone_id')
-            ->map(function ($items, $zoneId) {
-                $zone = $items->first()['zone'];
-
-                return [
-                    'zone_id' => $zoneId,
-                    'zone' => $zone,
-                    'order_count' => $items->sum('order_count'),
+                    'code' => Zone::resolveSaudiRegionCode($city),
+                    'City' => $city,
+                    'order_count' => (int) $zonesInCity->sum('order_count'),
+                    'color' => $topZone->zone_color,
                 ];
             })
             ->sortByDesc('order_count')
             ->take($limit)
             ->values();
-
-        $locale = app()->getLocale();
-
-        $result = $topAreas->map(function ($area) use ($locale) {
-            $zone = $area['zone'];
-
-            return [
-                'id' => $zone?->id,
-                'code' => $zone?->code,
-                'city' => $zone ? $zone->getTranslation('name', $locale) : 'Unknown',
-                'order_count' => $area['order_count'],
-            ];
-        });
 
         return successResponse(
             $result,
