@@ -581,6 +581,7 @@ class OrderTrackingController extends Controller
             'notes' => $order->notes,
             'pickup_at_vendor' => $order->pickup_at_vendor,
             'delivery_at_vendor' => $order->delivery_at_vendor,
+            'vendor_ready_notice_sent_at' => $order->vendor_ready_notice_sent_at?->toISOString(),
             'driver_id' => $order->driver_id,
             'pickup_driver_id' => $order->pickup_driver_id,
             'delivery_driver_id' => $order->delivery_driver_id,
