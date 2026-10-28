@@ -33,6 +33,7 @@ class ClientResource extends JsonResource
                 'latitude' => $defaultAddress->latitude,
                 'longitude' => $defaultAddress->longitude,
             ] : null,
+            'orders_count' => $this->orders_count ?? $this->orders()->count(),
             'is_verified' => $this->is_verified,
             'is_active' => $this->is_active ?? true,
             'is_banned' => $this->is_banned ?? false,

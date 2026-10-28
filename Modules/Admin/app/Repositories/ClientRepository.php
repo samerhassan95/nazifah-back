@@ -10,7 +10,7 @@ class ClientRepository implements ClientRepositoryInterface
 {
     public function all(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Client::with('addresses');
+        $query = Client::with('addresses')->withCount('orders');
 
         if (isset($filters['is_verified'])) {
             $query->where('is_verified', $filters['is_verified']);
