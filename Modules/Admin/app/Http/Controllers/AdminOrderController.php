@@ -861,6 +861,18 @@ class AdminOrderController extends Controller
             default => ($latestLog['sub_title'] ?? $estimatedArrivalText),
         };
 
+        // "awaiting driver assignment" only makes sense when a driver actually
+        // picks up the order. When the client drops it off at the branch
+        // themselves (pickup_at_vendor), there's no driver to assign next.
+        if (
+            in_array($actualStatus, ['confirmed', 'waiting_payment', 'payment_confirmed', 'awaiting_remaining_payment'], true)
+            && (bool) $order->pickup_at_vendor
+        ) {
+            $deliverySubtitle = $lang === 'ar'
+                ? 'تم تأكيد الطلب من العميل، ويمكنه الآن تسليم الطلب إلى الفرع المحدد لبدء التنفيذ.'
+                : 'The order has been confirmed by the client, who can now hand it over to the selected branch to begin processing.';
+        }
+
         // 'on_way_to_pickup', 'on_way_to_delivery', 'picked_up' and 'driver_delivery_accepted'
         // each silently cover multiple very different real moments (one side still en
         // route with nothing confirmed vs. the client already confirmed they're ready
