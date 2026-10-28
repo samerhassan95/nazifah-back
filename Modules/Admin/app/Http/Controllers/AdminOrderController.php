@@ -916,6 +916,24 @@ class AdminOrderController extends Controller
                 : "The laundry handed the order to the delivery driver and is awaiting the driver's confirmation of receipt.";
         }
 
+        // Self-pickup (pickup_at_vendor) branch dropoff: determineCurrentHandoffStage()
+        // returns TYPE_CLIENT_TO_LAUNDRY for the whole confirmed/payment_confirmed
+        // window regardless of whether the client has actually dropped the order off
+        // yet - unlike the driver legs above, that window also covers "client hasn't
+        // delivered yet" (handled by the self-pickup override further up). Only
+        // switch to "delivered, awaiting laundry confirmation" wording once the
+        // client has actually declared the handoff.
+        if (
+            $handoffStage === OrderPieceHandoffService::TYPE_CLIENT_TO_LAUNDRY
+            && $order->active_handoff_type === OrderPieceHandoffService::TYPE_CLIENT_TO_LAUNDRY
+            && $order->active_handoff_declared_at !== null
+        ) {
+            $deliveryTitle = $lang === 'ar' ? 'تم تسليم الطلب إلى المغسلة' : 'Order Delivered to Laundry';
+            $deliverySubtitle = $lang === 'ar'
+                ? 'تم تأكيد تسليم العميل الطلب للمغسلة بنجاح، وبانتظار تأكيد المغسلة.'
+                : "The client's handover of the order to the laundry has been confirmed, and it is awaiting the laundry's confirmation of receipt.";
+        }
+
         $deliveryStatusPayload = [
             'status' => $actualStatus,
             'title' => $deliveryTitle,
