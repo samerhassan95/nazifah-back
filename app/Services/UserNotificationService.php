@@ -21,6 +21,12 @@ class UserNotificationService
         'driver_on_the_way_delivery',
         'client_visit_confirmed_pickup',
         'client_visit_confirmed_delivery',
+        // Both require the client to actually go do something (pick up from the
+        // branch, or drop off at the laundry) — same urgency as the types above,
+        // so they get the same attention-grabbing sound/channel instead of
+        // whatever the device's generic "default" channel happens to be set to.
+        'waiting_client_receipt',
+        'order_confirmed_dropoff_required',
     ];
 
     private const NEW_ORDER_SOUND = 'new_order.wav';
