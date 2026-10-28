@@ -15,7 +15,6 @@ class UserNotificationService
     private const NEW_ORDER_NOTIFICATION_TYPES = [
         'new_order',
         'order_reviewed',
-        'driver_pickup_assigned',
         'driver_delivery_assigned',
         'driver_on_the_way_pickup',
         'driver_on_the_way_delivery',
@@ -27,6 +26,15 @@ class UserNotificationService
         // whatever the device's generic "default" channel happens to be set to.
         'waiting_client_receipt',
         'order_confirmed_dropoff_required',
+    ];
+
+    /**
+     * No tone at all for these — just a silent push + in-app entry. Checked
+     * before NEW_ORDER_NOTIFICATION_TYPES, so listing a type here always wins.
+     */
+    private const SILENT_NOTIFICATION_TYPES = [
+        'driver_pickup_assigned',
+        'driver_pickup_accepted',
     ];
 
     private const NEW_ORDER_SOUND = 'new_order.wav';
@@ -183,19 +191,22 @@ class UserNotificationService
         }
 
         $notificationType = (string) ($data['notification_type'] ?? $data['type'] ?? '');
-        $useNewOrderSound = $this->usesNewOrderSound($notificationType);
         $isVendor = $userType === 'vendor';
 
         $payload = [
             'title' => NotificationLocale::pick($titleAr, $titleEn, $lang),
             'body' => NotificationLocale::pick($bodyAr, $bodyEn, $lang),
-            'sound' => $useNewOrderSound
-                ? ($isVendor ? self::VENDOR_NEW_ORDER_SOUND : self::NEW_ORDER_SOUND)
-                : 'notification.wav',
         ];
 
-        if ($useNewOrderSound) {
+        if ($this->isSilent($notificationType)) {
+            // No 'sound' key at all — FirebaseAdminService leaves sound out of
+            // both the Android and iOS payload entirely for this, instead of
+            // falling back to the generic notification.wav tone.
+        } elseif ($this->usesNewOrderSound($notificationType)) {
+            $payload['sound'] = $isVendor ? self::VENDOR_NEW_ORDER_SOUND : self::NEW_ORDER_SOUND;
             $payload['channel_id'] = $isVendor ? self::VENDOR_NEW_ORDER_ANDROID_CHANNEL : self::NEW_ORDER_ANDROID_CHANNEL;
+        } else {
+            $payload['sound'] = 'notification.wav';
         }
 
         $this->firebaseService->sendToDevice($token, $this->flattenForFcm($data), $payload);
@@ -204,6 +215,11 @@ class UserNotificationService
     private function usesNewOrderSound(string $notificationType): bool
     {
         return in_array($notificationType, self::NEW_ORDER_NOTIFICATION_TYPES, true);
+    }
+
+    private function isSilent(string $notificationType): bool
+    {
+        return in_array($notificationType, self::SILENT_NOTIFICATION_TYPES, true);
     }
 
     /**

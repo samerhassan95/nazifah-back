@@ -103,6 +103,11 @@ class FirebaseAdminService
                 $message['data'] = $this->stringifyData($data);
             }
 
+            // Caller leaves 'sound' out entirely to request a genuinely silent push
+            // (e.g. driver_pickup_assigned/accepted) — distinct from passing 'default'
+            // or '', which still fall back to the normal tone below.
+            $wantsSilent = ! array_key_exists('sound', $notification);
+
             $sound = (string) ($notification['sound'] ?? 'notification.wav');
             if ($sound === 'default' || $sound === '') {
                 $sound = 'notification.wav';
@@ -110,15 +115,13 @@ class FirebaseAdminService
 
             $message['android'] = [
                 'priority' => 'HIGH',
-                'notification' => [
-                    'sound' => $sound,
-                    'channel_id' => (string) ($notification['channel_id'] ?? 'default'),
-                ],
+                'notification' => array_merge(
+                    $wantsSilent ? [] : ['sound' => $sound],
+                    ['channel_id' => (string) ($notification['channel_id'] ?? 'default')]
+                ),
             ];
 
-            $aps = [
-                'sound' => $sound,
-            ];
+            $aps = $wantsSilent ? [] : ['sound' => $sound];
 
             if (isset($notification['badge'])) {
                 $aps['badge'] = (int) $notification['badge'];
