@@ -238,6 +238,37 @@ class Zone extends Model
     }
 
     /**
+     * Map a zone's free-text city name to its Saudi region code (SA01-SA14),
+     * the same scheme database/seeders/SaudiCitiesZoneSeeder.php and the
+     * admin dashboard's Saudi-regions map use. Returns null for a city name
+     * that doesn't match one of the 13 regions (e.g. a district name).
+     */
+    public static function resolveSaudiRegionCode(?string $cityName): ?string
+    {
+        if (! $cityName) {
+            return null;
+        }
+
+        static $codesByCity = [
+            'الرياض' => 'SA01', 'riyadh' => 'SA01', 'ar riyad' => 'SA01',
+            'جدة' => 'SA02', 'مكة' => 'SA02', 'مكة المكرمة' => 'SA02', 'jeddah' => 'SA02', 'makkah' => 'SA02',
+            'المدينة' => 'SA03', 'المدينة المنورة' => 'SA03', 'medina' => 'SA03', 'madinah' => 'SA03', 'al madinah' => 'SA03',
+            'الدمام' => 'SA04', 'الشرقية' => 'SA04', 'المنطقة الشرقية' => 'SA04', 'dammam' => 'SA04', 'sharqiyah' => 'SA04', 'ash sharqiyah' => 'SA04',
+            'القصيم' => 'SA05', 'qassim' => 'SA05', 'al quassim' => 'SA05',
+            'حائل' => 'SA06', 'hail' => 'SA06', "ha'il" => 'SA06',
+            'تبوك' => 'SA07', 'tabuk' => 'SA07',
+            'الحدود الشمالية' => 'SA08', 'عرعر' => 'SA08', 'الشمالية' => 'SA08', 'arar' => 'SA08', 'shamaliyah' => 'SA08', 'al hudud ash shamaliyah' => 'SA08',
+            'جازان' => 'SA09', 'جيزان' => 'SA09', 'jizan' => 'SA09', 'jazan' => 'SA09',
+            'نجران' => 'SA10', 'najran' => 'SA10',
+            'الباحة' => 'SA11', 'bahah' => 'SA11', 'al bahah' => 'SA11',
+            'الجوف' => 'SA12', 'jawf' => 'SA12', 'al jawf' => 'SA12',
+            'أبها' => 'SA14', 'عسير' => 'SA14', 'abha' => 'SA14', 'asir' => 'SA14',
+        ];
+
+        return $codesByCity[mb_strtolower(trim($cityName))] ?? null;
+    }
+
+    /**
      * Calculate distance between two points using Haversine formula
      */
     public function calculateDistance(float $lat1, float $lon1, float $lat2, float $lon2): float
