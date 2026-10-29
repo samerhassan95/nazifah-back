@@ -198,6 +198,10 @@ class SubscriptionController extends Controller
             $gatewayName = PaymentMethod::getGatewayName($paymentMethod);
             $this->paymentService->setGateway($gatewayName);
 
+            // Mirror the order checkout flow exactly, so the gateway shows the same
+            // set of payment methods for a subscription as it does for an order.
+            $paymentOption = PaymentMethod::tryFrom($paymentMethod)?->getPayfortPaymentOption();
+
             $reference = 'SUB-'.$vendorId.'-'.time().'-'.Str::lower(Str::random(6));
 
             $baseUrl = rtrim((string) config('app.url'), '/');
@@ -217,6 +221,7 @@ class SubscriptionController extends Controller
                 customerPhone: $vendor->phone ?? null,
                 returnUrl: $returnUrl,
                 cancelUrl: $cancelUrl,
+                paymentOption: $paymentOption,
                 metadata: [
                     'vendor_subscription' => true,
                     'vendor_subscription_reference' => $reference,
@@ -224,6 +229,7 @@ class SubscriptionController extends Controller
                     'subscription_plan_id' => $plan->id,
                     'billing_cycle' => $billingCycle,
                     'payment_method' => $paymentMethod,
+                    'payment_option' => $paymentOption,
                 ],
             );
 
