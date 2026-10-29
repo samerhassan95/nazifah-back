@@ -438,6 +438,6 @@ return [
     'handoff_type_mismatch' => 'نوع التسليم غير متطابق مع المرحلة الحالية للطلب',
     'handoff_declared_log' => 'صرّح :role بتسليم القطع (:type)، بانتظار تأكيد الاستلام',
     'handoff_notify_driver_client_declared_title' => 'العميل سلّم الطلب',
-    'handoff_notify_driver_client_declared_body' => 'العميل أكّد تسليم القطع في الطلب :order_number — يرجى تأكيد الاستلام',
+    'handoff_notify_driver_client_declared_body' => 'أكّد العميل تسليم الطلب، يرجى تأكيد الاستلام',
     'handoff_notify_driver_client_declared_body_en' => 'Client handed over items for order :order_number — please confirm receipt',
 ];
