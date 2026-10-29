@@ -184,7 +184,7 @@
             }
             var saveToggle = document.getElementById('save-card-toggle');
             var saveWrap = document.querySelector('.save-card-opt');
-            var canSaveCard = methods.indexOf('creditcard') !== -1;
+            var canSaveCard = methods.indexOf('creditcard') !== -1 && config.allow_save_card !== false;
 
             if (canSaveCard) {
                 init.credit_card = { save_card: true };

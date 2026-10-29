@@ -160,6 +160,7 @@ return [
     'vendor_not_found' => 'Vendor not found',
     'vendor_not_active' => 'Vendor is not active',
     'vendor_banned' => 'Vendor is banned',
+    'vendor_daily_order_limit_reached' => 'This vendor has reached its maximum number of orders allowed today under its subscription plan, please try again tomorrow',
     'order_rejected_successfully' => 'Order rejected successfully',
     'order_cannot_be_rejected_current_status' => 'Order cannot be rejected in current status',
     'order_must_be_pending' => 'Order must be in pending status',

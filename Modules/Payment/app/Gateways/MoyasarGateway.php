@@ -1109,6 +1109,7 @@ class MoyasarGateway extends AbstractPaymentGateway
             'methods' => $jsMethods,
             'supported_networks' => ['mada', 'visa', 'mastercard'],
             'metadata' => $metadata,
+            'allow_save_card' => empty($metadata['vendor_subscription']),
         ];
 
         if ($invoiceId) {

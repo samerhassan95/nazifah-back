@@ -1009,6 +1009,20 @@ class OrderController extends Controller
 
         $vendorId = $vendor->id;
 
+        $activeSubscription = app(\Modules\Subscription\Services\SubscriptionService::class)
+            ->getActiveVendorSubscription($vendorId);
+        $dailyOrderLimit = $activeSubscription?->subscriptionPlan?->order_count;
+        if ($dailyOrderLimit !== null) {
+            $branchIds = \Modules\Branch\Models\Branch::where('vendor_id', $vendorId)->pluck('id');
+            $todayOrderCount = Order::whereIn('branch_id', $branchIds)
+                ->whereDate('created_at', now()->toDateString())
+                ->where('status', '!=', OrderStatus::CANCELLED->value)
+                ->count();
+            if ($todayOrderCount >= (int) $dailyOrderLimit) {
+                return errorResponse(__('order.vendor_daily_order_limit_reached'), 400);
+            }
+        }
+
         // Determine if delivery is needed (when either pickup or delivery is NOT at vendor)
         $needsDelivery = ! $request->boolean('pickup_at_vendor') || ! $request->boolean('delivery_at_vendor');
 

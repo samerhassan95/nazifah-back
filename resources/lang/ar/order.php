@@ -161,6 +161,7 @@ return [
     'vendor_not_found' => 'البائع غير موجود',
     'vendor_not_active' => 'البائع غير نشط',
     'vendor_banned' => 'البائع محظور',
+    'vendor_daily_order_limit_reached' => 'وصلت المغسلة للحد الأقصى من الطلبات المسموح بها اليوم حسب باقة الاشتراك، حاول مرة أخرى غدًا',
     'order_rejected_successfully' => 'تم رفض الطلب بنجاح',
     'order_cannot_be_rejected_current_status' => 'لا يمكن رفض الطلب في الحالة الحالية',
     'order_must_be_pending' => 'يجب أن يكون الطلب في حالة الانتظار',
