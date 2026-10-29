@@ -14,4 +14,7 @@ return [
     'unauthorized_cancel' => 'You do not have permission to cancel this subscription',
     'unauthorized_view' => 'You do not have permission to view this subscription',
     'plans_retrieved' => 'Subscription plans retrieved successfully',
+    'payment_initialized' => 'Payment initialized. Please complete payment.',
+    'payment_not_completed' => 'Payment has not completed yet',
+    'subscription_activation_failed' => 'Failed to activate subscription after payment',
 ];

@@ -160,6 +160,7 @@ Route::middleware(['auth:vendor', 'banned'])->prefix('v1/vendor')->group(functio
         Route::get('/active', [SubscriptionController::class, 'active'])->name('vendor.subscriptions.active');
         Route::get('/{id}', [SubscriptionController::class, 'show'])->name('vendor.subscriptions.show');
         Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])->name('vendor.subscriptions.subscribe');
+        Route::get('/payment/verify/{transactionId}', [SubscriptionController::class, 'verifyPayment'])->name('vendor.subscriptions.payment.verify');
         Route::post('/{id}/cancel', [SubscriptionController::class, 'cancel'])->name('vendor.subscriptions.cancel');
     });
 

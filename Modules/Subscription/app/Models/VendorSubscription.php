@@ -18,6 +18,7 @@ class VendorSubscription extends Model
     protected $fillable = [
         'vendor_id',
         'subscription_plan_id',
+        'payment_transaction_id',
         'billing_cycle',
         'amount',
         'payment_method',
@@ -58,6 +59,11 @@ class VendorSubscription extends Model
     public function subscriptionPlan(): BelongsTo
     {
         return $this->belongsTo(SubscriptionPlan::class);
+    }
+
+    public function paymentTransaction(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Payment\Models\PaymentTransaction::class);
     }
 
     /**

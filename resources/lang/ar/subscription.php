@@ -14,4 +14,7 @@ return [
     'unauthorized_cancel' => 'ليس لديك صلاحية لإلغاء هذا الاشتراك',
     'unauthorized_view' => 'ليس لديك صلاحية لعرض هذا الاشتراك',
     'plans_retrieved' => 'تم استرجاع خطط الاشتراك بنجاح',
+    'payment_initialized' => 'تم تهيئة عملية الدفع، يرجى إكمال الدفع',
+    'payment_not_completed' => 'لم تكتمل عملية الدفع بعد',
+    'subscription_activation_failed' => 'فشل تفعيل الاشتراك بعد الدفع',
 ];

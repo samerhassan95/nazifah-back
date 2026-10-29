@@ -22,6 +22,7 @@ use Modules\Payment\Models\PaymentRefund;
 use Modules\Payment\Models\PaymentTransaction;
 use Modules\Payment\Services\ClientCardService;
 use Modules\Payment\Services\PaymentService;
+use Modules\Payment\Services\VendorSubscriptionActivator;
 use Modules\Payment\Services\WalletDepositCreditor;
 
 class PaymentController extends Controller
@@ -30,6 +31,7 @@ class PaymentController extends Controller
         private PaymentService $paymentService,
         private ClientCardService $clientCardService,
         private WalletDepositCreditor $walletDepositCreditor,
+        private VendorSubscriptionActivator $subscriptionActivator,
     ) {}
 
     /**
@@ -304,13 +306,16 @@ class PaymentController extends Controller
             $isWalletDeposit = $request->get('wallet_deposit') == '1'
                 || $request->query('wallet_deposit') == '1';
 
+            $isVendorSubscription = $request->get('vendor_subscription') == '1'
+                || $request->query('vendor_subscription') == '1';
+
             $walletReference = $request->get('reference') ?? $request->query('reference');
 
             $merchantReference = $request->get('merchant_reference')
                 ?? $request->get('transaction_id')
                 ?? $request->get('checkoutSessionId')
                 ?? $request->get('amazonCheckoutSessionId')
-                ?? ($isWalletDeposit ? $walletReference : null);
+                ?? (($isWalletDeposit || $isVendorSubscription) ? $walletReference : null);
 
             if (! $merchantReference) {
                 return response()->json([
@@ -338,6 +343,13 @@ class PaymentController extends Controller
                 // For wallet deposits
                 $transaction = PaymentTransaction::where('transaction_id', $walletReference)
                     ->orWhereJsonContains('response_data->wallet_reference_id', $walletReference)
+                    ->latest()
+                    ->first();
+
+            } elseif ($isVendorSubscription && $walletReference) {
+                // For vendor subscription payments
+                $transaction = PaymentTransaction::where('transaction_id', $walletReference)
+                    ->orWhereJsonContains('response_data->vendor_subscription_reference', $walletReference)
                     ->latest()
                     ->first();
 
@@ -413,7 +425,7 @@ class PaymentController extends Controller
             }
 
             // If return_url lost query params (legacy), still treat WALLET-* / stored metadata as wallet deposit
-            if (! $isWalletDeposit && $transaction) {
+            if (! $isWalletDeposit && ! $isVendorSubscription && $transaction) {
                 $rd = $transaction->response_data ?? [];
                 if ($transaction->order_id === null && (
                     ! empty($rd['wallet_deposit']) ||
@@ -424,11 +436,18 @@ class PaymentController extends Controller
                     if (! $walletReference) {
                         $walletReference = $rd['wallet_reference_id'] ?? $transaction->transaction_id;
                     }
+                } elseif (! empty($rd['vendor_subscription']) || ! empty($rd['vendor_subscription_reference'])
+                    || (is_string($transaction->transaction_id) && str_starts_with($transaction->transaction_id, 'SUB-'))
+                ) {
+                    $isVendorSubscription = true;
+                    if (! $walletReference) {
+                        $walletReference = $rd['vendor_subscription_reference'] ?? $transaction->transaction_id;
+                    }
                 }
             }
 
-            // Get order if not wallet deposit
-            if (! $isWalletDeposit) {
+            // Get order if not wallet deposit / vendor subscription
+            if (! $isWalletDeposit && ! $isVendorSubscription) {
                 $order = $transaction->order;
             }
 
@@ -577,6 +596,38 @@ class PaymentController extends Controller
                         'Nathefah Wallet deposit'
                     );
                 }
+            } elseif ($isVendorSubscription) {
+                // A subscription has no fulfilment step either — capture an
+                // AUTHORIZATION hold immediately, same reasoning as the wallet
+                // branch above. Under PURCHASE this is already 'completed'.
+                if ($response->isSuccessful() && $mappedStatus === 'authorized' && $transaction->fort_id) {
+                    $subscriptionCapture = $this->paymentService->capture(
+                        $transaction->fort_id,
+                        (float) ($transaction->authorized_amount ?: $transaction->amount),
+                        $transaction->transaction_id,
+                        $transaction->payfortPaymentOption()
+                    );
+
+                    if ($subscriptionCapture->isSuccessful()) {
+                        $transaction->update([
+                            'status' => 'completed',
+                            'paid_at' => now(),
+                            'response_data' => array_merge($transaction->response_data ?? [], $subscriptionCapture->data ?? []),
+                        ]);
+                        $mappedStatus = 'completed';
+                    } else {
+                        Log::channel('payment')->error('Vendor subscription: capture of AUTHORIZATION hold failed — subscription NOT activated', [
+                            'transaction_id' => $transaction->transaction_id,
+                            'message' => $subscriptionCapture->message,
+                        ]);
+                    }
+                }
+
+                // Activate the subscription only once the payment is actually
+                // captured ('completed'). Never on a bare 'authorized' hold.
+                if ($mappedStatus === 'completed') {
+                    $this->subscriptionActivator->activateIfNotAlready($transaction->fresh());
+                }
             } elseif ($order) {
 
                 // Source of truth is the real column; fall back to the legacy JSON
@@ -680,13 +731,21 @@ class PaymentController extends Controller
                     $responseData['new_balance'] = (float) $newBalance;
                     $responseData['type'] = 'wallet_deposit';
                 }
+            } elseif ($isVendorSubscription) {
+                $responseData['vendor_id'] = $transaction->response_data['vendor_id'] ?? null;
+                $responseData['type'] = 'vendor_subscription';
+                if ($response->isSuccessful()) {
+                    $subscription = \Modules\Subscription\Models\VendorSubscription::where('payment_transaction_id', $transaction->id)->first();
+                    $responseData['subscription_id'] = $subscription?->id;
+                    $responseData['subscription_status'] = $subscription?->status;
+                }
             } else {
                 $responseData['order_id'] = $order->id ?? null;
                 $responseData['order_number'] = $order->order_number ?? null;
             }
 
             $responseMessage = $response->isSuccessful()
-                ? ($isWalletDeposit ? 'تمت عملية الإيداع بنجاح' : 'تمت عملية الدفع بنجاح')
+                ? ($isWalletDeposit ? 'تمت عملية الإيداع بنجاح' : ($isVendorSubscription ? 'تم تفعيل الاشتراك بنجاح' : 'تمت عملية الدفع بنجاح'))
                 : ($response->message ?? 'فشلت عملية الدفع');
 
             // Return JSON response
@@ -1027,7 +1086,10 @@ class PaymentController extends Controller
                 'id' => $data['id'] ?? $request->input('id'),
                 'status' => $data['status'] ?? $request->input('status'),
                 'wallet_deposit' => $meta['wallet_deposit'] ?? null,
-                'reference' => $meta['wallet_reference'] ?? ($meta['merchant_reference'] ?? null),
+                'vendor_subscription' => $meta['vendor_subscription'] ?? null,
+                'reference' => $meta['wallet_reference']
+                    ?? $meta['vendor_subscription_reference']
+                    ?? ($meta['merchant_reference'] ?? null),
                 'order_id' => $meta['order_id'] ?? null,
                 'pending_order_id' => $meta['pending_order_id'] ?? null,
                 'from_webhook' => true,
