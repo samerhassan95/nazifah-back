@@ -217,6 +217,7 @@ class AdminDashboardController extends Controller
                 'id' => $zoneId,
                 'code' => $zone->code,
                 'name' => $zone->getTranslation('name', $locale),
+                'color' => $zone->zone_color,
                 'vendors' => [
                     'total' => (int) ($vendorsPerZone[$zoneId] ?? 0),
                     'active' => (int) ($activeVendorsPerZone[$zoneId] ?? 0),
