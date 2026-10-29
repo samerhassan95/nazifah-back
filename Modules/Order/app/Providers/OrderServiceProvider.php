@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Modules\Order\Console\Commands\ExpireStaleOrderModificationIntents;
 use Modules\Order\Console\Commands\ReleaseExpiredPendingOrderWallets;
+use Modules\Order\Console\Commands\SendClientReceiptReminders;
 use Modules\Order\Models\Order;
 use Modules\Order\Observers\OrderObserver;
 use Nwidart\Modules\Traits\PathNamespace;
@@ -45,6 +46,7 @@ class OrderServiceProvider extends ServiceProvider
         $this->commands([
             ReleaseExpiredPendingOrderWallets::class,
             ExpireStaleOrderModificationIntents::class,
+            SendClientReceiptReminders::class,
         ]);
     }
 
@@ -58,6 +60,11 @@ class OrderServiceProvider extends ServiceProvider
 
             $schedule->command('orders:expire-stale-modification-intents')
                 ->everyFiveMinutes()
+                ->withoutOverlapping()
+                ->runInBackground();
+
+            $schedule->command('orders:send-client-receipt-reminders')
+                ->hourly()
                 ->withoutOverlapping()
                 ->runInBackground();
         });

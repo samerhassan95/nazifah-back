@@ -440,4 +440,8 @@ return [
     'handoff_notify_driver_client_declared_title' => 'العميل سلّم الطلب',
     'handoff_notify_driver_client_declared_body' => 'أكّد العميل تسليم الطلب، يرجى تأكيد الاستلام',
     'handoff_notify_driver_client_declared_body_en' => 'Client handed over items for order :order_number — please confirm receipt',
+    'client_receipt_reminder_24h_title' => 'تذكير بتأكيد الاستلام',
+    'client_receipt_reminder_24h_body' => 'نذكّرك بتأكيد استلام طلبك رقم :order_number، الذي تم تسليمه بتاريخ :date. يرجى تأكيد الاستلام من خلال التطبيق.',
+    'client_receipt_reminder_48h_title' => 'تذكير أخير بتأكيد الاستلام',
+    'client_receipt_reminder_48h_body' => 'نذكّرك بتأكيد استلام طلبك رقم :order_number، الذي تم تسليمه بتاريخ :date. يرجى تأكيد الاستلام من خلال التطبيق. في حال عدم التأكيد، سيقوم النظام بتأكيد الاستلام تلقائيًا.',
 ];

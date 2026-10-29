@@ -277,6 +277,8 @@ class OrderPieceHandoffService
             'active_handoff_declared_by_role' => $role,
             'active_handoff_declared_by_id' => $actorId,
             'active_handoff_declared_at' => now(),
+            'client_receipt_reminder_24h_sent_at' => null,
+            'client_receipt_reminder_48h_sent_at' => null,
         ]);
 
         OrderStatusLog::create([
@@ -444,6 +446,8 @@ class OrderPieceHandoffService
             'active_handoff_declared_by_role' => null,
             'active_handoff_declared_by_id' => null,
             'active_handoff_declared_at' => null,
+            'client_receipt_reminder_24h_sent_at' => null,
+            'client_receipt_reminder_48h_sent_at' => null,
         ]);
 
         return $order->fresh();

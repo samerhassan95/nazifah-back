@@ -439,4 +439,8 @@ return [
     'handoff_notify_driver_client_declared_title' => 'Client handed over the order',
     'handoff_notify_driver_client_declared_body' => 'Client confirmed handing over items for order :order_number — please confirm receipt',
     'handoff_notify_driver_client_declared_body_en' => 'Client handed over items for order :order_number — please confirm receipt',
+    'client_receipt_reminder_24h_title' => 'Reminder: confirm receipt',
+    'client_receipt_reminder_24h_body' => 'Reminder to confirm receipt of your order :order_number, delivered on :date. Please confirm receipt from the app.',
+    'client_receipt_reminder_48h_title' => 'Final reminder: confirm receipt',
+    'client_receipt_reminder_48h_body' => 'Reminder to confirm receipt of your order :order_number, delivered on :date. Please confirm receipt from the app. If not confirmed, the system will automatically confirm receipt.',
 ];
