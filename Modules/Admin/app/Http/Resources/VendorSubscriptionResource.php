@@ -29,6 +29,15 @@ class VendorSubscriptionResource extends JsonResource
             $accountStatus = 'expired';
         }
 
+        $branchCount = \Modules\Branch\Models\Branch::where('vendor_id', $this->vendor_id)->count();
+
+        $ordersSinceSubscription = \Modules\Order\Models\Order::whereIn(
+            'branch_id',
+            \Modules\Branch\Models\Branch::where('vendor_id', $this->vendor_id)->pluck('id')
+        )
+            ->whereDate('created_at', '>=', $this->subscription_date->toDateString())
+            ->count();
+
         return [
             'id' => $this->id,
             'vendor_id' => $this->vendor_id,
@@ -40,10 +49,15 @@ class VendorSubscriptionResource extends JsonResource
             'payment_method' => $this->payment_method,
             'subscription_date' => $this->subscription_date->format('Y-m-d'),
             'expiry_date' => $this->expiry_date->format('Y-m-d'),
+            'days_remaining' => max(0, now()->diffInDays($this->expiry_date, false)),
             'status' => $this->status,
             'account_status' => $accountStatus,
             'is_active' => $this->isActive(),
             'is_expired' => $this->isExpired(),
+            'branch_count' => $branchCount,
+            'branch_limit' => $this->subscriptionPlan->branch_count,
+            'daily_order_limit' => $this->subscriptionPlan->order_count,
+            'orders_since_subscription' => $ordersSinceSubscription,
             'created_at' => $this->created_at?->toDateTimeString(),
             'updated_at' => $this->updated_at?->toDateTimeString(),
         ];
