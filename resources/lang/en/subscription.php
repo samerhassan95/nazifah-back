@@ -17,4 +17,5 @@ return [
     'payment_initialized' => 'Payment initialized. Please complete payment.',
     'payment_not_completed' => 'Payment has not completed yet',
     'subscription_activation_failed' => 'Failed to activate subscription after payment',
+    'free_subscription_success' => 'Subscribed successfully',
 ];

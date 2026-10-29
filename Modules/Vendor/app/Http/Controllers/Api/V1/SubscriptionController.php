@@ -186,7 +186,7 @@ class SubscriptionController extends Controller
 
                 return successResponse(
                     new VendorSubscriptionResource($subscription),
-                    __('subscription.subscription_created'),
+                    $amount <= 0 ? __('subscription.free_subscription_success') : __('subscription.subscription_created'),
                     201
                 );
             } catch (\Exception $e) {

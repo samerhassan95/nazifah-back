@@ -17,4 +17,5 @@ return [
     'payment_initialized' => 'تم تهيئة عملية الدفع، يرجى إكمال الدفع',
     'payment_not_completed' => 'لم تكتمل عملية الدفع بعد',
     'subscription_activation_failed' => 'فشل تفعيل الاشتراك بعد الدفع',
+    'free_subscription_success' => 'تم الاشتراك بنجاح',
 ];
