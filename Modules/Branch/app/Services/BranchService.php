@@ -377,7 +377,7 @@ class BranchService
     /**
      * Get all pieces available at a branch
      */
-    public function getPiecesByBranch(int $branchId, ?int $categoryId = null): ?array
+    public function getPiecesByBranch(int $branchId, ?int $categoryId = null, ?string $search = null): ?array
     {
         $branch = $this->getBranchById($branchId);
 
@@ -389,6 +389,10 @@ class BranchService
 
         $pieces = $branch->activePieces()
             ->when($categoryId, fn ($q) => $q->where('pieces.category_id', $categoryId))
+            ->when($search, fn ($q) => $q->where(function ($qq) use ($search) {
+                $qq->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(pieces.name, '$.ar')) LIKE ?", ["%{$search}%"])
+                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(pieces.name, '$.en')) LIKE ?", ["%{$search}%"]);
+            }))
             ->with([
                 'iconRelation',
                 'services' => function ($query) use ($branchId) {

@@ -157,7 +157,8 @@ class BranchController extends Controller
     public function getPieces(Request $request, int $id): JsonResponse
     {
         $categoryId = $request->query('category_id') ? (int) $request->query('category_id') : null;
-        $pieces = $this->branchService->getPiecesByBranch($id, $categoryId);
+        $search = $request->query('name') ?: $request->query('search');
+        $pieces = $this->branchService->getPiecesByBranch($id, $categoryId, $search);
         if ($pieces === null) {
             return notFoundResponse('Branch not found');
         }
