@@ -182,18 +182,30 @@ class HomeController extends Controller
 
         // Calculate distance if coordinates are available
         if ($lat !== null && $lng !== null) {
-            $query->selectRaw('branches.*,
-                (6371 * acos(cos(radians(?)) * cos(radians(branches.latitude)) *
-                cos(radians(branches.longitude) - radians(?)) + sin(radians(?)) *
-                sin(radians(branches.latitude)))) AS distance', [$lat, $lng, $lat])
-                ->orderBy('distance');
+            $laundries = app(\App\Services\DistanceService::class)->paginateByRealDistance(
+                clone $query,
+                (float) $lat,
+                (float) $lng,
+                (int) ($request->per_page ?? 15),
+                (int) ($request->page ?? 1)
+            );
+
+            if ($laundries === null) {
+                $query->selectRaw('branches.*,
+                    (6371 * acos(cos(radians(?)) * cos(radians(branches.latitude)) *
+                    cos(radians(branches.longitude) - radians(?)) + sin(radians(?)) *
+                    sin(radians(branches.latitude)))) AS distance', [$lat, $lng, $lat])
+                    ->orderBy('distance');
+
+                $laundries = $query->paginate($request->per_page ?? 15);
+            }
         } else {
             // Order by rating (highest first), then by name
             $query->orderBy('rating', 'desc')
                 ->orderBy('name', 'asc');
-        }
 
-        $laundries = $query->paginate($request->per_page ?? 15);
+            $laundries = $query->paginate($request->per_page ?? 15);
+        }
 
         $laundries->getCollection()->transform(function ($branch) {
             $locale = app()->getLocale();

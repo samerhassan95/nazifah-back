@@ -84,13 +84,7 @@ class ClientBranchController extends Controller
             // No valid zone provided/found => fetch all active branches.
         }
 
-        if ($searchLat !== null && $searchLng !== null) {
-            $query->selectRaw('branches.*,
-                (6371 * acos(cos(radians(?)) * cos(radians(branches.latitude)) *
-                cos(radians(branches.longitude) - radians(?)) + sin(radians(?)) *
-                sin(radians(branches.latitude)))) AS distance', [$searchLat, $searchLng, $searchLat])
-                ->orderBy('distance');
-        } else {
+        if ($searchLat === null || $searchLng === null) {
             $query->orderBy('rating', 'desc');
         }
 
@@ -107,7 +101,7 @@ class ClientBranchController extends Controller
             $branches = $result['branches'];
             $meta = $result['meta'];
         } else {
-            $result = $this->getBranchesData($query, $request, $locale, $zone, $address);
+            $result = $this->getBranchesData($query, $request, $locale, $zone, $address, $searchLat, $searchLng);
             $branches = $result['branches'];
             $meta = $result['meta'];
         }
@@ -115,9 +109,29 @@ class ClientBranchController extends Controller
         return jsonResponse(true, 200, __('branch.branches_retrieved'), $branches, $meta);
     }
 
-    private function getBranchesData($query, $request, $locale, $zone, $address)
+    private function getBranchesData($query, $request, $locale, $zone, $address, $searchLat = null, $searchLng = null)
     {
-        $branches = $query->paginate($request->per_page ?? 15);
+        if ($searchLat !== null && $searchLng !== null) {
+            $branches = app(\App\Services\DistanceService::class)->paginateByRealDistance(
+                clone $query,
+                (float) $searchLat,
+                (float) $searchLng,
+                (int) ($request->per_page ?? 15),
+                (int) ($request->page ?? 1)
+            );
+
+            if ($branches === null) {
+                $query->selectRaw('branches.*,
+                    (6371 * acos(cos(radians(?)) * cos(radians(branches.latitude)) *
+                    cos(radians(branches.longitude) - radians(?)) + sin(radians(?)) *
+                    sin(radians(branches.latitude)))) AS distance', [$searchLat, $searchLng, $searchLat])
+                    ->orderBy('distance');
+
+                $branches = $query->paginate($request->per_page ?? 15);
+            }
+        } else {
+            $branches = $query->paginate($request->per_page ?? 15);
+        }
 
         $branches->getCollection()->transform(function ($branch) use ($locale) {
             $vendor = $branch->vendor;

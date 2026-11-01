@@ -370,8 +370,12 @@ class Zone extends Model
     public static function findNearestZoneByCoordinates(float $latitude, float $longitude): ?array
     {
         $zones = static::where('is_active', true)->get();
-        $nearest = null;
 
+        // Resolve every zone's center first (DB value, or polygon centroid
+        // fallback), then ask DistanceService for all distances in as few
+        // Google Distance Matrix calls as possible (batched), instead of
+        // one external API call per zone.
+        $centers = [];
         foreach ($zones as $zone) {
             $centerLatRaw = $zone->center_latitude;
             $centerLngRaw = $zone->center_longitude;
@@ -397,13 +401,34 @@ class Zone extends Model
                 continue;
             }
 
-            $distance = $zone->calculateDistance($centerLat, $centerLng, $latitude, $longitude);
+            $centers[$zone->id] = [
+                'zone' => $zone,
+                'latitude' => $centerLat,
+                'longitude' => $centerLng,
+            ];
+        }
 
+        if ($centers === []) {
+            return null;
+        }
+
+        $points = [];
+        foreach ($centers as $zoneId => $center) {
+            $points[$zoneId] = ['lat' => $center['latitude'], 'lon' => $center['longitude']];
+        }
+
+        $distances = app(\App\Services\DistanceService::class)->distancesTo($latitude, $longitude, $points);
+
+        $nearest = null;
+        foreach ($distances as $zoneId => $distance) {
             if ($nearest === null || $distance < $nearest['distance']) {
                 $nearest = [
-                    'zone' => $zone,
+                    'zone' => $centers[$zoneId]['zone'],
                     'distance' => $distance,
-                    'center' => ['latitude' => (float) $centerLat, 'longitude' => (float) $centerLng],
+                    'center' => [
+                        'latitude' => $centers[$zoneId]['latitude'],
+                        'longitude' => $centers[$zoneId]['longitude'],
+                    ],
                 ];
             }
         }
