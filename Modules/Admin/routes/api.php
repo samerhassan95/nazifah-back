@@ -13,6 +13,7 @@ use Modules\Admin\Http\Controllers\AdminClientController;
 use Modules\Admin\Http\Controllers\AdminController;
 use Modules\Admin\Http\Controllers\AdminDashboardController;
 use Modules\Admin\Http\Controllers\AdminDriverController;
+use Modules\Admin\Http\Controllers\AdminDistanceSettingController;
 use Modules\Admin\Http\Controllers\AdminGeneralSettingController;
 use Modules\Admin\Http\Controllers\AdminIconController;
 use Modules\Admin\Http\Controllers\AdminInvoiceSettingController;
@@ -370,6 +371,12 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
     Route::prefix('invoice-settings')->group(function () {
         Route::get('/', [AdminInvoiceSettingController::class, 'index']);
         Route::put('/', [AdminInvoiceSettingController::class, 'update']);
+    });
+
+    // Distance Calculation Settings (aerial vs Google Maps real distance)
+    Route::prefix('distance-settings')->group(function () {
+        Route::get('/', [AdminDistanceSettingController::class, 'index']);
+        Route::put('/', [AdminDistanceSettingController::class, 'update']);
     });
 
     // Timezones
