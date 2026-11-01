@@ -20510,6 +20510,41 @@
                                         "description": "Route: /api/v1/vendor/dashboard/statistics\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\DashboardController@statistics\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned"
                                     },
                                     "response": []
+                                },
+                                {
+                                    "name": "GET dashboard / overview",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{vendor_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/vendor/dashboard/overview",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "vendor",
+                                                "dashboard",
+                                                "overview"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/vendor/dashboard/overview\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\DashboardController@overview\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned\n\nReturns everything the vendor dashboard home screen needs in one call: orders.total_orders / today_orders / current_orders, today_activities (today's order-creation feed), top_branches (by order count, with color), order_status_trend (monthly new/completed/cancelled), monthly_revenue_growth (monthly final_amount sum), and order_statuses (completed/current/cancelled/pending counts + percentages)."
+                                    },
+                                    "response": []
                                 }
                             ]
                         },
