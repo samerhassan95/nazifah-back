@@ -110,6 +110,7 @@ Route::middleware(['auth:vendor', 'banned'])->prefix('v1/vendor')->group(functio
     // ========================================================================
     Route::prefix('dashboard')->group(function () {
         Route::get('/statistics', [DashboardController::class, 'statistics'])->name('vendor.dashboard.statistics');
+        Route::get('/overview', [DashboardController::class, 'overview'])->name('vendor.dashboard.overview');
     });
 
     // ========================================================================
