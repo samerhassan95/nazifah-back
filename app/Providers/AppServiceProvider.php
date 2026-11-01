@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\ResponseFactory;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\ServiceProvider;
 
@@ -27,6 +29,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Without this, a whole-number float like 3.0 (e.g. a Google Maps distance
+        // of exactly 3km, 3000m / 1000) serializes to JSON as "3", not "3.0" — a
+        // bare int on the wire. Strict client-side models (e.g. Dart/Flutter casting
+        // a decoded JSON number straight to `double`) can then throw a type error,
+        // even though the PHP value was never anything but a float server-side.
+        // JSON_PRESERVE_ZERO_FRACTION keeps every float's decimal point in every
+        // response()->json(...) call app-wide.
+        ResponseFactory::macro('json', function ($data = [], $status = 200, array $headers = [], $options = 0) {
+            return new JsonResponse($data, $status, $headers, $options | JSON_PRESERVE_ZERO_FRACTION);
+        });
+
         // WebSocket broadcast auth: allow client, vendor, or driver to authorize private channels
         Broadcast::routes(['middleware' => ['api', 'auth:sanctum']]);
 
