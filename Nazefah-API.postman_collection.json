@@ -3084,6 +3084,92 @@
                             ]
                         },
                         {
+                            "name": "Distance Settings",
+                            "item": [
+                                {
+                                    "name": "GET api/v1/admin/distance-settings (AdminDistanceSettingController@index)",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/distance-settings",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "distance-settings"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/distance-settings\nAction: Modules\\Admin\\Http\\Controllers\\AdminDistanceSettingController@index\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "PUT api/v1/admin/distance-settings (AdminDistanceSettingController@update)",
+                                    "request": {
+                                        "method": "PUT",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/distance-settings",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "distance-settings"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/distance-settings\nAction: Modules\\Admin\\Http\\Controllers\\AdminDistanceSettingController@update\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                }
+                            ]
+                        },
+                        {
                             "name": "Drivers",
                             "item": [
                                 {
@@ -4088,6 +4174,92 @@
                             ]
                         },
                         {
+                            "name": "Invoice Settings",
+                            "item": [
+                                {
+                                    "name": "GET api/v1/admin/invoice-settings (AdminInvoiceSettingController@index)",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/invoice-settings",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "invoice-settings"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/invoice-settings\nAction: Modules\\Admin\\Http\\Controllers\\AdminInvoiceSettingController@index\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "PUT api/v1/admin/invoice-settings (AdminInvoiceSettingController@update)",
+                                    "request": {
+                                        "method": "PUT",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/invoice-settings",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "invoice-settings"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/invoice-settings\nAction: Modules\\Admin\\Http\\Controllers\\AdminInvoiceSettingController@update\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                }
+                            ]
+                        },
+                        {
                             "name": "Laundries",
                             "item": [
                                 {
@@ -4291,6 +4463,56 @@
                                             ]
                                         },
                                         "description": "Route: /api/v1/admin/laundries/additional_services/{id}\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryAdditionalServiceController@destroy\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST api/v1/admin/laundries/additional_services/{id}/toggle-status (AdminLaundryAdditionalServiceController@toggleStatus)",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/additional_services/:id/toggle-status",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "additional_services",
+                                                ":id",
+                                                "toggle-status"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/additional_services/{id}/toggle-status\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryAdditionalServiceController@toggleStatus\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
                                     },
                                     "response": []
                                 },
@@ -4655,6 +4877,364 @@
                                             ]
                                         },
                                         "description": "Route: /api/v1/admin/laundries/branches/{id}\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryBranchController@update\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "DELETE api/v1/admin/laundries/branches/{id} (AdminLaundryBranchController@destroy)",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/branches/:id",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "branches",
+                                                ":id"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/branches/{id}\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryBranchController@destroy\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST api/v1/admin/laundries/branches/{id}/additional-services (AdminLaundryBranchController@assignAdditionalServices)",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/branches/:id/additional-services",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "branches",
+                                                ":id",
+                                                "additional-services"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/branches/{id}/additional-services\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryBranchController@assignAdditionalServices\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "GET api/v1/admin/laundries/branches/{id}/detail (AdminLaundryBranchController@detail)",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/branches/:id/detail",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "branches",
+                                                ":id",
+                                                "detail"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/branches/{id}/detail\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryBranchController@detail\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST api/v1/admin/laundries/branches/{id}/pieces (AdminLaundryBranchController@assignPieces)",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/branches/:id/pieces",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "branches",
+                                                ":id",
+                                                "pieces"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/branches/{id}/pieces\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryBranchController@assignPieces\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST api/v1/admin/laundries/branches/{id}/services (AdminLaundryBranchController@assignServices)",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/branches/:id/services",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "branches",
+                                                ":id",
+                                                "services"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/branches/{id}/services\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryBranchController@assignServices\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "GET api/v1/admin/laundries/branches/{id}/working-hours (AdminLaundryBranchController@getWorkingHours)",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/branches/:id/working-hours",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "branches",
+                                                ":id",
+                                                "working-hours"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/branches/{id}/working-hours\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryBranchController@getWorkingHours\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "PUT api/v1/admin/laundries/branches/{id}/working-hours (AdminLaundryBranchController@saveWorkingHours)",
+                                    "request": {
+                                        "method": "PUT",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/branches/:id/working-hours",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "branches",
+                                                ":id",
+                                                "working-hours"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/branches/{id}/working-hours\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryBranchController@saveWorkingHours\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST api/v1/admin/laundries/catalog-import (AdminLaundryCatalogImportController@import)",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/catalog-import",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "catalog-import"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/catalog-import\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryCatalogImportController@import\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
                                         "body": {
                                             "mode": "raw",
                                             "raw": "{\n    \"example_key\": \"example_value\"\n}",
@@ -5040,6 +5620,42 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "DELETE api/v1/admin/laundries/drivers/{id} (AdminLaundryDriverController@destroy)",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/drivers/:id",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "drivers",
+                                                ":id"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/drivers/{id}\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryDriverController@destroy\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "GET api/v1/admin/laundries/laundry_data (AdminLaundryController@laundryData)",
                                     "request": {
                                         "method": "GET",
@@ -5106,6 +5722,42 @@
                                             ]
                                         },
                                         "description": "Route: /api/v1/admin/laundries/orders\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryOrderController@index\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "DELETE api/v1/admin/laundries/orders/{id} (AdminLaundryOrderController@destroy)",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/orders/:id",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "orders",
+                                                ":id"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/orders/{id}\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryOrderController@destroy\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
                                     },
                                     "response": []
                                 },
@@ -5189,6 +5841,42 @@
                                                 }
                                             }
                                         }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "GET api/v1/admin/laundries/pieces/form-options (AdminLaundryPieceController@formOptions)",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/pieces/form-options",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "pieces",
+                                                "form-options"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/pieces/form-options\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryPieceController@formOptions\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
                                     },
                                     "response": []
                                 },
@@ -5397,6 +6085,55 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "POST api/v1/admin/laundries/services/attach (AdminLaundryServiceController@attachToVendor)",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/services/attach",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "services",
+                                                "attach"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/services/attach\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryServiceController@attachToVendor\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "GET api/v1/admin/laundries/services/{id} (AdminLaundryServiceController@show)",
                                     "request": {
                                         "method": "GET",
@@ -5514,6 +6251,56 @@
                                             ]
                                         },
                                         "description": "Route: /api/v1/admin/laundries/services/{id}\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryServiceController@destroy\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST api/v1/admin/laundries/services/{id}/toggle-status (AdminLaundryServiceController@toggleForVendor)",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/laundries/services/:id/toggle-status",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "laundries",
+                                                "services",
+                                                ":id",
+                                                "toggle-status"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/laundries/services/{id}/toggle-status\nAction: Modules\\Admin\\Http\\Controllers\\AdminLaundryServiceController@toggleForVendor\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
                                     },
                                     "response": []
                                 },
@@ -7705,6 +8492,42 @@
                                             ]
                                         },
                                         "description": "Route: /api/v1/admin/orders/{id}/details\nAction: Modules\\Admin\\Http\\Controllers\\AdminOrderController@details\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "GET api/v1/admin/orders/{id}/invoice (AdminOrderController@invoice)",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/orders/:id/invoice",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "orders",
+                                                ":id",
+                                                "invoice"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/orders/{id}/invoice\nAction: Modules\\Admin\\Http\\Controllers\\AdminOrderController@invoice\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
                                     },
                                     "response": []
                                 },
@@ -11423,6 +12246,41 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "GET api/v1/admin/zones/cities (AdminZoneController@cities)",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{admin_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/zones/cities",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "zones",
+                                                "cities"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/admin/zones/cities\nAction: Modules\\Admin\\Http\\Controllers\\AdminZoneController@cities\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:admin"
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "GET api/v1/admin/zones/statistics (AdminZoneController@statistics)",
                                     "request": {
                                         "method": "GET",
@@ -13339,6 +14197,55 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "POST orders / confirm-handoff",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{driver_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/driver/orders/:orderId/confirm-handoff",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "driver",
+                                                "orders",
+                                                ":orderId",
+                                                "confirm-handoff"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/driver/orders/{orderId}/confirm-handoff\nAction: Modules\\Driver\\Http\\Controllers\\Api\\V1\\OrderController@confirmHandoff\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:driver",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "POST orders / confirm-qr",
                                     "request": {
                                         "method": "POST",
@@ -13375,6 +14282,55 @@
                                             ]
                                         },
                                         "description": "Route: /api/v1/driver/orders/{orderId}/confirm-qr\nAction: Modules\\Driver\\Http\\Controllers\\Api\\V1\\OrderController@confirmQR\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:driver",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST orders / handoff",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{driver_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/driver/orders/:orderId/handoff",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "driver",
+                                                "orders",
+                                                ":orderId",
+                                                "handoff"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/driver/orders/{orderId}/handoff\nAction: Modules\\Driver\\Http\\Controllers\\Api\\V1\\OrderController@declareHandoff\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:driver",
                                         "body": {
                                             "mode": "raw",
                                             "raw": "{\n    \"example_key\": \"example_value\"\n}",
@@ -13930,6 +14886,78 @@
                     ]
                 },
                 {
+                    "name": "Invoices",
+                    "item": [
+                        {
+                            "name": "{invoice}",
+                            "item": [
+                                {
+                                    "name": "GET invoice / pdf",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/invoices/:invoice/pdf",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "invoices",
+                                                ":invoice",
+                                                "pdf"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/invoices/{invoice}/pdf\nAction: Modules\\Invoice\\Http\\Controllers\\Api\\V1\\InvoiceController@sharePdf\nMiddleware: api, Illuminate\\Routing\\Middleware\\ValidateSignature"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "GET invoice / share",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/invoices/:invoice/share",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "invoices",
+                                                ":invoice",
+                                                "share"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/invoices/{invoice}/share\nAction: Modules\\Invoice\\Http\\Controllers\\Api\\V1\\InvoiceController@share\nMiddleware: api, Illuminate\\Routing\\Middleware\\ValidateSignature"
+                                    },
+                                    "response": []
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
                     "name": "Orders",
                     "item": [
                         {
@@ -14296,6 +15324,52 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "POST payment / moyasar / checkout / save-card-preference",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/payments/moyasar/checkout/:transactionId/save-card-preference",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "payments",
+                                                "moyasar",
+                                                "checkout",
+                                                ":transactionId",
+                                                "save-card-preference"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/payments/moyasar/checkout/{transactionId}/save-card-preference\nAction: Modules\\Payment\\Http\\Controllers\\PaymentController@saveCardPreference\nMiddleware: api",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "POST payment / moyasar / webhook",
                                     "request": {
                                         "method": "POST",
@@ -14512,6 +15586,104 @@
                         {
                             "name": "Auth",
                             "item": [
+                                {
+                                    "name": "POST auth / change-phone / request",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/auth/change-phone/request",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "auth",
+                                                "change-phone",
+                                                "request"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/auth/change-phone/request\nAction: Modules\\Client\\Http\\Controllers\\Api\\V1\\AuthController@requestPhoneChange\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST auth / change-phone / verify",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/auth/change-phone/verify",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "auth",
+                                                "change-phone",
+                                                "verify"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/auth/change-phone/verify\nAction: Modules\\Client\\Http\\Controllers\\Api\\V1\\AuthController@verifyPhoneChange\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
                                 {
                                     "name": "POST auth / create-profile",
                                     "request": {
@@ -14995,6 +16167,261 @@
                                             ]
                                         },
                                         "description": "Route: /api/v1/user/branches/{id}/pieces\nAction: Modules\\Branch\\Http\\Controllers\\BranchController@getPieces\nMiddleware: api"
+                                    },
+                                    "response": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Cart",
+                            "item": [
+                                {
+                                    "name": "GET cart / index",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/cart",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "cart"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/cart\nAction: Modules\\Order\\Http\\Controllers\\Api\\V1\\User\\CartController@index\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "DELETE cart / clear",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/cart",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "cart"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/cart\nAction: Modules\\Order\\Http\\Controllers\\Api\\V1\\User\\CartController@clear\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST cart / items / store",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/cart/items",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "cart",
+                                                "items"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/cart/items\nAction: Modules\\Order\\Http\\Controllers\\Api\\V1\\User\\CartController@store\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "PUT cart / items / update",
+                                    "request": {
+                                        "method": "PUT",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/cart/items/:cart_item_id",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "cart",
+                                                "items",
+                                                ":cart_item_id"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/cart/items/{cart_item_id}\nAction: Modules\\Order\\Http\\Controllers\\Api\\V1\\User\\CartController@update\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "PATCH cart / items / update",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/cart/items/:cart_item_id",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "cart",
+                                                "items",
+                                                ":cart_item_id"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/cart/items/{cart_item_id}\nAction: Modules\\Order\\Http\\Controllers\\Api\\V1\\User\\CartController@update\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "DELETE cart / items / destroy",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/cart/items/:cart_item_id",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "cart",
+                                                "items",
+                                                ":cart_item_id"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/cart/items/{cart_item_id}\nAction: Modules\\Order\\Http\\Controllers\\Api\\V1\\User\\CartController@destroyItem\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned"
                                     },
                                     "response": []
                                 }
@@ -16713,6 +18140,41 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "GET orders / order-action",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/orders/order-action",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "orders",
+                                                "order-action"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/orders/order-action\nAction: Modules\\Order\\Http\\Controllers\\Api\\V1\\User\\OrderController@getOrderActions\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned"
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "GET orders / payment-confirm",
                                     "request": {
                                         "method": "GET",
@@ -17222,6 +18684,55 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "POST orders / handoff",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/orders/:order_id/handoff",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "orders",
+                                                ":order_id",
+                                                "handoff"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/orders/{order_id}/handoff\nAction: Modules\\Order\\Http\\Controllers\\Api\\V1\\User\\OrderController@declareHandoff\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "GET orders / payment-status",
                                     "request": {
                                         "method": "GET",
@@ -17575,6 +19086,56 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "POST orders / update / calculate",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/orders/:order_id/update/calculate",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "orders",
+                                                ":order_id",
+                                                "update",
+                                                "calculate"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/orders/{order_id}/update/calculate\nAction: Modules\\Order\\Http\\Controllers\\Api\\V1\\User\\OrderTrackingController@calculateOrderUpdate\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "POST orders / visit-response",
                                     "request": {
                                         "method": "POST",
@@ -17620,6 +19181,42 @@
                                                 }
                                             }
                                         }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "GET invoice / orders / show",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/orders/:order/invoice",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "orders",
+                                                ":order",
+                                                "invoice"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/orders/{order}/invoice\nAction: Modules\\Invoice\\Http\\Controllers\\Api\\V1\\InvoiceController@showForOrder\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
                                     },
                                     "response": []
                                 }
@@ -17921,6 +19518,56 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "POST wallet / set-default-card",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/wallet/cards/:card_id/default",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "wallet",
+                                                "cards",
+                                                ":card_id",
+                                                "default"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/wallet/cards/{card_id}/default\nAction: Modules\\Payment\\Http\\Controllers\\Api\\V1\\User\\WalletController@setDefaultCard\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "POST wallet / deposit",
                                     "request": {
                                         "method": "POST",
@@ -17969,7 +19616,7 @@
                                     "response": []
                                 },
                                 {
-                                    "name": "POST wallet / deposit / direct",
+                                    "name": "POST wallet / deposit / moyasar-confirm",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -17991,7 +19638,7 @@
                                             }
                                         ],
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/user/wallet/deposit/direct",
+                                            "raw": "{{base_url}}/api/v1/user/wallet/deposit/moyasar/confirm",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -18001,10 +19648,98 @@
                                                 "user",
                                                 "wallet",
                                                 "deposit",
-                                                "direct"
+                                                "moyasar",
+                                                "confirm"
                                             ]
                                         },
-                                        "description": "Route: /api/v1/user/wallet/deposit/direct\nAction: Modules\\Payment\\Http\\Controllers\\Api\\V1\\User\\WalletController@addDirectDeposit\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "description": "Route: /api/v1/user/wallet/deposit/moyasar/confirm\nAction: Modules\\Payment\\Http\\Controllers\\Api\\V1\\User\\WalletController@confirmMoyasarDeposit\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "GET wallet / deposit / confirm",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/wallet/deposit/:transactionId/confirm",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "wallet",
+                                                "deposit",
+                                                ":transactionId",
+                                                "confirm"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/wallet/deposit/{transactionId}/confirm\nAction: Modules\\Payment\\Http\\Controllers\\Api\\V1\\User\\WalletController@verifyDeposit\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST wallet / deposit / confirm",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{user_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/user/wallet/deposit/:transactionId/confirm",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "user",
+                                                "wallet",
+                                                "deposit",
+                                                ":transactionId",
+                                                "confirm"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/user/wallet/deposit/{transactionId}/confirm\nAction: Modules\\Payment\\Http\\Controllers\\Api\\V1\\User\\WalletController@verifyDeposit\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:client, App\\Http\\Middleware\\CheckBanned",
                                         "body": {
                                             "mode": "raw",
                                             "raw": "{\n    \"example_key\": \"example_value\"\n}",
@@ -20477,6 +22212,41 @@
                             "name": "Dashboard",
                             "item": [
                                 {
+                                    "name": "GET dashboard / overview",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{vendor_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/vendor/dashboard/overview",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "vendor",
+                                                "dashboard",
+                                                "overview"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/vendor/dashboard/overview\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\DashboardController@overview\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned"
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "GET dashboard / statistics",
                                     "request": {
                                         "method": "GET",
@@ -20508,41 +22278,6 @@
                                             ]
                                         },
                                         "description": "Route: /api/v1/vendor/dashboard/statistics\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\DashboardController@statistics\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned"
-                                    },
-                                    "response": []
-                                },
-                                {
-                                    "name": "GET dashboard / overview",
-                                    "request": {
-                                        "method": "GET",
-                                        "header": [
-                                            {
-                                                "key": "Accept",
-                                                "value": "application/json"
-                                            },
-                                            {
-                                                "key": "Accept-Language",
-                                                "value": "{{Accept-Language}}"
-                                            },
-                                            {
-                                                "key": "Authorization",
-                                                "value": "Bearer {{vendor_token}}"
-                                            }
-                                        ],
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/vendor/dashboard/overview",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "vendor",
-                                                "dashboard",
-                                                "overview"
-                                            ]
-                                        },
-                                        "description": "Route: /api/v1/vendor/dashboard/overview\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\DashboardController@overview\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned\n\nReturns everything the vendor dashboard home screen needs in one call: orders.total_orders / today_orders / current_orders, today_activities (today's order-creation feed), top_branches (by order count, with color), order_status_trend (monthly new/completed/cancelled), monthly_revenue_growth (monthly final_amount sum), and order_statuses (completed/current/cancelled/pending counts + percentages)."
                                     },
                                     "response": []
                                 }
@@ -22251,6 +23986,153 @@
                                     "response": []
                                 },
                                 {
+                                    "name": "POST orders / confirm-handoff",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{vendor_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/vendor/orders/:orderId/confirm-handoff",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "vendor",
+                                                "orders",
+                                                ":orderId",
+                                                "confirm-handoff"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/vendor/orders/{orderId}/confirm-handoff\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\OrderController@confirmHandoff\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST orders / handoff",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{vendor_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/vendor/orders/:orderId/handoff",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "vendor",
+                                                "orders",
+                                                ":orderId",
+                                                "handoff"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/vendor/orders/{orderId}/handoff\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\OrderController@declareHandoff\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "POST orders / notify-ready-for-pickup",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{vendor_token}}"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/vendor/orders/:orderId/notify-ready-for-pickup",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "vendor",
+                                                "orders",
+                                                ":orderId",
+                                                "notify-ready-for-pickup"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/vendor/orders/{orderId}/notify-ready-for-pickup\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\OrderController@notifyReadyForPickup\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"example_key\": \"example_value\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "POST orders / reject",
                                     "request": {
                                         "method": "POST",
@@ -23442,6 +25324,43 @@
                                             ]
                                         },
                                         "description": "Route: /api/v1/vendor/subscriptions/active\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\SubscriptionController@active\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned"
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "GET subscriptions / payment / verify",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "Accept-Language",
+                                                "value": "{{Accept-Language}}"
+                                            },
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{vendor_token}}"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/vendor/subscriptions/payment/verify/:transactionId",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "vendor",
+                                                "subscriptions",
+                                                "payment",
+                                                "verify",
+                                                ":transactionId"
+                                            ]
+                                        },
+                                        "description": "Route: /api/v1/vendor/subscriptions/payment/verify/{transactionId}\nAction: Modules\\Vendor\\Http\\Controllers\\Api\\V1\\SubscriptionController@verifyPayment\nMiddleware: api, Illuminate\\Auth\\Middleware\\Authenticate:vendor, App\\Http\\Middleware\\CheckBanned"
                                     },
                                     "response": []
                                 },
