@@ -32,7 +32,7 @@ class DriversController extends Controller
         $vendorId = $employee->vendor_id;
 
         // Build query
-        $query = Driver::where('vendor_id', $vendorId);
+        $query = Driver::where('vendor_id', $vendorId)->with('branch');
 
         if (VendorBranchFilter::hasFilter($request)) {
             $branchIds = VendorBranchFilter::resolveIds($request, $vendorId);
@@ -56,6 +56,8 @@ class DriversController extends Controller
                     'image' => $this->uploadFilesService->getFullUrl($driver->image),
                     'is_available' => (bool) $driver->is_available,
                     'branch_id' => $driver->branch_id,
+                    'branch_name' => $driver->branch?->getTranslation('name', $lang),
+                    'national_id' => $driver->id_number,
                     'phone' => $driver->phone,
                     'full_name' => $driver->getTranslations('full_name'),
                     'email' => $driver->email,
