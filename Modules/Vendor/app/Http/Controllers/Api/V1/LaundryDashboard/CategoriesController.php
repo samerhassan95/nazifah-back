@@ -48,10 +48,13 @@ class CategoriesController extends Controller
      */
     public function icons(Request $request): JsonResponse
     {
-        $request->validate([
+        $validator = $this->makeValidator($request->all(), [
             'type' => ['nullable', 'string', 'in:'.IconType::valuesString()],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
+        if ($validator->fails()) {
+            return $this->invalid($validator->errors());
+        }
 
         $query = Icon::query()->orderBy('id');
         if ($request->filled('type')) {

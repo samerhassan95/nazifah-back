@@ -27,7 +27,7 @@ class WalletController extends Controller
      */
     public function withdrawalRequests(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $validator = $this->makeValidator($request->all(), [
             'status' => ['nullable', 'in:pending,approved,rejected,completed,all'],
         ]);
         if ($validator->fails()) {
@@ -76,7 +76,7 @@ class WalletController extends Controller
      */
     public function addWithdrawalRequest(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $validator = $this->makeValidator($request->all(), [
             'bank_account_id' => ['required', 'integer'],
             'amount' => ['required', 'numeric', 'min:1'],
         ]);
@@ -92,7 +92,7 @@ class WalletController extends Controller
             ->where('status', 'approved')
             ->first();
         if (! $account) {
-            return $this->invalid(['bank_account_id' => ['الحساب البنكي غير موجود أو غير معتمد / Bank account not found or not approved']]);
+            return $this->invalid(['bank_account_id' => [$this->t('الحساب البنكي غير موجود أو غير معتمد', 'Bank account not found or not approved')]]);
         }
 
         $balance = (float) (Vendor::find($vendorId)?->wallet_balance ?? 0);
@@ -124,7 +124,7 @@ class WalletController extends Controller
      */
     public function transactions(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $validator = $this->makeValidator($request->all(), [
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'search' => ['nullable', 'string', 'max:100'],

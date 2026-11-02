@@ -99,7 +99,7 @@ class ServicesController extends Controller
      */
     public function activate(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $validator = $this->makeValidator($request->all(), [
             'service_ids' => ['required', 'array', 'min:1'],
             'service_ids.*' => ['required', 'integer', 'distinct', 'exists:services,id'],
         ]);

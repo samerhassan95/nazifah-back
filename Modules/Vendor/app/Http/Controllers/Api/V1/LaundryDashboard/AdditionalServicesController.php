@@ -31,7 +31,7 @@ class AdditionalServicesController extends Controller
     /** POST /additional-services */
     public function store(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), $this->rules());
+        $validator = $this->makeValidator($request->all(), $this->rules());
         if ($validator->fails()) {
             return $this->invalid($validator->errors());
         }
@@ -55,7 +55,7 @@ class AdditionalServicesController extends Controller
             return $this->notFound('الخدمة الإضافية غير موجودة', 'Additional service not found');
         }
 
-        $validator = Validator::make($request->all(), $this->rules());
+        $validator = $this->makeValidator($request->all(), $this->rules());
         if ($validator->fails()) {
             return $this->invalid($validator->errors());
         }

@@ -33,7 +33,7 @@ class PiecesController extends Controller
     /** POST /pieces */
     public function store(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), $this->rules());
+        $validator = $this->makeValidator($request->all(), $this->rules());
         if ($validator->fails()) {
             return $this->invalid($validator->errors());
         }
@@ -56,7 +56,7 @@ class PiecesController extends Controller
             return $this->notFound('القطعة غير موجودة', 'Piece not found');
         }
 
-        $validator = Validator::make($request->all(), $this->rules());
+        $validator = $this->makeValidator($request->all(), $this->rules());
         if ($validator->fails()) {
             return $this->invalid($validator->errors());
         }
@@ -136,7 +136,7 @@ class PiecesController extends Controller
      */
     private function runImport(Request $request, bool $persist): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $validator = $this->makeValidator($request->all(), [
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:5120'],
         ]);
         if ($validator->fails()) {
@@ -147,7 +147,7 @@ class PiecesController extends Controller
             $sheet = IOFactory::load($request->file('file')->getRealPath())->getActiveSheet();
             $rows = $sheet->toArray(null, true, true, false);
         } catch (\Throwable $e) {
-            return $this->invalid(['file' => ['الملف غير صالح / Invalid file']]);
+            return $this->invalid(['file' => [$this->t('الملف غير صالح', 'Invalid file')]]);
         }
 
         $header = array_map(fn ($h) => strtolower(trim((string) $h)), array_shift($rows) ?? []);
@@ -156,7 +156,7 @@ class PiecesController extends Controller
         $iconCol = array_search('icon_id', $header, true);
 
         if ($arCol === false || $enCol === false) {
-            return $this->invalid(['file' => ['الأعمدة المطلوبة: name_ar, name_en / Required columns: name_ar, name_en']]);
+            return $this->invalid(['file' => [$this->t('الأعمدة المطلوبة: name_ar, name_en', 'Required columns: name_ar, name_en')]]);
         }
 
         $vendorId = $this->vendorId();
@@ -178,7 +178,7 @@ class PiecesController extends Controller
                 continue; // blank line
             }
             if ($ar === '' || $en === '') {
-                $errors[] = 'السطر '.($i + 2).': الاسم بالعربي والإنجليزي مطلوبان / Row '.($i + 2).': both names are required';
+                $errors[] = $this->t('السطر '.($i + 2).': الاسم بالعربي والإنجليزي مطلوبان', 'Row '.($i + 2).': both names are required');
 
                 continue;
             }
@@ -196,7 +196,7 @@ class PiecesController extends Controller
             if ($iconCol !== false && ($row[$iconCol] ?? '') !== '') {
                 $iconId = (int) $row[$iconCol];
                 if (! in_array($iconId, $validIcons, true)) {
-                    $errors[] = 'السطر '.($i + 2).': icon_id غير موجود / Row '.($i + 2).': icon_id does not exist';
+                    $errors[] = $this->t('السطر '.($i + 2).': الأيقونة غير موجودة', 'Row '.($i + 2).': icon_id does not exist');
 
                     continue;
                 }

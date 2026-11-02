@@ -79,32 +79,26 @@ class DriversController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'name.ar' => ['required', 'string', 'max:255'],
-            'name.en' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', Rule::unique('drivers', 'email')->whereNull('deleted_at')],
-            'phone_number' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('drivers', 'phone')->whereNull('deleted_at')],
-            'id_number' => ['required', 'string', 'max:50'],
-            'branch_id' => ['required', 'integer', 'exists:branches,id'],
-            'image' => ['nullable', 'file', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
-            'image_document' => ['nullable', 'file', 'mimes:pdf,jpeg,png,jpg,gif,svg', 'max:5120'],
-        ]);
+        $validator = $this->makeValidator($request->all(), $this->rules());
 
         if ($validator->fails()) {
             return $this->invalid($validator->errors());
         }
 
         $vendorId = $this->vendorId();
-        $branch = Branch::where('id', $request->branch_id)->where('vendor_id', $vendorId)->first();
-        if (! $branch) {
-            return $this->invalid(['branch_id' => ['الفرع غير موجود أو لا يتبع المغسلة / Branch not found or not yours']]);
+        $branch = null;
+        if ($request->filled('branch_id')) {
+            $branch = Branch::where('id', $request->branch_id)->where('vendor_id', $vendorId)->first();
+            if (! $branch) {
+                return $this->invalid(['branch_id' => [$this->t('الفرع غير موجود أو لا يتبع المغسلة', 'Branch not found or not yours')]]);
+            }
         }
 
         $driver = Driver::create([
             'vendor_id' => $vendorId,
-            'branch_id' => $branch->id,
-            'full_name' => ['ar' => $request->input('name.ar'), 'en' => $request->input('name.en')],
-            'email' => $request->email,
+            'branch_id' => $branch?->id,
+            'full_name' => $this->nameFromRequest($request),
+            'email' => $request->filled('email') ? $request->email : null,
             'phone' => $request->phone_number,
             'id_number' => $request->id_number,
             'image' => $request->hasFile('image')
@@ -132,33 +126,31 @@ class DriversController extends Controller
             return $this->notFound('السائق غير موجود', 'Driver not found');
         }
 
-        $validator = Validator::make($request->all(), [
-            'name.ar' => ['required', 'string', 'max:255'],
-            'name.en' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', Rule::unique('drivers', 'email')->ignore($driverId)->whereNull('deleted_at')],
-            'phone_number' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('drivers', 'phone')->ignore($driverId)->whereNull('deleted_at')],
-            'id_number' => ['required', 'string', 'max:50'],
-            'branch_id' => ['required', 'integer', 'exists:branches,id'],
-            'image' => ['nullable', 'file', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
-            'image_document' => ['nullable', 'file', 'mimes:pdf,jpeg,png,jpg,gif,svg', 'max:5120'],
-        ]);
+        $validator = $this->makeValidator($request->all(), $this->rules($driverId));
 
         if ($validator->fails()) {
             return $this->invalid($validator->errors());
         }
 
-        $branch = Branch::where('id', $request->branch_id)->where('vendor_id', $this->vendorId())->first();
-        if (! $branch) {
-            return $this->invalid(['branch_id' => ['الفرع غير موجود أو لا يتبع المغسلة / Branch not found or not yours']]);
-        }
-
         $data = [
-            'full_name' => ['ar' => $request->input('name.ar'), 'en' => $request->input('name.en')],
-            'email' => $request->email,
+            'full_name' => $this->nameFromRequest($request),
+            'email' => $request->filled('email') ? $request->email : null,
             'phone' => $request->phone_number,
             'id_number' => $request->id_number,
-            'branch_id' => $branch->id,
         ];
+
+        // Branch is optional: only touched when the key is sent (empty value = detach).
+        if ($request->has('branch_id')) {
+            if ($request->filled('branch_id')) {
+                $branch = Branch::where('id', $request->branch_id)->where('vendor_id', $this->vendorId())->first();
+                if (! $branch) {
+                    return $this->invalid(['branch_id' => [$this->t('الفرع غير موجود أو لا يتبع المغسلة', 'Branch not found or not yours')]]);
+                }
+                $data['branch_id'] = $branch->id;
+            } else {
+                $data['branch_id'] = null;
+            }
+        }
 
         if ($request->hasFile('image')) {
             $data['image'] = $this->uploadFilesService->uploadImage(
@@ -210,7 +202,7 @@ class DriversController extends Controller
                 'لا يمكن حذف سائق لديه طلبات نشطة',
                 'Cannot delete a driver with active orders',
                 422,
-                ['driver_id' => ['لا يمكن حذف سائق لديه طلبات نشطة / Cannot delete a driver with active orders']]
+                ['driver_id' => [$this->t('لا يمكن حذف سائق لديه طلبات نشطة', 'Cannot delete a driver with active orders')]]
             );
         }
 
@@ -234,6 +226,39 @@ class DriversController extends Controller
             ->map(fn (Branch $b) => $this->branchPayload($b));
 
         return $this->ok($branches, 'تم جلب الفروع بنجاح', 'Branches retrieved successfully');
+    }
+
+    /**
+     * Shared rules. Email and branch are optional; name may be a single string (the UI has one field)
+     * or { ar, en }.
+     */
+    private function rules(?int $ignoreId = null): array
+    {
+        $nameIsArray = is_array(request()->input('name'));
+
+        return [
+            'name' => $nameIsArray ? ['required', 'array'] : ['required', 'string', 'max:255'],
+            'name.ar' => $nameIsArray ? ['required', 'string', 'max:255'] : ['nullable'],
+            'name.en' => $nameIsArray ? ['required', 'string', 'max:255'] : ['nullable'],
+            'email' => ['nullable', 'email', Rule::unique('drivers', 'email')->ignore($ignoreId)->whereNull('deleted_at')],
+            'phone_number' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('drivers', 'phone')->ignore($ignoreId)->whereNull('deleted_at')],
+            'id_number' => ['required', 'string', 'max:50'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'image' => ['nullable', 'file', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
+            'image_document' => ['nullable', 'file', 'mimes:pdf,jpeg,png,jpg,gif,svg', 'max:5120'],
+        ];
+    }
+
+    /** { ar, en } from either a plain string or an array. */
+    private function nameFromRequest(Request $request): array
+    {
+        $name = $request->input('name');
+
+        if (is_array($name)) {
+            return ['ar' => $name['ar'] ?? $name['en'], 'en' => $name['en'] ?? $name['ar']];
+        }
+
+        return ['ar' => $name, 'en' => $name];
     }
 
     private function findDriver(int $driverId): ?Driver
