@@ -11,6 +11,12 @@ use Modules\Vendor\Http\Controllers\Api\V1\ChatsController;
 use Modules\Vendor\Http\Controllers\Api\V1\DashboardController;
 use Modules\Vendor\Http\Controllers\Api\V1\DriversController;
 use Modules\Vendor\Http\Controllers\Api\V1\HomeController;
+use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\AdditionalServicesController as LdAdditionalServicesController;
+use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\CategoriesController as LdCategoriesController;
+use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\DriversController as LdDriversController;
+use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\PiecesController as LdPiecesController;
+use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\ServicesController as LdServicesController;
+use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\WalletController as LdWalletController;
 use Modules\Vendor\Http\Controllers\Api\V1\IconController as VendorIconController;
 use Modules\Vendor\Http\Controllers\Api\V1\LaundryDataController;
 use Modules\Vendor\Http\Controllers\Api\V1\OrderController;
@@ -308,3 +314,51 @@ Route::middleware(['auth:vendor', 'banned'])->prefix('v1/vendor')->group(functio
     // ========================================================================
     Route::get('/laundry-data', [LaundryDataController::class, 'getLaundryData'])->name('vendor.laundry-data');
 });
+
+// ============================================================================
+// LAUNDRY DASHBOARD - OPERATIONS MANAGEMENT
+// All routes are prefixed with /api/v1/vendor/laundry-dashboard/operations
+// Dedicated endpoints for the laundry dashboard frontend (bilingual {ar,en} messages).
+// ============================================================================
+Route::middleware(['auth:vendor', 'banned'])
+    ->prefix('v1/vendor/laundry-dashboard/operations')
+    ->name('vendor.ld.')
+    ->group(function () {
+        // Drivers
+        Route::get('/branches', [LdDriversController::class, 'branches'])->name('branches');
+        Route::get('/drivers', [LdDriversController::class, 'index'])->name('drivers.index');
+        Route::post('/drivers', [LdDriversController::class, 'store'])->name('drivers.store');
+        Route::get('/drivers/{driverId}', [LdDriversController::class, 'show'])->whereNumber('driverId')->name('drivers.show');
+        Route::put('/drivers/{driverId}', [LdDriversController::class, 'update'])->whereNumber('driverId')->name('drivers.update');
+        Route::delete('/drivers/{driverId}', [LdDriversController::class, 'destroy'])->whereNumber('driverId')->name('drivers.destroy');
+
+        // Categories + icon catalogue
+        Route::get('/categories', [LdCategoriesController::class, 'index'])->name('categories.index');
+        Route::get('/icons', [LdCategoriesController::class, 'icons'])->name('icons.index');
+
+        // Services
+        Route::get('/services', [LdServicesController::class, 'index'])->name('services.index');
+        Route::get('/services/catalog', [LdServicesController::class, 'catalog'])->name('services.catalog');
+        Route::post('/services/activate', [LdServicesController::class, 'activate'])->name('services.activate');
+        Route::post('/services/{serviceId}/toggle-status', [LdServicesController::class, 'toggleStatus'])->whereNumber('serviceId')->name('services.toggle-status');
+
+        // Pieces
+        Route::get('/pieces', [LdPiecesController::class, 'index'])->name('pieces.index');
+        Route::post('/pieces', [LdPiecesController::class, 'store'])->name('pieces.store');
+        Route::post('/pieces/import/check', [LdPiecesController::class, 'importCheck'])->name('pieces.import-check');
+        Route::post('/pieces/import', [LdPiecesController::class, 'import'])->name('pieces.import');
+        Route::put('/pieces/{pieceId}', [LdPiecesController::class, 'update'])->whereNumber('pieceId')->name('pieces.update');
+        Route::post('/pieces/{pieceId}/toggle-status', [LdPiecesController::class, 'toggleStatus'])->whereNumber('pieceId')->name('pieces.toggle-status');
+
+        // Additional services
+        Route::get('/additional-services', [LdAdditionalServicesController::class, 'index'])->name('additional-services.index');
+        Route::post('/additional-services', [LdAdditionalServicesController::class, 'store'])->name('additional-services.store');
+        Route::put('/additional-services/{id}', [LdAdditionalServicesController::class, 'update'])->whereNumber('id')->name('additional-services.update');
+        Route::post('/additional-services/{id}/toggle-status', [LdAdditionalServicesController::class, 'toggleStatus'])->whereNumber('id')->name('additional-services.toggle-status');
+
+        // Wallet
+        Route::get('/wallet/withdrawal-requests', [LdWalletController::class, 'withdrawalRequests'])->name('wallet.withdrawal-requests');
+        Route::post('/wallet/withdrawal-requests', [LdWalletController::class, 'addWithdrawalRequest'])->name('wallet.withdrawal-requests.store');
+        Route::get('/wallet/transactions', [LdWalletController::class, 'transactions'])->name('wallet.transactions');
+        Route::get('/wallet/transactions/{id}', [LdWalletController::class, 'transactionDetails'])->whereNumber('id')->name('wallet.transactions.show');
+    });
