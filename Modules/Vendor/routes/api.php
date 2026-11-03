@@ -14,6 +14,7 @@ use Modules\Vendor\Http\Controllers\Api\V1\HomeController;
 use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\AdditionalServicesController as LdAdditionalServicesController;
 use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\CategoriesController as LdCategoriesController;
 use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\DriversController as LdDriversController;
+use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\OverviewController as LdOverviewController;
 use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\PiecesController as LdPiecesController;
 use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\ServicesController as LdServicesController;
 use Modules\Vendor\Http\Controllers\Api\V1\LaundryDashboard\WalletController as LdWalletController;
@@ -361,4 +362,14 @@ Route::middleware(['auth:vendor', 'banned'])
         Route::post('/wallet/withdrawal-requests', [LdWalletController::class, 'addWithdrawalRequest'])->name('wallet.withdrawal-requests.store');
         Route::get('/wallet/transactions', [LdWalletController::class, 'transactions'])->name('wallet.transactions');
         Route::get('/wallet/transactions/{id}', [LdWalletController::class, 'transactionDetails'])->whereNumber('id')->name('wallet.transactions.show');
+    });
+
+// ============================================================================
+// LAUNDRY DASHBOARD - OVERVIEW (single aggregated endpoint)
+// GET /api/v1/vendor/laundry-dashboard/overview?year=2026
+// ============================================================================
+Route::middleware(['auth:vendor', 'banned'])
+    ->prefix('v1/vendor/laundry-dashboard')
+    ->group(function () {
+        Route::get('/overview', [LdOverviewController::class, 'index'])->name('vendor.ld.overview');
     });
