@@ -107,7 +107,7 @@ class SmartOrderConversationService
             return $this->advance($conversation, $locale);
         }
 
-        // field is 'piece' or 'service' — a deterministic draft-line mutation, no Claude call needed.
+        // field is 'piece', 'service', or 'unknown_item' — a deterministic draft-line mutation, no Claude call needed.
         $lines = $conversation->draft_lines ?? [];
         $lineIndex = null;
         foreach ($lines as $i => $line) {
@@ -118,6 +118,23 @@ class SmartOrderConversationService
         }
         if ($lineIndex === null) {
             return ['success' => false, 'status' => 400, 'message' => __('smart_order.line_not_found')];
+        }
+
+        if ($field === 'unknown_item') {
+            if ($optionId === 1) {
+                $lines[$lineIndex]['unknown_confirmed'] = true;
+            } else {
+                array_splice($lines, $lineIndex, 1);
+            }
+
+            $conversation->draft_lines = $lines;
+
+            $messages = $conversation->messages ?? [];
+            $optionLabel = collect($question['options'])->firstWhere('id', $optionId)['label'] ?? (string) $optionId;
+            $messages[] = ['role' => 'user', 'text' => $optionLabel];
+            $conversation->messages = $messages;
+
+            return $this->finalizeDraft($conversation, $locale, null);
         }
 
         if ($field === 'piece') {
@@ -300,9 +317,6 @@ class SmartOrderConversationService
 
         $lines = [];
         foreach ($parsed['lines'] as $i => $line) {
-            if (($line['status'] ?? null) === 'unknown') {
-                continue; // dropped silently — Claude's `reply` already explains it per the system prompt
-            }
             $line['line_key'] = 'l'.($i + 1);
             $lines[] = $line;
         }
@@ -336,6 +350,18 @@ class SmartOrderConversationService
                 $line['unit_price'] = round($unitPrice, 2);
                 $line['line_total'] = round($unitPrice * $qty, 2);
                 $total += $line['line_total'];
+            }
+
+            if ($nextQuestion === null && ($line['status'] ?? null) === 'unknown' && ! ($line['unknown_confirmed'] ?? false)) {
+                $nextQuestion = [
+                    'line_key' => $line['line_key'],
+                    'field' => 'unknown_item',
+                    'text' => __('smart_order.unknown_item_question', ['piece' => $line['raw_text']]),
+                    'options' => [
+                        ['id' => 1, 'label' => __('smart_order.yes_sure')],
+                        ['id' => 0, 'label' => __('smart_order.remove_it')],
+                    ],
+                ];
             }
 
             if ($nextQuestion === null && ($line['status'] ?? null) === 'ambiguous') {

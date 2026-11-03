@@ -15,4 +15,7 @@ return [
     'ask_service_for_piece' => 'والخدمة إيه لـ :piece؟',
     'line_not_found' => 'السطر المطلوب غير موجود',
     'option_not_found' => 'الاختيار غير متاح',
+    'unknown_item_question' => 'القطعة ":piece" مش موجودة في كتالوج المغسلة دي، متأكد إنك عايزها؟',
+    'yes_sure' => 'أيوه متأكد',
+    'remove_it' => 'لا، شيلها',
 ];

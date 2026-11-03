@@ -104,11 +104,8 @@ For each line in your response:
   could match what the user described (max 4).
 
 "reply": a short, natural {$locale} reply to show in the chat — confirm what
-you understood, ask the one most important open question if any (there can
-only be one open question per turn, in priority: piece > service > quantity
-doesn't need asking, just default to 1), and if any line is "unknown"
-(item not offered by this laundry at all), say so plainly in the reply so
-the client knows it won't be included.
+you understood. Don't ask about "unknown" lines yourself — the app asks the
+client a separate yes/no confirmation for those automatically.
 
 "not_understood": true ONLY if you could not extract any order-like line at
 all from the message (e.g. pure small talk, or truly nonsensical input) —

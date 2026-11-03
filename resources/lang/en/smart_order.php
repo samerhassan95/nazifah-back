@@ -15,4 +15,7 @@ return [
     'ask_service_for_piece' => 'Which service for :piece?',
     'line_not_found' => 'The requested line was not found',
     'option_not_found' => 'This option is not available',
+    'unknown_item_question' => '":piece" is not offered by this laundry\'s catalog, are you sure you want it?',
+    'yes_sure' => 'Yes, I\'m sure',
+    'remove_it' => 'No, remove it',
 ];

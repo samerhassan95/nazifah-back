@@ -49,7 +49,7 @@ class SmartOrderController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'line_key' => ['nullable', 'string'],
-            'field' => ['required', 'string', 'in:piece,service,laundry'],
+            'field' => ['required', 'string', 'in:piece,service,laundry,unknown_item'],
             'option_id' => ['required', 'integer'],
         ]);
 
