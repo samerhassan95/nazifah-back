@@ -95,6 +95,7 @@ trait LaundryDashboardResponse
             'date_to' => ['إلى تاريخ', 'date to'],
             'sort_by' => ['الترتيب حسب', 'sort by'],
             'sort_dir' => ['اتجاه الترتيب', 'sort direction'],
+            'year' => ['السنة', 'year'],
             'page' => ['الصفحة', 'page'],
             'per_page' => ['عدد العناصر', 'per page'],
             'type' => ['النوع', 'type'],
