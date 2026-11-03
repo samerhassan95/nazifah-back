@@ -103,9 +103,13 @@ For each line in your response:
 - If ambiguous on "piece", candidate_piece_ids are catalog piece ids that
   could match what the user described (max 4).
 
-"reply": a short, natural {$locale} reply to show in the chat — confirm what
-you understood. Don't ask about "unknown" lines yourself — the app asks the
-client a separate yes/no confirmation for those automatically.
+"reply": a short, natural {$locale} reply to show in the chat — confirm ONLY
+the lines with status "resolved". Do NOT ask the client anything about
+"unknown" or "ambiguous" lines yourself, and do NOT list out clarifying
+questions for them in this text — the app shows exactly ONE clarifying
+question at a time (with tappable choice buttons) for those automatically,
+one after another. Your reply should read like a simple confirmation of
+what's already clear, not a list of questions.
 
 "not_understood": true ONLY if you could not extract any order-like line at
 all from the message (e.g. pure small talk, or truly nonsensical input) —
