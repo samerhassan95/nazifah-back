@@ -128,8 +128,8 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'array'],
-            'name.ar' => ['nullable', 'string', 'max:255'],
-            'name.en' => ['nullable', 'string', 'max:255'],
+            'name.ar' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->ar')->whereNull('deleted_at')],
+            'name.en' => ['nullable', 'string', 'max:255', Rule::unique('vendors', 'name->en')->whereNull('deleted_at')],
             'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,15}$/', Rule::unique('vendors', 'phone')->whereNull('deleted_at')],
             'email' => ['required', 'email', Rule::unique('vendors', 'email')->whereNull('deleted_at')],
             'vat_number' => ['sometimes', 'nullable', 'string', 'max:50'],
