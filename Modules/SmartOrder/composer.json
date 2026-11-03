@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/smartorder",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\SmartOrder\\": "app/",
+            "Modules\\SmartOrder\\Database\\Factories\\": "database/factories/",
+            "Modules\\SmartOrder\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\SmartOrder\\Tests\\": "tests/"
+        }
+    }
+}

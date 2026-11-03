@@ -15,6 +15,7 @@ use Modules\Order\Http\Controllers\Api\V1\User\OrderTrackingController;
 use Modules\Payment\Http\Controllers\Api\V1\User\PaymentMethodController;
 use Modules\Payment\Http\Controllers\PaymentController;
 use Modules\Payment\Http\Controllers\Api\V1\User\WalletController;
+use Modules\SmartOrder\Http\Controllers\SmartOrderController;
 use Modules\Zone\Http\Controllers\Api\ZonesController;
 
 /*
@@ -286,6 +287,20 @@ Route::middleware(['auth:client', 'banned'])->group(function () {
 
         Route::delete('/', [CartController::class, 'clear'])
             ->name('user.cart.clear');
+    });
+
+    // ========================================================================
+    // SMART ORDER API — see SMART_ORDER_TEXT_TO_CART.md
+    // ========================================================================
+    Route::prefix('smart-order')->group(function () {
+        Route::post('/messages', [SmartOrderController::class, 'sendMessage'])
+            ->name('user.smart-order.messages');
+
+        Route::post('/{conversation_id}/resolve', [SmartOrderController::class, 'resolve'])
+            ->name('user.smart-order.resolve');
+
+        Route::post('/{conversation_id}/confirm', [SmartOrderController::class, 'confirm'])
+            ->name('user.smart-order.confirm');
     });
 
     // ========================================================================

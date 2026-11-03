@@ -1,0 +1,11 @@
+{
+    "name": "SmartOrder",
+    "alias": "smartorder",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\SmartOrder\\Providers\\SmartOrderServiceProvider"
+    ],
+    "files": []
+}

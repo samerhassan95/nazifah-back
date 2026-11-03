@@ -23,5 +23,6 @@
     "Chat": true,
     "Subscription": true,
     "Whatsapp": true,
-    "Invoice": true
+    "Invoice": true,
+    "SmartOrder": true
 }

@@ -15,6 +15,7 @@ use Modules\Admin\Http\Controllers\AdminDashboardController;
 use Modules\Admin\Http\Controllers\AdminDriverController;
 use Modules\Admin\Http\Controllers\AdminDistanceSettingController;
 use Modules\Admin\Http\Controllers\AdminGeneralSettingController;
+use Modules\Admin\Http\Controllers\AdminSmartOrderSettingController;
 use Modules\Admin\Http\Controllers\AdminIconController;
 use Modules\Admin\Http\Controllers\AdminInvoiceSettingController;
 use Modules\Admin\Http\Controllers\AdminLaundryAdditionalServiceController;
@@ -377,6 +378,12 @@ Route::middleware(['auth:admin'])->prefix('v1/admin')->group(function () {
     Route::prefix('distance-settings')->group(function () {
         Route::get('/', [AdminDistanceSettingController::class, 'index']);
         Route::put('/', [AdminDistanceSettingController::class, 'update']);
+    });
+
+    // Smart Order Settings (Claude API key, daily message limit, laundry ranking)
+    Route::prefix('smart-order-settings')->group(function () {
+        Route::get('/', [AdminSmartOrderSettingController::class, 'index']);
+        Route::put('/', [AdminSmartOrderSettingController::class, 'update']);
     });
 
     // Timezones
